@@ -157,8 +157,20 @@ const onCategoryPage = computed(() => activeSlug.value !== null)
   align-items: center;
   gap: 5px;
 }
-.d .nav .links a:hover { color: var(--purple); }
+/* Hover con intención: morado + subrayado grueso con offset (sin shift) */
+.d .nav .links a:hover {
+  color: var(--purple);
+  text-decoration: underline;
+  text-decoration-thickness: 3px;
+  text-decoration-color: var(--purple);
+  text-underline-offset: 7px;
+}
 .d .nav .links a.on { color: var(--purple); }
+/* Focus visible: anillo turquesa estándar del design system */
+.d .nav .links a:focus-visible {
+  outline: 2px solid var(--turq);
+  outline-offset: 2px;
+}
 .d .nav .icons {
   display: flex;
   align-items: center;
@@ -231,6 +243,10 @@ const onCategoryPage = computed(() => activeSlug.value !== null)
   background: var(--ink);
   border-color: var(--ink);
   color: #fff;
+}
+.m .chip:focus-visible {
+  outline: 2px solid var(--turq);
+  outline-offset: 2px;
 }
 
 /* ===================== compartido: logo + iconbtn + cartdot ===================== */

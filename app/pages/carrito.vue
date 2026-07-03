@@ -250,11 +250,12 @@ const waCheckout = computed(() => {
   text-align: center;
   font-size: 13px;
   font-weight: 600;
-  color: var(--mut);
+  /* convención de links de texto: morado -> morado oscuro (como .section__link) */
+  color: var(--purple);
   text-decoration: none;
   margin-top: var(--space-1);
 }
-.summary__continue:hover { color: var(--purple); }
+.summary__continue:hover { color: var(--purple-d); }
 
 /* ---------- responsive ---------- */
 @media (max-width: 860px) {

@@ -264,6 +264,7 @@ const perks = [
   color: var(--purple);
   text-decoration: none;
 }
+.info__cat:hover { color: var(--purple-d); }
 .info__name {
   font-family: var(--ff-display);
   font-weight: 400;
