@@ -3,7 +3,10 @@ import type { Product } from '~~/shared/types/woo'
 
 const props = defineProps<{ product: Product }>()
 
-// Demo local del favorito; en su fase irá a un store / wishlist.
+// Wishlist OCULTA por decisión aprobada: la UI era visual-only (este ref
+// local no persiste). Se reactiva con ENABLE_WISHLIST cuando exista el
+// store Pinia con persistencia + página de favoritos (ver README, Fase D).
+const ENABLE_WISHLIST = false
 const fav = ref(false)
 
 const isSoldOut = computed(() => props.product.badges?.some(b => b.variant === 'soldout') ?? false)
@@ -26,7 +29,7 @@ const to = computed(() => `/producto/${props.product.slug}`)
         </KBadge>
       </div>
 
-      <button class="pfav" type="button" :aria-pressed="fav" aria-label="Añadir a favoritos" @click="fav = !fav">
+      <button v-if="ENABLE_WISHLIST" class="pfav" type="button" :aria-pressed="fav" aria-label="Añadir a favoritos" @click="fav = !fav">
         <svg width="17" height="17" viewBox="0 0 24 24" :fill="fav ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M12 20s-7-4.6-7-9.5A3.5 3.5 0 0 1 12 8a3.5 3.5 0 0 1 7 2.5C19 15.4 12 20 12 20z" />
         </svg>

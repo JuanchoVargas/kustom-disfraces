@@ -164,4 +164,9 @@ tipo `Product` y la devuelve al cliente — sin exponer nunca las llaves.
 3. Cambiar `useProducts.ts` de import JSON a `useFetch('/api/...')`.
 4. (Opcional) Borrar `app/data/*.json`.
 
+### Pendientes Fase D
+- **Wishlist**: UI existente pero oculta (`ENABLE_WISHLIST = false` en
+  `ProductCard.vue`); falta store Pinia con persistencia (análogo al carrito)
+  y página de favoritos.
+
 Nada más: el resto del frontend ya está listo.
