@@ -19,6 +19,9 @@ logs
 .idea
 .tmp
 
+# Insumos del cliente (local-only, respaldar fuera del repo)
+app/insumos/
+
 # Local env files
 .env
 .env.*

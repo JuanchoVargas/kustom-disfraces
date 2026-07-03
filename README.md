@@ -19,7 +19,7 @@ app/
   components/      ui/ · layout/ · product/ · category/ · home/
   composables/     useSiteNav.ts · useProducts.ts   <-- fuente de datos
   data/            products.json · categories.json  <-- datos REALES del catálogo 2026 (precios provisionales, ver abajo)
-  insumos/         fuentes del cliente (PDF/Excel/imágenes) — NO se publican ni entran al build
+  insumos/         fuentes del cliente (PDF/Excel/imágenes) — LOCAL-ONLY: fuera del git (.gitignore), no se publican ni entran al build; respaldar por fuera del repo
   layouts/         default.vue (navbar + trust + footer)
   pages/           index · categoria/[slug] · producto/[slug] · carrito · design-system · preview
   stores/          cart.ts (Pinia)
