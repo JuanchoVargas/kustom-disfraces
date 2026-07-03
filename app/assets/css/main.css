@@ -1,0 +1,119 @@
+/* ============================================================
+   KUSTOM Disfraces — main.css
+   Reset + base global. Depende de tokens.css (variables de marca).
+   ============================================================ */
+
+/* ---------- RESET ---------- */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+* {
+  margin: 0;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* ---------- BASE ---------- */
+body {
+  min-height: 100vh;
+  background-color: var(--hueso);
+  color: var(--ink);
+  font-family: var(--ff-body);
+  font-size: var(--text-md);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Tipografía display por defecto en encabezados */
+h1, h2, h3, h4 {
+  font-family: var(--ff-display);
+  font-weight: 400;
+  line-height: 1.1;
+}
+
+/* ---------- MEDIA ---------- */
+img,
+picture,
+video,
+canvas,
+svg {
+  display: block;
+  max-width: 100%;
+}
+
+/* ---------- FORMULARIOS ---------- */
+input,
+button,
+textarea,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+  background: none;
+  border: none;
+}
+
+/* ---------- ENLACES ---------- */
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* ---------- ROMPER PALABRAS LARGAS ---------- */
+p,
+h1, h2, h3, h4, h5, h6 {
+  overflow-wrap: break-word;
+}
+
+/* ---------- TRANSICIÓN DE PÁGINA (fade corto) ---------- */
+.page-enter-active,
+.page-leave-active {
+  transition: opacity 0.22s var(--ease-out);
+}
+.page-enter-from,
+.page-leave-to {
+  opacity: 0;
+}
+
+/* Accesibilidad: sin transición si el usuario pidió movimiento reducido */
+@media (prefers-reduced-motion: reduce) {
+  .page-enter-active,
+  .page-leave-active {
+    transition: none;
+  }
+  .page-enter-from,
+  .page-leave-to {
+    opacity: 1;
+  }
+}
+
+/* ---------- TEXTURA DE MARCA (patrón espacial crema) ---------- */
+/* Utilidad global: patrón crema en un ::before con opacity calibrable vía
+   --pattern-opacity (tokens.css). Las cards/galerías de producto van SIEMPRE
+   sobre blanco limpio encima — el patrón es textura de fondo de página. */
+.textured {
+  position: relative;
+  isolation: isolate;
+}
+.textured::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image: url('/images/pattern-crema.webp');
+  background-repeat: repeat;
+  background-size: 460px auto;
+  opacity: var(--pattern-opacity);
+  pointer-events: none;
+}

@@ -1,0 +1,81 @@
+/* ============================================================
+   KUSTOM Disfraces — Design Tokens
+   Marca v2 "Premium / Editorial" — aprobada por cliente
+   Jerarquía de color: 70% carbón · 20% morado · 7% turquesa · 3% acentos
+   Tipografía: Luckiest Guy (display) · Bahnschrift/Barlow (body)
+   ============================================================ */
+
+:root {
+  /* ---------- PALETA ---------- */
+  --ink: #111111;            /* Negro Carbón — 70% · texto, footer, base */
+  --purple: #7E57C2;         /* Morado Kustom — 20% · marca, CTAs */
+  --purple-d: #6A45AD;       /* morado hover/pressed */
+  --purple-soft: #EFE9F8;    /* lila suave · fondo bloque KO, chips */
+  --purple-line: #DCD0F0;    /* borde lila */
+  --hueso: #F7F6F2;          /* Blanco Hueso · fondos de página */
+  --turq: #00BFA6;           /* Turquesa — 7% · botones, links, tallas */
+  --turq-d: #00A892;         /* turquesa hover */
+  --yellow: #FFC44D;         /* Amarillo · promociones, tags de atención */
+  --fucsia: #FF4DA6;         /* Fucsia — acento 3% */
+  --lima: #A6E22E;           /* Verde Lima — acento 3% */
+  --wa: #25D366;             /* WhatsApp */
+
+  /* ---------- NEUTRALES / LÍNEAS ---------- */
+  --line: #E8E5DD;           /* bordes suaves */
+  --line-2: #DCD8CE;         /* bordes medios */
+  --mut: #6F6C66;            /* texto secundario */
+  --mut-2: #9B978E;          /* texto terciario / placeholders */
+
+  /* ---------- TIPOGRAFÍA ---------- */
+  --ff-display: "Luckiest Guy", "Arial Black", system-ui, sans-serif;
+  --ff-body: "Bahnschrift", "Barlow Semi Condensed", "Archivo", system-ui, sans-serif;
+  --ff-mono: ui-monospace, "SF Mono", Menlo, monospace;
+
+  /* Escala tipográfica (mobile-first) */
+  --text-xs: 11px;
+  --text-sm: 13px;
+  --text-md: 15px;
+  --text-lg: 18px;
+  --text-xl: 22px;
+  --text-2xl: 28px;
+  --text-3xl: 36px;
+  --text-4xl: 48px;
+
+  /* ---------- RADIOS ---------- */
+  --r-sm: 10px;
+  --r-md: 14px;
+  --r-lg: 20px;
+  --r-xl: 28px;
+  --r-pill: 999px;
+
+  /* ---------- PATRONES DE MARCA ---------- */
+  /* Opacidad del patrón espacial CREMA (pattern-crema.webp: line-art carbón
+     con alpha; la intensidad se controla AQUÍ, no en el asset). Regla de
+     marca: textura, nunca protagonista — si se nota a primera vista, bajar.
+     Los tiles morado (bloque KO) e ink (footer) son los assets originales
+     del pack con su intensidad de fábrica. */
+  --pattern-opacity: 0.045;
+
+  /* ---------- SOMBRAS ---------- */
+  --shadow: 0 1px 2px rgba(17,17,17,.05);
+  --shadow-card: 0 14px 32px -16px rgba(17,17,17,.2), 0 2px 5px rgba(17,17,17,.05);
+  --shadow-lift: 0 30px 60px -26px rgba(17,17,17,.32), 0 3px 8px rgba(17,17,17,.07);
+
+  /* ---------- ESPACIADO (escala 4pt) ---------- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+
+  /* ---------- TRANSICIONES ---------- */
+  --dur-fast: 150ms;
+  --dur-med: 240ms;
+  --ease-out: cubic-bezier(.22, .61, .36, 1);
+
+  /* ---------- BREAKPOINTS (referencia) ---------- */
+  /* mobile: 375px base · desktop: >= 1024px */
+}
