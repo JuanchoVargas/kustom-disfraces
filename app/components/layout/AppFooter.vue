@@ -74,11 +74,16 @@ const year = 2026
 
 <style scoped>
 .foot {
-  background: var(--ink);
-  /* patrón doodle espacial (bg5 del pack de marca), repetido a tamaño natural — sutil sobre el carbón */
-  background-image: url('/images/pattern-ink.webp');
+  background-color: var(--ink);
+  /* patrón doodle espacial (bg5 del pack) ATENUADO: overlay carbón encima
+     del tile para que el doodle se insinúe como textura de fondo y los
+     links de navegación manden. Calibración: si el telescopio/aliens se
+     leen como dibujos a primera vista, subir el alpha del overlay. */
+  background-image:
+    linear-gradient(rgba(17, 17, 17, 0.87), rgba(17, 17, 17, 0.87)),
+    url('/images/pattern-ink.webp');
   background-repeat: repeat;
-  background-size: 720px auto;
+  background-size: auto, 720px auto;
   color: #fff;
   position: relative;
   overflow: hidden;

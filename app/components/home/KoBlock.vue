@@ -23,11 +23,12 @@ const { reveal } = useSiteMotion()
       <div v-motion v-bind="reveal(120)" class="ko-text">
         <span class="ko-eyebrow">Conoce a KO</span>
         <h2>Nuestro alien favorito</h2>
+        <!-- Copy contenido: KO no "acompaña" ni "celebra tu elección" — la
+             mascota solo aparece en su bloque y en estados especiales -->
         <p>
           KO aterrizó de otra galaxia y se quedó en Kustom por los disfraces.
-          Desde entonces acompaña cada visita: te presenta a los personajes,
-          celebra tu elección y no descansa hasta que cada historia encuentra
-          su disfraz.
+          Aparece solo en ocasiones especiales; si te lo cruzas por aquí, es
+          porque está celebrando que cada historia encuentre el suyo.
         </p>
         <NuxtLink to="/categoria/ninos" class="ko-cta">Explora el catálogo</NuxtLink>
       </div>

@@ -13,12 +13,16 @@ useHead({
   <!-- Raíz única obligatoria (el div de arriba, sin comentarios fuera de él):
        con pageTransition, un template multi-raíz rompe la navegación
        (la página destino nunca se monta) -->
-  <!-- Zona texturizada: patrón espacial crema detrás de TODO, hero incluido
-       (los brillos del hero pintan por encima; las cards van en blanco) -->
-  <div class="textured">
-
   <!-- ===================== HERO (carrusel) ===================== -->
-  <HeroCarousel />
+  <!-- Zona texturizada propia: el hero expone más patrón en sus vacíos,
+       va con --pattern-opacity-hero (más baja que el resto) -->
+  <div class="textured textured--hero">
+    <HeroCarousel />
+  </div>
+
+  <!-- Zona texturizada estándar: patrón crema a 0.045 detrás del resto
+       de secciones (las cards van en blanco encima) -->
+  <div class="textured">
 
   <!-- Marquee del eslogan (único uso en el sitio) -->
   <SloganMarquee />

@@ -52,9 +52,12 @@
   /* Opacidad del patrón espacial CREMA (pattern-crema.webp: line-art carbón
      con alpha; la intensidad se controla AQUÍ, no en el asset). Regla de
      marca: textura, nunca protagonista — si se nota a primera vista, bajar.
-     Los tiles morado (bloque KO) e ink (footer) son los assets originales
-     del pack con su intensidad de fábrica. */
+     El tile morado (banda KO) va con su intensidad de fábrica; el tile ink
+     del footer va ATENUADO con overlay carbón (ver AppFooter.vue). */
   --pattern-opacity: 0.045;
+  /* El hero expone más zonas vacías que el resto: lleva su propia opacidad,
+     más baja (vía .textured--hero). El 0.045 del resto no se toca. */
+  --pattern-opacity-hero: 0.03;
 
   /* ---------- SOMBRAS ---------- */
   --shadow: 0 1px 2px rgba(17,17,17,.05);

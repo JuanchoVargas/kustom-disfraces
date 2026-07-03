@@ -117,3 +117,8 @@ h1, h2, h3, h4, h5, h6 {
   opacity: var(--pattern-opacity);
   pointer-events: none;
 }
+/* Variante del hero: mismas reglas, opacidad propia más baja (el hero tiene
+   grandes zonas vacías donde el patrón se expone más que en las secciones). */
+.textured--hero {
+  --pattern-opacity: var(--pattern-opacity-hero);
+}
