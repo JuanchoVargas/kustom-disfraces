@@ -118,7 +118,12 @@ h1, h2, h3, h4, h5, h6 {
   pointer-events: none;
 }
 /* Variante del hero: mismas reglas, opacidad propia más baja (el hero tiene
-   grandes zonas vacías donde el patrón se expone más que en las secciones). */
+   grandes zonas vacías donde el patrón se expone más que en las secciones).
+   Lleva el crema como fondo PROPIO: .textured aísla (isolation) y el hueso
+   del body queda fuera del contexto — sin esto, el mix-blend-mode: multiply
+   de la foto del hero no tiene backdrop contra el cual fundir su blanco.
+   El ::before del patrón (z -1) pinta por encima de este fondo: no se pierde. */
 .textured--hero {
   --pattern-opacity: var(--pattern-opacity-hero);
+  background-color: var(--hueso);
 }

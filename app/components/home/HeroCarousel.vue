@@ -106,6 +106,18 @@ function onLeave() {
           </div>
         </div>
         <div class="hero__media">
+          <!-- Motivos espaciales line-art del set de marca (acento morado
+               suave detrás del producto — NO el patrón tile) -->
+          <svg class="motif motif--planet" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="4.4" /><ellipse cx="12" cy="12" rx="8.6" ry="2.8" transform="rotate(-18 12 12)" />
+          </svg>
+          <svg class="motif motif--star" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 3.5c.75 4.2 2.55 6 6.75 6.75-4.2.75-6 2.55-6.75 6.75-.75-4.2-2.55-6-6.75-6.75 4.2-.75 6-2.55 6.75-6.75z" />
+          </svg>
+          <!-- INTERIM: las fotos traen fondo blanco; mix-blend-mode: multiply
+               (en .hero__img) lo funde con el crema. Cuando existan los
+               recortes transparentes: apuntar :src al recorte y QUITAR el
+               mix-blend-mode — el resto del tratamiento queda igual. -->
           <img :src="current.image" :alt="current.imageAlt" class="hero__img">
         </div>
       </div>
@@ -180,7 +192,9 @@ function onLeave() {
 /* ---------- slide ---------- */
 .hero__slide {
   position: relative;
-  z-index: 1;
+  /* SIN z-index: crearía un stacking context que aísla el mix-blend-mode
+     de la foto y el blanco no se funde con el crema de .textured--hero.
+     El slide queda sobre los blobs por orden de DOM (van antes). */
   width: 100%;
   display: grid;
   grid-template-columns: 1.05fr 0.95fr;
@@ -208,17 +222,57 @@ function onLeave() {
   gap: var(--space-3);
   margin-top: var(--space-5);
 }
+/* ---------- media: producto flotante (sin card blanca) ---------- */
+.hero__media {
+  position: relative;
+  display: grid;
+  place-items: center;
+}
 .hero__img {
-  width: 100%;
-  aspect-ratio: 4 / 3;
+  position: relative;
+  z-index: 1;
+  /* ~25% más grande que el área visible que daba la card 4:3 anterior */
+  width: min(100%, 540px);
+  aspect-ratio: 1 / 1;
   object-fit: contain;
-  border-radius: var(--r-lg);
-  background: #fff;
-  border: 1px solid var(--line);
-  /* misma sombra de reposo del sistema de cards: la superficie blanca
-     flota con intención sobre el crema texturizado */
-  box-shadow: var(--shadow-card);
   display: block;
+  /* INTERIM: funde el fondo blanco de la foto con el crema del hero;
+     QUITAR cuando el src sea un recorte PNG/WebP transparente */
+  mix-blend-mode: multiply;
+}
+/* sombra elíptica difusa que asienta el producto (no box-shadow duro) */
+.hero__media::after {
+  content: '';
+  position: absolute;
+  bottom: 7%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 52%;
+  height: 30px;
+  background: radial-gradient(50% 50% at 50% 50%, rgba(17, 17, 17, 0.16), transparent 72%);
+  z-index: 0;
+  pointer-events: none;
+}
+/* motivos line-art de acento (mismos trazos del set del marquee) */
+.motif {
+  position: absolute;
+  z-index: 0;
+  color: var(--purple);
+  opacity: 0.13;
+  pointer-events: none;
+}
+.motif--planet {
+  width: 150px;
+  height: 150px;
+  top: 3%;
+  right: -1%;
+  transform: rotate(10deg);
+}
+.motif--star {
+  width: 92px;
+  height: 92px;
+  bottom: 14%;
+  left: 1%;
 }
 
 /* ---------- dots ---------- */
@@ -263,6 +317,9 @@ function onLeave() {
     gap: var(--space-5);
   }
   .hero__media { order: -1; }
+  .hero__img { width: min(86%, 360px); }
+  .motif--planet { width: 104px; height: 104px; }
+  .motif--star { width: 64px; height: 64px; bottom: 10%; }
   .hero__title { font-size: var(--text-3xl); }
 }
 
