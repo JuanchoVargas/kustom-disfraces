@@ -26,7 +26,7 @@ export const useSiteNav = () => {
 
   // Contacto oficial
   const contact = {
-    email: 'hola@kustomdisfraces.com',
+    email: 'hola@disfraceskustom.com',
     city: 'Bogotá, Colombia',
     whatsapp: 'https://wa.me/573000000000', // placeholder hasta tener el número real
   }

@@ -26,6 +26,13 @@ export default defineNuxtConfig({
   // Transición de página global (fade corto). CSS en main.css.
   app: {
     pageTransition: { name: 'page', mode: 'out-in' },
+    head: {
+      meta: [
+        // PROVISIONAL: quitar en el lanzamiento oficial cuando los precios
+        // sean reales (el dominio ya es público pero no debe indexarse aún)
+        { name: 'robots', content: 'noindex, nofollow' },
+      ],
+    },
   },
 
   // Auto-hospeda solo las fuentes que NO son de sistema.
