@@ -1,0 +1,3090 @@
+[
+  {
+    "codigo": "001001001",
+    "nombre": "Spider-Man Clásico",
+    "nombreCatalogo": "SPIDERMAN CLASICO",
+    "etiq": "SUPER SPCL",
+    "linea": "disfraces",
+    "grupo": "super",
+    "publicos": [
+      "ninos"
+    ],
+    "subcategoriaNav": "super",
+    "tallas": [
+      0,
+      2,
+      4,
+      6,
+      8,
+      10,
+      12
+    ],
+    "precio": 129900,
+    "imagenes": [
+      "/images/products/spider-man-clasico-super-acolchado.webp"
+    ],
+    "disponibleWeb": true,
+    "idWeb": 1,
+    "slug": "spider-man-clasico",
+    "descripcion": "El trepamuros de siempre: enterizo rojo y azul con telaraña, máscara y cubrebotas.",
+    "descripcionGama": "Acolchado premium con musculatura, máxima presencia y durabilidad.",
+    "incluye": [
+      "Máscara",
+      "Enterizo",
+      "Cubrebotas"
+    ],
+    "destacado": true,
+    "temporada": "Todo el año"
+  },
+  {
+    "codigo": "001002008",
+    "nombre": "Spider-Man Clásico (Línea Eco)",
+    "nombreCatalogo": "SPIDERMAN CLASICO DE LINEA",
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "economico",
+    "publicos": [
+      "ninos"
+    ],
+    "subcategoriaNav": "economico",
+    "tallas": [
+      2,
+      4,
+      6,
+      8,
+      10,
+      12
+    ],
+    "precio": 89900,
+    "imagenes": [
+      "/images/products/spider-man-clasico-eco.webp"
+    ],
+    "disponibleWeb": true,
+    "parejaDe": "001001001",
+    "descripcionGama": "Versión ligera del mismo diseño, ideal para un evento puntual."
+  },
+  {
+    "codigo": "001001006",
+    "nombre": "Iron Spider-Man",
+    "nombreCatalogo": "IRON SPIDERMAN",
+    "etiq": "SUPER IRSP",
+    "linea": "disfraces",
+    "grupo": "super",
+    "publicos": [
+      "ninos"
+    ],
+    "subcategoriaNav": "super",
+    "tallas": [
+      0,
+      2,
+      4,
+      6,
+      8,
+      10,
+      12
+    ],
+    "precio": 129900,
+    "imagenes": [
+      "/images/products/iron-spider-man-super-acolchado.webp"
+    ],
+    "disponibleWeb": true,
+    "idWeb": 2,
+    "slug": "iron-spider-man",
+    "descripcion": "La armadura arácnida de Infinity War con detalles dorados.",
+    "descripcionGama": "Acolchado premium con musculatura, máxima presencia y durabilidad.",
+    "incluye": [
+      "Máscara",
+      "Enterizo",
+      "Cubrebotas"
+    ],
+    "destacado": false,
+    "temporada": "Todo el año"
+  },
+  {
+    "codigo": "001002011",
+    "nombre": "Iron Spider-Man (Línea Eco)",
+    "nombreCatalogo": "IRON SPIDERMAN DE LINEA",
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "economico",
+    "publicos": [
+      "ninos"
+    ],
+    "subcategoriaNav": "economico",
+    "tallas": [
+      2,
+      4,
+      6,
+      8,
+      10,
+      12
+    ],
+    "precio": 89900,
+    "imagenes": [
+      "/images/products/iron-spider-man-eco.webp"
+    ],
+    "disponibleWeb": true,
+    "parejaDe": "001001006",
+    "descripcionGama": "Versión ligera del mismo diseño, ideal para un evento puntual."
+  },
+  {
+    "codigo": "001001004",
+    "nombre": "Spider-Man Negro",
+    "nombreCatalogo": "SPIDERMAN NEGRO",
+    "etiq": "SUPER SPNG",
+    "linea": "disfraces",
+    "grupo": "super",
+    "publicos": [
+      "ninos"
+    ],
+    "subcategoriaNav": "super",
+    "tallas": [
+      0,
+      2,
+      4,
+      6,
+      8,
+      10,
+      12
+    ],
+    "precio": 129900,
+    "imagenes": [
+      "/images/products/spider-man-negro-super-acolchado.webp"
+    ],
+    "disponibleWeb": true,
+    "idWeb": 3,
+    "slug": "spider-man-negro",
+    "descripcion": "La versión oscura del arácnido, con detalles en rojo.",
+    "descripcionGama": "Acolchado premium con musculatura, máxima presencia y durabilidad.",
+    "incluye": [
+      "Máscara",
+      "Enterizo",
+      "Cubrebotas"
+    ],
+    "destacado": false,
+    "temporada": "Todo el año"
+  },
+  {
+    "codigo": "001002001",
+    "nombre": "Spider-Man Negro (Línea Eco)",
+    "nombreCatalogo": "SPIDERMAN NEGRO DE LINEA",
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "economico",
+    "publicos": [
+      "ninos"
+    ],
+    "subcategoriaNav": "economico",
+    "tallas": [
+      2,
+      4,
+      6,
+      8,
+      10,
+      12
+    ],
+    "precio": 89900,
+    "imagenes": [
+      "/images/products/spider-man-negro-eco.webp"
+    ],
+    "disponibleWeb": true,
+    "parejaDe": "001001004",
+    "descripcionGama": "Versión ligera del mismo diseño, ideal para un evento puntual."
+  },
+  {
+    "codigo": "001001002",
+    "nombre": "Spider-Man Miles Morales",
+    "nombreCatalogo": "MILES MORALES",
+    "etiq": "SUPER MILM",
+    "linea": "disfraces",
+    "grupo": "super",
+    "publicos": [
+      "ninos"
+    ],
+    "subcategoriaNav": "super",
+    "tallas": [
+      0,
+      2,
+      4,
+      6,
+      8,
+      10,
+      12
+    ],
+    "precio": 129900,
+    "imagenes": [
+      "/images/products/spider-man-miles-morales-super-acolchado.webp"
+    ],
+    "disponibleWeb": true,
+    "idWeb": 4,
+    "slug": "spider-man-miles-morales",
+    "descripcion": "El Spider-Man de Brooklyn: traje negro con araña roja.",
+    "descripcionGama": "Acolchado premium con musculatura, máxima presencia y durabilidad.",
+    "incluye": [
+      "Máscara",
+      "Enterizo",
+      "Cubrebotas"
+    ],
+    "destacado": false,
+    "temporada": "Todo el año"
+  },
+  {
+    "codigo": "001002007",
+    "nombre": "Spider-Man Miles Morales (Línea Eco)",
+    "nombreCatalogo": "MILES MORALES DE LINEA",
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "economico",
+    "publicos": [
+      "ninos"
+    ],
+    "subcategoriaNav": "economico",
+    "tallas": [
+      2,
+      4,
+      6,
+      8,
+      10,
+      12
+    ],
+    "precio": 89900,
+    "imagenes": [
+      "/images/products/spider-man-miles-morales-eco.webp"
+    ],
+    "disponibleWeb": true,
+    "parejaDe": "001001002",
+    "descripcionGama": "Versión ligera del mismo diseño, ideal para un evento puntual."
+  },
+  {
+    "codigo": "001001015",
+    "nombre": "Superman",
+    "nombreCatalogo": "SUPERMAN SUB",
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "super",
+    "publicos": [
+      "ninos"
+    ],
+    "subcategoriaNav": "super",
+    "tallas": [
+      0,
+      2,
+      4,
+      6,
+      8,
+      10,
+      12
+    ],
+    "precio": 129900,
+    "imagenes": [
+      "/images/products/superman-super-acolchado.webp"
+    ],
+    "disponibleWeb": true,
+    "idWeb": 5,
+    "slug": "superman",
+    "descripcion": "El hombre de acero con capa — incluye capa extra para tu mascota.",
+    "descripcionGama": "Acolchado premium con musculatura, máxima presencia y durabilidad.",
+    "incluye": [
+      "Capa",
+      "Enterizo",
+      "Cubrebotas",
+      "Capa para mascota"
+    ],
+    "destacado": true,
+    "temporada": "Todo el año"
+  },
+  {
+    "codigo": "001002012",
+    "nombre": "Superman (Línea Eco)",
+    "nombreCatalogo": "SUPERMAN DE LINEA",
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "economico",
+    "publicos": [
+      "ninos"
+    ],
+    "subcategoriaNav": "economico",
+    "tallas": [
+      2,
+      4,
+      6,
+      8,
+      10,
+      12
+    ],
+    "precio": 89900,
+    "imagenes": [
+      "/images/products/superman-eco.webp"
+    ],
+    "disponibleWeb": true,
+    "parejaDe": "001001015",
+    "descripcionGama": "Versión ligera del mismo diseño, ideal para un evento puntual."
+  },
+  {
+    "codigo": "001001012",
+    "nombre": "Iron Man",
+    "nombreCatalogo": "IRON-MAN",
+    "etiq": "SUPER IRMA",
+    "linea": "disfraces",
+    "grupo": "super",
+    "publicos": [
+      "ninos"
+    ],
+    "subcategoriaNav": "super",
+    "tallas": [
+      0,
+      2,
+      4,
+      6,
+      8,
+      10,
+      12
+    ],
+    "precio": 129900,
+    "imagenes": [
+      "/images/products/iron-man-super-acolchado.webp"
+    ],
+    "disponibleWeb": true,
+    "idWeb": 6,
+    "slug": "iron-man",
+    "descripcion": "La armadura roja y dorada de Tony Stark.",
+    "descripcionGama": "Acolchado premium con musculatura, máxima presencia y durabilidad.",
+    "incluye": [
+      "Máscara",
+      "Enterizo",
+      "Cubrebotas"
+    ],
+    "destacado": false,
+    "temporada": "Todo el año"
+  },
+  {
+    "codigo": "001002014",
+    "nombre": "Iron Man (Línea Eco)",
+    "nombreCatalogo": "IRONMAN DE LINEA",
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "economico",
+    "publicos": [
+      "ninos"
+    ],
+    "subcategoriaNav": "economico",
+    "tallas": [
+      2,
+      4,
+      6,
+      8,
+      10,
+      12
+    ],
+    "precio": 89900,
+    "imagenes": [
+      "/images/products/iron-man-eco.webp"
+    ],
+    "disponibleWeb": true,
+    "parejaDe": "001001012",
+    "descripcionGama": "Versión ligera del mismo diseño, ideal para un evento puntual."
+  },
+  {
+    "codigo": "001001007",
+    "nombre": "Capitán América",
+    "nombreCatalogo": "CAPITAN AMERICA",
+    "etiq": "SUPER CPAM",
+    "linea": "disfraces",
+    "grupo": "super",
+    "publicos": [
+      "ninos"
+    ],
+    "subcategoriaNav": "super",
+    "tallas": [
+      0,
+      2,
+      4,
+      6,
+      8,
+      10,
+      12
+    ],
+    "precio": 129900,
+    "imagenes": [
+      "/images/products/capitan-america-super-acolchado.webp"
+    ],
+    "disponibleWeb": true,
+    "idWeb": 7,
+    "slug": "capitan-america",
+    "descripcion": "El primer vengador, con la estrella al pecho.",
+    "descripcionGama": "Acolchado premium con musculatura, máxima presencia y durabilidad.",
+    "incluye": [
+      "Máscara",
+      "Enterizo",
+      "Cubrebotas"
+    ],
+    "destacado": false,
+    "temporada": "Todo el año"
+  },
+  {
+    "codigo": "001002006",
+    "nombre": "Capitán América (Línea Eco)",
+    "nombreCatalogo": "CAPITAN AMERICA DE LINEA",
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "economico",
+    "publicos": [
+      "ninos"
+    ],
+    "subcategoriaNav": "economico",
+    "tallas": [
+      2,
+      4,
+      6,
+      8,
+      10,
+      12
+    ],
+    "precio": 89900,
+    "imagenes": [
+      "/images/products/capitan-america-eco.webp"
+    ],
+    "disponibleWeb": true,
+    "parejaDe": "001001007",
+    "descripcionGama": "Versión ligera del mismo diseño, ideal para un evento puntual."
+  },
+  {
+    "codigo": "001001016",
+    "nombre": "Thor",
+    "nombreCatalogo": "THOR",
+    "etiq": "SUPER THR",
+    "linea": "disfraces",
+    "grupo": "super",
+    "publicos": [
+      "ninos"
+    ],
+    "subcategoriaNav": "super",
+    "tallas": [
+      0,
+      2,
+      4,
+      6,
+      8,
+      10,
+      12
+    ],
+    "precio": 129900,
+    "imagenes": [
+      "/images/products/thor-super-acolchado.webp"
+    ],
+    "disponibleWeb": true,
+    "idWeb": 8,
+    "slug": "thor",
+    "descripcion": "El dios del trueno con capa y armadura asgardiana.",
+    "descripcionGama": "Acolchado premium con musculatura, máxima presencia y durabilidad.",
+    "incluye": [
+      "Enterizo",
+      "Capa",
+      "Cubrebotas"
+    ],
+    "destacado": false,
+    "temporada": "Todo el año"
+  },
+  {
+    "codigo": "001002003",
+    "nombre": "Thor (Línea Eco)",
+    "nombreCatalogo": "THOR DE LINEA",
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "economico",
+    "publicos": [
+      "ninos"
+    ],
+    "subcategoriaNav": "economico",
+    "tallas": [
+      2,
+      4,
+      6,
+      8,
+      10,
+      12
+    ],
+    "precio": 89900,
+    "imagenes": [
+      "/images/products/thor-eco.webp"
+    ],
+    "disponibleWeb": true,
+    "parejaDe": "001001016",
+    "descripcionGama": "Versión ligera del mismo diseño, ideal para un evento puntual."
+  },
+  {
+    "codigo": "001001005",
+    "nombre": "Flash",
+    "nombreCatalogo": "FLASH",
+    "etiq": "SUPER FLH",
+    "linea": "disfraces",
+    "grupo": "super",
+    "publicos": [
+      "ninos"
+    ],
+    "subcategoriaNav": "super",
+    "tallas": [
+      0,
+      2,
+      4,
+      6,
+      8,
+      10,
+      12
+    ],
+    "precio": 129900,
+    "imagenes": [
+      "/images/products/flash-super-acolchado.webp"
+    ],
+    "disponibleWeb": true,
+    "idWeb": 9,
+    "slug": "flash",
+    "descripcion": "El velocista escarlata de Central City.",
+    "descripcionGama": "Acolchado premium con musculatura, máxima presencia y durabilidad.",
+    "incluye": [
+      "Máscara",
+      "Enterizo",
+      "Cubrebotas"
+    ],
+    "destacado": false,
+    "temporada": "Todo el año"
+  },
+  {
+    "codigo": "001002005",
+    "nombre": "Flash (Línea Eco)",
+    "nombreCatalogo": "FLASH DE LINEA",
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "economico",
+    "publicos": [
+      "ninos"
+    ],
+    "subcategoriaNav": "economico",
+    "tallas": [
+      2,
+      4,
+      6,
+      8,
+      10,
+      12
+    ],
+    "precio": 89900,
+    "imagenes": [
+      "/images/products/flash-eco.webp"
+    ],
+    "disponibleWeb": true,
+    "parejaDe": "001001005",
+    "descripcionGama": "Versión ligera del mismo diseño, ideal para un evento puntual."
+  },
+  {
+    "codigo": "001001008",
+    "nombre": "Batman",
+    "nombreCatalogo": "BATMAN CLASICO",
+    "etiq": "SUPER BAT",
+    "linea": "disfraces",
+    "grupo": "super",
+    "publicos": [
+      "ninos"
+    ],
+    "subcategoriaNav": "super",
+    "tallas": [
+      0,
+      2,
+      4,
+      6,
+      8,
+      10,
+      12
+    ],
+    "precio": 129900,
+    "imagenes": [
+      "/images/products/batman-super-acolchado.webp"
+    ],
+    "disponibleWeb": true,
+    "idWeb": 10,
+    "slug": "batman",
+    "descripcion": "El caballero de la noche con capa y máscara.",
+    "descripcionGama": "Acolchado premium con musculatura, máxima presencia y durabilidad.",
+    "incluye": [
+      "Máscara",
+      "Enterizo",
+      "Capa",
+      "Cubrebotas"
+    ],
+    "destacado": true,
+    "temporada": "Todo el año"
+  },
+  {
+    "codigo": "001002010",
+    "nombre": "Batman (Línea Eco)",
+    "nombreCatalogo": "BATMAN DE LINEA",
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "economico",
+    "publicos": [
+      "ninos"
+    ],
+    "subcategoriaNav": "economico",
+    "tallas": [
+      2,
+      4,
+      6,
+      8,
+      10,
+      12
+    ],
+    "precio": 89900,
+    "imagenes": [
+      "/images/products/batman-eco.webp"
+    ],
+    "disponibleWeb": true,
+    "parejaDe": "001001008",
+    "descripcionGama": "Versión ligera del mismo diseño, ideal para un evento puntual."
+  },
+  {
+    "codigo": "001001009",
+    "nombre": "Venom Negro",
+    "nombreCatalogo": "VENON NEGRO",
+    "etiq": "SUPER VENG",
+    "linea": "disfraces",
+    "grupo": "super",
+    "publicos": [
+      "ninos"
+    ],
+    "subcategoriaNav": "super",
+    "tallas": [
+      0,
+      2,
+      4,
+      6,
+      8,
+      10,
+      12
+    ],
+    "precio": 129900,
+    "imagenes": [
+      "/images/products/venom-negro-super-acolchado.webp"
+    ],
+    "disponibleWeb": true,
+    "idWeb": 11,
+    "slug": "venom-negro",
+    "descripcion": "El simbionte clásico: negro con araña blanca.",
+    "descripcionGama": "Acolchado premium con musculatura, máxima presencia y durabilidad.",
+    "incluye": [
+      "Máscara",
+      "Enterizo",
+      "Cubrebotas"
+    ],
+    "destacado": false,
+    "temporada": "Todo el año"
+  },
+  {
+    "codigo": "001002004",
+    "nombre": "Venom Negro (Línea Eco)",
+    "nombreCatalogo": "VENOM DE LINEA",
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "economico",
+    "publicos": [
+      "ninos"
+    ],
+    "subcategoriaNav": "economico",
+    "tallas": [
+      2,
+      4,
+      6,
+      8,
+      10,
+      12
+    ],
+    "precio": 89900,
+    "imagenes": [
+      "/images/products/venom-negro-eco.webp"
+    ],
+    "disponibleWeb": true,
+    "parejaDe": "001001009",
+    "descripcionGama": "Versión ligera del mismo diseño, ideal para un evento puntual."
+  },
+  {
+    "codigo": "001001013",
+    "nombre": "Deadpool",
+    "nombreCatalogo": "DEADPOOL",
+    "etiq": "SUPER DDPL",
+    "linea": "disfraces",
+    "grupo": "super",
+    "publicos": [
+      "ninos"
+    ],
+    "subcategoriaNav": "super",
+    "tallas": [
+      0,
+      2,
+      4,
+      6,
+      8,
+      10,
+      12
+    ],
+    "precio": 129900,
+    "imagenes": [
+      "/images/products/deadpool-super-acolchado.webp"
+    ],
+    "disponibleWeb": true,
+    "idWeb": 12,
+    "slug": "deadpool",
+    "descripcion": "El mercenario bocón en rojo y negro.",
+    "descripcionGama": "Acolchado premium con musculatura, máxima presencia y durabilidad.",
+    "incluye": [
+      "Máscara",
+      "Enterizo",
+      "Cubrebotas"
+    ],
+    "destacado": false,
+    "temporada": "Todo el año"
+  },
+  {
+    "codigo": "001002002",
+    "nombre": "Deadpool (Línea Eco)",
+    "nombreCatalogo": "DEADPOOL DE LINEA",
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "economico",
+    "publicos": [
+      "ninos"
+    ],
+    "subcategoriaNav": "economico",
+    "tallas": [
+      2,
+      4,
+      6,
+      8,
+      10,
+      12
+    ],
+    "precio": 89900,
+    "imagenes": [
+      "/images/products/deadpool-eco.webp"
+    ],
+    "disponibleWeb": true,
+    "parejaDe": "001001013",
+    "descripcionGama": "Versión ligera del mismo diseño, ideal para un evento puntual."
+  },
+  {
+    "codigo": "001001003",
+    "nombre": "Pantera Negra",
+    "nombreCatalogo": "PANTERA",
+    "etiq": "SUPER PANT",
+    "linea": "disfraces",
+    "grupo": "super",
+    "publicos": [
+      "ninos"
+    ],
+    "subcategoriaNav": "super",
+    "tallas": [
+      0,
+      2,
+      4,
+      6,
+      8,
+      10,
+      12
+    ],
+    "precio": 129900,
+    "imagenes": [
+      "/images/products/pantera-negra.webp"
+    ],
+    "disponibleWeb": true,
+    "idWeb": 13,
+    "slug": "pantera-negra",
+    "descripcion": "El rey de Wakanda en traje de vibranium.",
+    "descripcionGama": "Acolchado premium con musculatura, máxima presencia y durabilidad.",
+    "incluye": [
+      "Máscara",
+      "Enterizo",
+      "Cubrebotas"
+    ],
+    "destacado": false,
+    "temporada": "Todo el año"
+  },
+  {
+    "codigo": "001001011",
+    "nombre": "Hulk",
+    "nombreCatalogo": "HULK",
+    "etiq": "SUPER HUL",
+    "linea": "disfraces",
+    "grupo": "super",
+    "publicos": [
+      "ninos"
+    ],
+    "subcategoriaNav": "super",
+    "tallas": [
+      0,
+      2,
+      4,
+      6,
+      8,
+      10,
+      12
+    ],
+    "precio": 129900,
+    "imagenes": [
+      "/images/products/hulk.webp"
+    ],
+    "disponibleWeb": true,
+    "idWeb": 14,
+    "slug": "hulk",
+    "descripcion": "El gigante esmeralda con musculatura acolchada.",
+    "descripcionGama": "Acolchado premium con musculatura, máxima presencia y durabilidad.",
+    "incluye": [
+      "Máscara",
+      "Enterizo",
+      "Cubrebotas"
+    ],
+    "destacado": false,
+    "temporada": "Todo el año"
+  },
+  {
+    "codigo": "001001010",
+    "nombre": "Wolverine",
+    "nombreCatalogo": "WOLVERINE",
+    "etiq": "SUPER WOL",
+    "linea": "disfraces",
+    "grupo": "super",
+    "publicos": [
+      "ninos"
+    ],
+    "subcategoriaNav": "super",
+    "tallas": [
+      0,
+      2,
+      4,
+      6,
+      8,
+      10,
+      12
+    ],
+    "precio": 129900,
+    "imagenes": [
+      "/images/products/wolverine.webp"
+    ],
+    "disponibleWeb": true,
+    "idWeb": 15,
+    "slug": "wolverine",
+    "descripcion": "El mutante de las garras en su clásico amarillo.",
+    "descripcionGama": "Acolchado premium con musculatura, máxima presencia y durabilidad.",
+    "incluye": [
+      "Máscara",
+      "Enterizo",
+      "Cubrebotas"
+    ],
+    "destacado": false,
+    "temporada": "Todo el año"
+  },
+  {
+    "codigo": "001001017",
+    "nombre": "Aquaman",
+    "nombreCatalogo": "AQUAMAN",
+    "etiq": "SUPER AQA",
+    "linea": "disfraces",
+    "grupo": "super",
+    "publicos": [
+      "ninos"
+    ],
+    "subcategoriaNav": "super",
+    "tallas": [
+      0,
+      2,
+      4,
+      6,
+      8,
+      10,
+      12
+    ],
+    "precio": 129900,
+    "imagenes": [
+      "/images/products/aquaman.webp"
+    ],
+    "disponibleWeb": true,
+    "idWeb": 16,
+    "slug": "aquaman",
+    "descripcion": "El rey de la Atlántida en escamas doradas y verdes.",
+    "descripcionGama": "Acolchado premium con musculatura, máxima presencia y durabilidad.",
+    "incluye": [
+      "Enterizo",
+      "Cubrebotas"
+    ],
+    "destacado": false,
+    "temporada": "Todo el año"
+  },
+  {
+    "codigo": "001001018",
+    "nombre": "Buzz Lightyear",
+    "nombreCatalogo": "BUZZ LIGYEAR",
+    "etiq": "SUPER BLIG",
+    "linea": "disfraces",
+    "grupo": "super",
+    "publicos": [
+      "ninos"
+    ],
+    "subcategoriaNav": "super",
+    "tallas": [
+      0,
+      2,
+      4,
+      6,
+      8,
+      10,
+      12
+    ],
+    "precio": 129900,
+    "imagenes": [
+      "/images/products/buzz-lightyear.webp"
+    ],
+    "disponibleWeb": true,
+    "idWeb": 17,
+    "slug": "buzz-lightyear",
+    "descripcion": "Al infinito y más allá con el guardián espacial.",
+    "descripcionGama": "Acolchado premium con musculatura, máxima presencia y durabilidad.",
+    "incluye": [
+      "Capota",
+      "Enterizo",
+      "Cubrebotas"
+    ],
+    "destacado": false,
+    "temporada": "Todo el año"
+  },
+  {
+    "codigo": "001001014",
+    "nombre": "Venom Rojo",
+    "nombreCatalogo": "VENUM ROJO",
+    "etiq": "SUPER VER",
+    "linea": "disfraces",
+    "grupo": "super",
+    "publicos": [
+      "ninos"
+    ],
+    "subcategoriaNav": "super",
+    "tallas": [
+      0,
+      2,
+      4,
+      6,
+      8,
+      10,
+      12
+    ],
+    "precio": 129900,
+    "imagenes": [
+      "/images/products/venom-rojo.webp"
+    ],
+    "disponibleWeb": true,
+    "idWeb": 18,
+    "slug": "venom-rojo",
+    "descripcion": "La variante carmesí del simbionte.",
+    "descripcionGama": "Acolchado premium con musculatura, máxima presencia y durabilidad.",
+    "incluye": [
+      "Máscara",
+      "Enterizo",
+      "Cubrebotas"
+    ],
+    "destacado": true,
+    "temporada": "Todo el año"
+  },
+  {
+    "codigo": "001002009",
+    "nombre": "Gokú",
+    "nombreCatalogo": "GOKU DE LINEA",
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "economico",
+    "publicos": [
+      "ninos"
+    ],
+    "subcategoriaNav": "economico",
+    "tallas": [
+      2,
+      4,
+      6,
+      8,
+      10,
+      12
+    ],
+    "precio": 89900,
+    "imagenes": [
+      "/images/products/goku.webp"
+    ],
+    "disponibleWeb": true,
+    "idWeb": 19,
+    "slug": "goku",
+    "descripcion": "El gi naranja del saiyajin más querido.",
+    "descripcionGama": "Versión ligera, ideal para un evento puntual.",
+    "incluye": [
+      "Enterizo",
+      "Cubrebotas",
+      "Cinturón",
+      "Manillas"
+    ],
+    "destacado": false,
+    "temporada": "Todo el año"
+  },
+  {
+    "codigo": "001004001",
+    "nombre": "Tanjiro",
+    "nombreCatalogo": "TANJIRO",
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "anime",
+    "publicos": [
+      "ninos"
+    ],
+    "subcategoriaNav": "anime-ninos",
+    "tallas": [
+      8,
+      10,
+      12,
+      14
+    ],
+    "precio": 139900,
+    "imagenes": [
+      "/images/products/tanjiro.webp"
+    ],
+    "disponibleWeb": true,
+    "idWeb": 20,
+    "slug": "tanjiro",
+    "descripcion": "El haori a cuadros verde y negro del cazador de demonios.",
+    "incluye": [
+      "Uniforme cazador (camiseta y pantalón)",
+      "Haobi",
+      "Cubrepiernas"
+    ],
+    "destacado": false,
+    "temporada": "Todo el año"
+  },
+  {
+    "codigo": "001004006",
+    "nombre": "Zenitzu",
+    "nombreCatalogo": "ZENITZU",
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "anime",
+    "publicos": [
+      "ninos"
+    ],
+    "subcategoriaNav": "anime-ninos",
+    "tallas": [
+      8,
+      10,
+      12,
+      14
+    ],
+    "precio": 139900,
+    "imagenes": [
+      "/images/products/zenitzu.webp"
+    ],
+    "disponibleWeb": true,
+    "idWeb": 21,
+    "slug": "zenitzu",
+    "descripcion": "El haori amarillo con destellos del durmiente más veloz.",
+    "incluye": [
+      "Uniforme cazador (camiseta y pantalón)",
+      "Haobi",
+      "Cubrepiernas"
+    ],
+    "destacado": false,
+    "temporada": "Todo el año"
+  },
+  {
+    "codigo": "001004002",
+    "nombre": "Tomioka",
+    "nombreCatalogo": "TOMIOKA",
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "anime",
+    "publicos": [
+      "ninos"
+    ],
+    "subcategoriaNav": "anime-ninos",
+    "tallas": [
+      8,
+      10,
+      12,
+      14
+    ],
+    "precio": 139900,
+    "imagenes": [
+      "/images/products/tomioka.webp"
+    ],
+    "disponibleWeb": true,
+    "idWeb": 22,
+    "slug": "tomioka",
+    "descripcion": "El uniforme del pilar del agua, mitad liso y mitad estampado.",
+    "incluye": [
+      "Uniforme cazador (camiseta y pantalón)",
+      "Haobi",
+      "Cubrepiernas"
+    ],
+    "destacado": false,
+    "temporada": "Todo el año"
+  },
+  {
+    "codigo": "001004004",
+    "nombre": "Rengoku",
+    "nombreCatalogo": "RENGOKU",
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "anime",
+    "publicos": [
+      "ninos"
+    ],
+    "subcategoriaNav": "anime-ninos",
+    "tallas": [
+      8,
+      10,
+      12,
+      14
+    ],
+    "precio": 139900,
+    "imagenes": [
+      "/images/products/rengoku.webp"
+    ],
+    "disponibleWeb": true,
+    "idWeb": 23,
+    "slug": "rengoku",
+    "descripcion": "El haori en llamas del pilar del fuego.",
+    "incluye": [
+      "Uniforme cazador (camiseta y pantalón)",
+      "Haobi",
+      "Cubrepiernas"
+    ],
+    "destacado": false,
+    "temporada": "Todo el año"
+  },
+  {
+    "codigo": "001009001",
+    "nombre": "Ninja Azul",
+    "nombreCatalogo": "NINJA AZUL",
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "ninja",
+    "publicos": [
+      "ninos",
+      "ninas"
+    ],
+    "subcategoriaNav": "ninjas",
+    "tallas": [
+      4,
+      6,
+      8,
+      10,
+      12
+    ],
+    "precio": 109900,
+    "imagenes": [
+      "/images/products/ninja-azul.webp"
+    ],
+    "disponibleWeb": true,
+    "idWeb": 24,
+    "slug": "ninja-azul",
+    "descripcion": "Ninja con dragón bordado y detalles azules.",
+    "incluye": [
+      "Buso",
+      "Pantalón",
+      "Cubrebocas",
+      "Pechera",
+      "Cinturón"
+    ],
+    "destacado": false,
+    "temporada": "Todo el año"
+  },
+  {
+    "codigo": "001009002",
+    "nombre": "Ninja Rojo",
+    "nombreCatalogo": "NINJA ROJO",
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "ninja",
+    "publicos": [
+      "ninos",
+      "ninas"
+    ],
+    "subcategoriaNav": "ninjas",
+    "tallas": [
+      4,
+      6,
+      8,
+      10,
+      12
+    ],
+    "precio": 109900,
+    "imagenes": [
+      "/images/products/ninja-rojo.webp"
+    ],
+    "disponibleWeb": true,
+    "idWeb": 25,
+    "slug": "ninja-rojo",
+    "descripcion": "Ninja con dragón bordado y detalles rojos.",
+    "incluye": [
+      "Buso",
+      "Pantalón",
+      "Cubrebocas",
+      "Pechera",
+      "Cinturón"
+    ],
+    "destacado": false,
+    "temporada": "Todo el año"
+  },
+  {
+    "codigo": "001009003",
+    "nombre": "Ninja Dorado",
+    "nombreCatalogo": "NINJA DORADA",
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "ninja",
+    "publicos": [
+      "ninos",
+      "ninas"
+    ],
+    "subcategoriaNav": "ninjas",
+    "tallas": [
+      4,
+      6,
+      8,
+      10,
+      12
+    ],
+    "precio": 109900,
+    "imagenes": [
+      "/images/products/ninja-dorado.webp"
+    ],
+    "disponibleWeb": true,
+    "idWeb": 26,
+    "slug": "ninja-dorado",
+    "descripcion": "Ninja con dragón bordado y detalles dorados.",
+    "incluye": [
+      "Buso",
+      "Pantalón",
+      "Cubrebocas",
+      "Pechera",
+      "Cinturón"
+    ],
+    "destacado": false,
+    "temporada": "Todo el año"
+  },
+  {
+    "codigo": "001004008-P",
+    "nombre": "Michael Jackson",
+    "nombreCatalogo": null,
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "personajes",
+    "publicos": [
+      "ninos",
+      "ninas"
+    ],
+    "subcategoriaNav": null,
+    "tallas": [
+      4,
+      6,
+      8,
+      10,
+      12,
+      14
+    ],
+    "precio": 129900,
+    "imagenes": [
+      "/images/products/michael-jackson.webp"
+    ],
+    "disponibleWeb": true,
+    "idWeb": 27,
+    "slug": "michael-jackson",
+    "descripcion": "El rey del pop: sombrero, guante y chaqueta.",
+    "incluye": [
+      "Camisa",
+      "Pantalón",
+      "Chaqueta",
+      "Guantes",
+      "Sombrero"
+    ],
+    "destacado": false,
+    "temporada": "Todo el año"
+  },
+  {
+    "codigo": "001006003",
+    "nombre": "Esqueleto",
+    "nombreCatalogo": "TRUSA ESQUELETO INFANTIL",
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "trusa-infantil",
+    "publicos": [
+      "ninos",
+      "ninas"
+    ],
+    "subcategoriaNav": "trusas",
+    "tallas": [
+      0,
+      2,
+      4,
+      6,
+      8,
+      10,
+      12
+    ],
+    "precio": 99900,
+    "imagenes": [
+      "/images/products/esqueleto-infantil.webp"
+    ],
+    "disponibleWeb": true,
+    "idWeb": 28,
+    "slug": "esqueleto-infantil",
+    "descripcion": "Trusa de esqueleto que brilla en la noche de brujas.",
+    "incluye": [
+      "Máscara",
+      "Enterizo",
+      "Cubrebotas"
+    ],
+    "destacado": false,
+    "temporada": "Halloween"
+  },
+  {
+    "codigo": "001008003",
+    "nombre": "Batichica",
+    "nombreCatalogo": "VESTIDO NIÑA BATICHICA",
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "vestidos",
+    "publicos": [
+      "ninas"
+    ],
+    "subcategoriaNav": "vestidos",
+    "tallas": [
+      4,
+      6,
+      8,
+      10,
+      12,
+      14
+    ],
+    "precio": 119900,
+    "imagenes": [
+      "/images/products/batichica.webp"
+    ],
+    "disponibleWeb": true,
+    "idWeb": 29,
+    "slug": "batichica",
+    "descripcion": "Vestido con capa y antifaz de la heroína de Ciudad Gótica.",
+    "incluye": [
+      "Antifaz",
+      "Vestido",
+      "Capa",
+      "Cubrebotas"
+    ],
+    "destacado": true,
+    "temporada": "Todo el año"
+  },
+  {
+    "codigo": "001008001",
+    "nombre": "Mujer Maravilla",
+    "nombreCatalogo": "VESTIDO NIÑA MARAVILLA",
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "vestidos",
+    "publicos": [
+      "ninas"
+    ],
+    "subcategoriaNav": "vestidos",
+    "tallas": [
+      4,
+      6,
+      8,
+      10,
+      12,
+      14
+    ],
+    "precio": 119900,
+    "imagenes": [
+      "/images/products/mujer-maravilla.webp"
+    ],
+    "disponibleWeb": true,
+    "idWeb": 30,
+    "slug": "mujer-maravilla",
+    "descripcion": "Vestido de amazona con tiara, capa y botas.",
+    "incluye": [
+      "Tiara",
+      "Vestido",
+      "Capa",
+      "Cubrebotas"
+    ],
+    "destacado": true,
+    "temporada": "Todo el año"
+  },
+  {
+    "codigo": "001008002",
+    "nombre": "Super Chica",
+    "nombreCatalogo": "VESTIDO NIÑA SUPERCHICA",
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "vestidos",
+    "publicos": [
+      "ninas"
+    ],
+    "subcategoriaNav": "vestidos",
+    "tallas": [
+      4,
+      6,
+      8,
+      10,
+      12,
+      14
+    ],
+    "precio": 119900,
+    "imagenes": [
+      "/images/products/super-chica.webp"
+    ],
+    "disponibleWeb": true,
+    "idWeb": 31,
+    "slug": "super-chica",
+    "descripcion": "La prima de Superman con falda, capa y mucho poder.",
+    "incluye": [
+      "Capa",
+      "Enterizo",
+      "Cubrebotas"
+    ],
+    "destacado": false,
+    "temporada": "Todo el año"
+  },
+  {
+    "codigo": "001008009-P",
+    "nombre": "Capitana América",
+    "nombreCatalogo": null,
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "vestidos",
+    "publicos": [
+      "ninas"
+    ],
+    "subcategoriaNav": "vestidos",
+    "tallas": [
+      4,
+      6,
+      8,
+      10,
+      12,
+      14
+    ],
+    "precio": 119900,
+    "imagenes": [
+      "/images/products/capitana-america.webp"
+    ],
+    "disponibleWeb": true,
+    "idWeb": 32,
+    "slug": "capitana-america",
+    "descripcion": "Vestido brillante con la estrella del primer vengador.",
+    "incluye": [
+      "Antifaz",
+      "Vestido",
+      "Cubrebotas"
+    ],
+    "destacado": false,
+    "temporada": "Todo el año"
+  },
+  {
+    "codigo": "001006002",
+    "nombre": "Spider Woman",
+    "nombreCatalogo": "TRUSA GWEN STACY INFANTIL",
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "trusa-infantil",
+    "publicos": [
+      "ninas"
+    ],
+    "subcategoriaNav": "trusas",
+    "tallas": [
+      0,
+      2,
+      4,
+      6,
+      8,
+      10,
+      12
+    ],
+    "precio": 99900,
+    "imagenes": [
+      "/images/products/spider-woman.webp"
+    ],
+    "disponibleWeb": true,
+    "idWeb": 33,
+    "slug": "spider-woman",
+    "descripcion": "Trusa arácnida con capota blanca estilo Gwen.",
+    "incluye": [
+      "Máscara",
+      "Capota",
+      "Enterizo",
+      "Cubrebotas"
+    ],
+    "destacado": false,
+    "temporada": "Todo el año"
+  },
+  {
+    "codigo": "001006004-P",
+    "nombre": "Lady Bug",
+    "nombreCatalogo": null,
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "trusa-infantil",
+    "publicos": [
+      "ninas"
+    ],
+    "subcategoriaNav": "trusas",
+    "tallas": [
+      0,
+      2,
+      4,
+      6,
+      8,
+      10,
+      12
+    ],
+    "precio": 99900,
+    "imagenes": [
+      "/images/products/lady-bug.webp"
+    ],
+    "disponibleWeb": true,
+    "idWeb": 34,
+    "slug": "lady-bug",
+    "descripcion": "Trusa roja de puntos negros de la heroína parisina.",
+    "incluye": [
+      "Antifaz",
+      "Enterizo",
+      "Cubrebotas"
+    ],
+    "destacado": false,
+    "temporada": "Todo el año"
+  },
+  {
+    "codigo": "001006005-P",
+    "nombre": "Elastic Girl",
+    "nombreCatalogo": null,
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "trusa-infantil",
+    "publicos": [
+      "ninas"
+    ],
+    "subcategoriaNav": "trusas",
+    "tallas": [
+      0,
+      2,
+      4,
+      6,
+      8,
+      10,
+      12
+    ],
+    "precio": 99900,
+    "imagenes": [
+      "/images/products/elastic-girl.webp"
+    ],
+    "disponibleWeb": true,
+    "idWeb": 35,
+    "slug": "elastic-girl",
+    "descripcion": "La súper elástica de Los Increíbles.",
+    "incluye": [
+      "Antifaz",
+      "Enterizo",
+      "Cubrebotas"
+    ],
+    "destacado": false,
+    "temporada": "Todo el año"
+  },
+  {
+    "codigo": "001006001",
+    "nombre": "Katrina",
+    "nombreCatalogo": "TRUSA KATRINA INFANTIL",
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "trusa-infantil",
+    "publicos": [
+      "ninas"
+    ],
+    "subcategoriaNav": "trusas",
+    "tallas": [
+      0,
+      2,
+      4,
+      6,
+      8,
+      10,
+      12
+    ],
+    "precio": 99900,
+    "imagenes": [
+      "/images/products/katrina.webp"
+    ],
+    "disponibleWeb": true,
+    "idWeb": 36,
+    "slug": "katrina",
+    "descripcion": "Trusa de catrina con esqueleto floral para el Día de Muertos.",
+    "incluye": [
+      "Enterizo",
+      "Cubrebotas"
+    ],
+    "destacado": false,
+    "temporada": "Halloween"
+  },
+  {
+    "codigo": "001004003",
+    "nombre": "Nezuko",
+    "nombreCatalogo": "NEZUKO",
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "anime",
+    "publicos": [
+      "ninas"
+    ],
+    "subcategoriaNav": "anime-ninas",
+    "tallas": [
+      8,
+      10,
+      12,
+      14
+    ],
+    "precio": 139900,
+    "imagenes": [
+      "/images/products/nezuko.webp"
+    ],
+    "disponibleWeb": true,
+    "idWeb": 37,
+    "slug": "nezuko",
+    "descripcion": "El kimono rosa y el haori café de la demonio más tierna.",
+    "incluye": [
+      "Kimono",
+      "Haobi",
+      "Cinturón",
+      "Cubrepiernas"
+    ],
+    "destacado": true,
+    "temporada": "Todo el año"
+  },
+  {
+    "codigo": "001004005",
+    "nombre": "Shinobu",
+    "nombreCatalogo": "SHINOBU",
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "anime",
+    "publicos": [
+      "ninas"
+    ],
+    "subcategoriaNav": "anime-ninas",
+    "tallas": [
+      8,
+      10,
+      12,
+      14
+    ],
+    "precio": 139900,
+    "imagenes": [
+      "/images/products/shinobu.webp"
+    ],
+    "disponibleWeb": true,
+    "idWeb": 38,
+    "slug": "shinobu",
+    "descripcion": "El haori alas de mariposa del pilar del insecto.",
+    "incluye": [
+      "Uniforme cazador (camiseta y pantalón)",
+      "Haobi",
+      "Cubrepiernas",
+      "Cinturón"
+    ],
+    "destacado": false,
+    "temporada": "Todo el año"
+  },
+  {
+    "codigo": "001005001",
+    "nombre": "Spider Woman",
+    "nombreCatalogo": "TRUSA SPIDERMAN CLASICO",
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "trusa-adulto",
+    "publicos": [
+      "damas"
+    ],
+    "subcategoriaNav": "trusas",
+    "tallas": [
+      "S",
+      "M",
+      "L",
+      "XL"
+    ],
+    "precio": 119900,
+    "imagenes": [
+      "/images/products/spider-woman-adulto.webp"
+    ],
+    "disponibleWeb": true,
+    "idWeb": 39,
+    "slug": "spider-woman-adulto",
+    "descripcion": "Trusa arácnida clásica en rojo y azul.",
+    "incluye": [
+      "Antifaz",
+      "Enterizo",
+      "Cubrebotas"
+    ],
+    "destacado": false,
+    "temporada": "Todo el año"
+  },
+  {
+    "codigo": "001005002",
+    "nombre": "Iron Spider Woman",
+    "nombreCatalogo": "TRUSA IROSPIDERMAN",
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "trusa-adulto",
+    "publicos": [
+      "damas"
+    ],
+    "subcategoriaNav": "trusas",
+    "tallas": [
+      "S",
+      "M",
+      "L",
+      "XL"
+    ],
+    "precio": 119900,
+    "imagenes": [
+      "/images/products/iron-spider-woman.webp"
+    ],
+    "disponibleWeb": true,
+    "idWeb": 40,
+    "slug": "iron-spider-woman",
+    "descripcion": "Trusa con la armadura arácnida dorada.",
+    "incluye": [
+      "Antifaz",
+      "Enterizo",
+      "Cubrebotas"
+    ],
+    "destacado": false,
+    "temporada": "Todo el año"
+  },
+  {
+    "codigo": "001005011",
+    "nombre": "Spider Woman Miles Morales",
+    "nombreCatalogo": "TRUSA MILES MORALES",
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "trusa-adulto",
+    "publicos": [
+      "damas"
+    ],
+    "subcategoriaNav": "trusas",
+    "tallas": [
+      "S",
+      "M",
+      "L",
+      "XL"
+    ],
+    "precio": 119900,
+    "imagenes": [
+      "/images/products/spider-woman-miles-morales.webp"
+    ],
+    "disponibleWeb": true,
+    "idWeb": 41,
+    "slug": "spider-woman-miles-morales",
+    "descripcion": "La versión Miles Morales en negro y rojo.",
+    "incluye": [
+      "Antifaz",
+      "Enterizo",
+      "Cubrebotas"
+    ],
+    "destacado": false,
+    "temporada": "Todo el año"
+  },
+  {
+    "codigo": "001005010",
+    "nombre": "Spider Gwen",
+    "nombreCatalogo": "TRUSA GWEN STACY",
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "trusa-adulto",
+    "publicos": [
+      "damas"
+    ],
+    "subcategoriaNav": "trusas",
+    "tallas": [
+      "S",
+      "M",
+      "L",
+      "XL"
+    ],
+    "precio": 119900,
+    "imagenes": [
+      "/images/products/spider-gwen.webp"
+    ],
+    "disponibleWeb": true,
+    "idWeb": 42,
+    "slug": "spider-gwen",
+    "descripcion": "La spider de blanco y rosa con capota.",
+    "incluye": [
+      "Máscara",
+      "Enterizo",
+      "Cubrebotas",
+      "Capota"
+    ],
+    "destacado": false,
+    "temporada": "Todo el año"
+  },
+  {
+    "codigo": "001005004",
+    "nombre": "Capitana América",
+    "nombreCatalogo": "TRUSA CAP AMERICA",
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "trusa-adulto",
+    "publicos": [
+      "damas"
+    ],
+    "subcategoriaNav": "trusas",
+    "tallas": [
+      "S",
+      "M",
+      "L",
+      "XL"
+    ],
+    "precio": 119900,
+    "imagenes": [
+      "/images/products/capitana-america-adulto.webp"
+    ],
+    "disponibleWeb": true,
+    "idWeb": 43,
+    "slug": "capitana-america-adulto",
+    "descripcion": "Trusa con la estrella y los colores del capitán.",
+    "incluye": [
+      "Antifaz",
+      "Enterizo",
+      "Cubrebotas"
+    ],
+    "destacado": false,
+    "temporada": "Todo el año"
+  },
+  {
+    "codigo": "001005003",
+    "nombre": "Venom Negro",
+    "nombreCatalogo": "TRUSA VENOM NEGRO",
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "trusa-adulto",
+    "publicos": [
+      "caballeros"
+    ],
+    "subcategoriaNav": "trusas",
+    "tallas": [
+      "S",
+      "M",
+      "L",
+      "XL"
+    ],
+    "precio": 119900,
+    "imagenes": [
+      "/images/products/venom-negro-adulto.webp"
+    ],
+    "disponibleWeb": true,
+    "idWeb": 44,
+    "slug": "venom-negro-adulto",
+    "descripcion": "El simbionte en versión adulta, negro con venas blancas.",
+    "incluye": [
+      "Antifaz",
+      "Enterizo",
+      "Cubrebotas"
+    ],
+    "destacado": false,
+    "temporada": "Todo el año"
+  },
+  {
+    "codigo": "001005009",
+    "nombre": "Deadpool",
+    "nombreCatalogo": "TRUSA DEAD POOL",
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "trusa-adulto",
+    "publicos": [
+      "caballeros"
+    ],
+    "subcategoriaNav": "trusas",
+    "tallas": [
+      "S",
+      "M",
+      "L",
+      "XL"
+    ],
+    "precio": 119900,
+    "imagenes": [
+      "/images/products/deadpool-adulto.webp"
+    ],
+    "disponibleWeb": true,
+    "idWeb": 45,
+    "slug": "deadpool-adulto",
+    "descripcion": "El antihéroe rojo y negro en trusa para adultos.",
+    "incluye": [
+      "Antifaz",
+      "Enterizo",
+      "Cubrebotas"
+    ],
+    "destacado": false,
+    "temporada": "Todo el año"
+  },
+  {
+    "codigo": "001005007",
+    "nombre": "Super Woman",
+    "nombreCatalogo": "TRUSA SUPERMAN",
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "trusa-adulto",
+    "publicos": [
+      "damas"
+    ],
+    "subcategoriaNav": "trusas",
+    "tallas": [
+      "S",
+      "M",
+      "L",
+      "XL"
+    ],
+    "precio": 119900,
+    "imagenes": [
+      "/images/products/super-woman.webp"
+    ],
+    "disponibleWeb": true,
+    "idWeb": 46,
+    "slug": "super-woman",
+    "descripcion": "Trusa azul con capa roja y la S más famosa.",
+    "incluye": [
+      "Capa",
+      "Enterizo",
+      "Cubrebotas"
+    ],
+    "destacado": false,
+    "temporada": "Todo el año"
+  },
+  {
+    "codigo": "001005005",
+    "nombre": "Esqueleto Mujer",
+    "nombreCatalogo": "TRUSA ESQUELETO",
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "trusa-adulto",
+    "publicos": [
+      "damas"
+    ],
+    "subcategoriaNav": "trusas",
+    "tallas": [
+      "S",
+      "M",
+      "L",
+      "XL"
+    ],
+    "precio": 119900,
+    "imagenes": [
+      "/images/products/esqueleto-mujer.webp"
+    ],
+    "disponibleWeb": true,
+    "idWeb": 47,
+    "slug": "esqueleto-mujer",
+    "descripcion": "Trusa de esqueleto entallada para la noche de brujas.",
+    "incluye": [
+      "Máscara",
+      "Enterizo",
+      "Cubrebotas"
+    ],
+    "destacado": false,
+    "temporada": "Halloween"
+  },
+  {
+    "codigo": "001005006",
+    "nombre": "Katrina",
+    "nombreCatalogo": "TRUSA KATRINA",
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "trusa-adulto",
+    "publicos": [
+      "damas"
+    ],
+    "subcategoriaNav": "trusas",
+    "tallas": [
+      "S",
+      "M",
+      "L",
+      "XL"
+    ],
+    "precio": 119900,
+    "imagenes": [
+      "/images/products/katrina-adulto.webp"
+    ],
+    "disponibleWeb": true,
+    "idWeb": 48,
+    "slug": "katrina-adulto",
+    "descripcion": "Catrina floral en trusa adulta para el Día de Muertos.",
+    "incluye": [
+      "Enterizo",
+      "Cubrebotas"
+    ],
+    "destacado": false,
+    "temporada": "Halloween"
+  },
+  {
+    "codigo": "001011001",
+    "nombre": "Pollito",
+    "nombreCatalogo": "POLLO",
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "peluche-linea",
+    "publicos": [
+      "bebes"
+    ],
+    "subcategoriaNav": "peluches-linea",
+    "tallas": [
+      "Bebé",
+      0,
+      2,
+      4
+    ],
+    "precio": 79900,
+    "imagenes": [
+      "/images/products/pollito.webp"
+    ],
+    "disponibleWeb": true,
+    "idWeb": 49,
+    "slug": "pollito",
+    "descripcion": "Enterizo amarillo de pollito, suave y abrigado.",
+    "incluye": [
+      "Capota",
+      "Enterizo",
+      "Zapatos"
+    ],
+    "destacado": true,
+    "temporada": "Todo el año"
+  },
+  {
+    "codigo": "001011003",
+    "nombre": "Miquito",
+    "nombreCatalogo": "MICO",
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "peluche-linea",
+    "publicos": [
+      "bebes"
+    ],
+    "subcategoriaNav": "peluches-linea",
+    "tallas": [
+      "Bebé",
+      0,
+      2,
+      4
+    ],
+    "precio": 79900,
+    "imagenes": [
+      "/images/products/miquito.webp"
+    ],
+    "disponibleWeb": true,
+    "idWeb": 50,
+    "slug": "miquito",
+    "descripcion": "Enterizo café de monito con orejitas y cola.",
+    "incluye": [
+      "Capota",
+      "Enterizo",
+      "Zapatos"
+    ],
+    "destacado": false,
+    "temporada": "Todo el año"
+  },
+  {
+    "codigo": "001011002",
+    "nombre": "Cerdito",
+    "nombreCatalogo": "CERDITO",
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "peluche-linea",
+    "publicos": [
+      "bebes"
+    ],
+    "subcategoriaNav": "peluches-linea",
+    "tallas": [
+      "Bebé",
+      0,
+      2,
+      4
+    ],
+    "precio": 79900,
+    "imagenes": [
+      "/images/products/cerdito.webp"
+    ],
+    "disponibleWeb": true,
+    "idWeb": 51,
+    "slug": "cerdito",
+    "descripcion": "Enterizo rosa de cerdito con capota de orejas.",
+    "incluye": [
+      "Capota",
+      "Enterizo",
+      "Zapatos"
+    ],
+    "destacado": false,
+    "temporada": "Todo el año"
+  },
+  {
+    "codigo": "001011004",
+    "nombre": "Perrito",
+    "nombreCatalogo": "PERRO",
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "peluche-linea",
+    "publicos": [
+      "bebes"
+    ],
+    "subcategoriaNav": "peluches-linea",
+    "tallas": [
+      "Bebé",
+      0,
+      2,
+      4
+    ],
+    "precio": 79900,
+    "imagenes": [
+      "/images/products/perrito.webp"
+    ],
+    "disponibleWeb": true,
+    "idWeb": 52,
+    "slug": "perrito",
+    "descripcion": "Enterizo de perrito con orejas caídas y colita.",
+    "incluye": [
+      "Capota",
+      "Enterizo",
+      "Zapatos"
+    ],
+    "destacado": false,
+    "temporada": "Todo el año"
+  },
+  {
+    "codigo": "001011005",
+    "nombre": "Vaquita",
+    "nombreCatalogo": "VACA",
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "peluche-linea",
+    "publicos": [
+      "bebes"
+    ],
+    "subcategoriaNav": "peluches-linea",
+    "tallas": [
+      "Bebé",
+      0,
+      2,
+      4
+    ],
+    "precio": 79900,
+    "imagenes": [
+      "/images/products/vaquita.webp"
+    ],
+    "disponibleWeb": true,
+    "idWeb": 53,
+    "slug": "vaquita",
+    "descripcion": "Enterizo blanco y negro de vaquita con cuernitos.",
+    "incluye": [
+      "Capota",
+      "Enterizo",
+      "Zapatos"
+    ],
+    "destacado": false,
+    "temporada": "Todo el año"
+  },
+  {
+    "codigo": "001010002-P",
+    "nombre": "Stitch",
+    "nombreCatalogo": null,
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "peluche-plus",
+    "publicos": [
+      "bebes"
+    ],
+    "subcategoriaNav": "peluches-plus",
+    "tallas": [
+      "Bebé",
+      0,
+      2,
+      4
+    ],
+    "precio": 89900,
+    "imagenes": [
+      "/images/products/stitch.webp"
+    ],
+    "disponibleWeb": true,
+    "idWeb": 54,
+    "slug": "stitch",
+    "descripcion": "El experimento 626 en enterizo azul de peluche.",
+    "incluye": [
+      "Capota",
+      "Enterizo"
+    ],
+    "destacado": true,
+    "temporada": "Todo el año"
+  },
+  {
+    "codigo": "001010001",
+    "nombre": "Gato con Botas",
+    "nombreCatalogo": "GATO CON BOTAS DE BB A T8",
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "peluche-plus",
+    "publicos": [
+      "bebes"
+    ],
+    "subcategoriaNav": "peluches-plus",
+    "tallas": [
+      "Bebé",
+      0,
+      2,
+      4
+    ],
+    "precio": 89900,
+    "imagenes": [
+      "/images/products/gato-con-botas.webp"
+    ],
+    "disponibleWeb": true,
+    "idWeb": 55,
+    "slug": "gato-con-botas",
+    "descripcion": "El felino más valiente con sombrero, capa y botas.",
+    "incluye": [
+      "Enterizo",
+      "Capa",
+      "Botas",
+      "Sombrero"
+    ],
+    "destacado": false,
+    "temporada": "Todo el año"
+  },
+  {
+    "codigo": "001001019",
+    "nombre": "BATMAN SUBL",
+    "nombreCatalogo": "BATMAN SUBL",
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "super",
+    "publicos": [
+      "ninos"
+    ],
+    "subcategoriaNav": "super",
+    "tallas": [
+      0,
+      2,
+      4,
+      6,
+      8,
+      10,
+      12
+    ],
+    "precio": 129900,
+    "imagenes": [],
+    "disponibleWeb": false
+  },
+  {
+    "codigo": "001001020",
+    "nombre": "SUPERMAN BOR",
+    "nombreCatalogo": "SUPERMAN BOR",
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "super",
+    "publicos": [
+      "ninos"
+    ],
+    "subcategoriaNav": "super",
+    "tallas": [
+      0,
+      2,
+      4,
+      6,
+      8,
+      10,
+      12
+    ],
+    "precio": 129900,
+    "imagenes": [],
+    "disponibleWeb": false
+  },
+  {
+    "codigo": "001002013",
+    "nombre": "WOLVERINE DE LINEA",
+    "nombreCatalogo": "WOLVERINE DE LINEA",
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "economico",
+    "publicos": [
+      "ninos"
+    ],
+    "subcategoriaNav": "economico",
+    "tallas": [
+      2,
+      4,
+      6,
+      8,
+      10,
+      12
+    ],
+    "precio": 89900,
+    "imagenes": [],
+    "disponibleWeb": false
+  },
+  {
+    "codigo": "001003001",
+    "nombre": "SPIDERMAN CLASICO SEMI",
+    "nombreCatalogo": "SPIDERMAN CLASICO SEMI",
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "semi",
+    "publicos": [
+      "ninos"
+    ],
+    "subcategoriaNav": "semi",
+    "tallas": [
+      2,
+      4,
+      6,
+      8,
+      10,
+      12
+    ],
+    "precio": null,
+    "imagenes": [],
+    "disponibleWeb": false
+  },
+  {
+    "codigo": "001003002",
+    "nombre": "SPIDERMAN NEGRO SEMI",
+    "nombreCatalogo": "SPIDERMAN NEGRO SEMI",
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "semi",
+    "publicos": [
+      "ninos"
+    ],
+    "subcategoriaNav": "semi",
+    "tallas": [
+      2,
+      4,
+      6,
+      8,
+      10,
+      12
+    ],
+    "precio": null,
+    "imagenes": [],
+    "disponibleWeb": false
+  },
+  {
+    "codigo": "001003003",
+    "nombre": "IRON SPIDERMAN SEMI",
+    "nombreCatalogo": "IRON SPIDERMAN SEMI",
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "semi",
+    "publicos": [
+      "ninos"
+    ],
+    "subcategoriaNav": "semi",
+    "tallas": [
+      2,
+      4,
+      6,
+      8,
+      10,
+      12
+    ],
+    "precio": null,
+    "imagenes": [],
+    "disponibleWeb": false
+  },
+  {
+    "codigo": "001003004",
+    "nombre": "IRON-MAN SEMI",
+    "nombreCatalogo": "IRON-MAN SEMI",
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "semi",
+    "publicos": [
+      "ninos"
+    ],
+    "subcategoriaNav": "semi",
+    "tallas": [
+      2,
+      4,
+      6,
+      8,
+      10,
+      12
+    ],
+    "precio": null,
+    "imagenes": [],
+    "disponibleWeb": false
+  },
+  {
+    "codigo": "001003005",
+    "nombre": "BATMAN SEMI",
+    "nombreCatalogo": "BATMAN SEMI",
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "semi",
+    "publicos": [
+      "ninos"
+    ],
+    "subcategoriaNav": "semi",
+    "tallas": [
+      2,
+      4,
+      6,
+      8,
+      10,
+      12
+    ],
+    "precio": null,
+    "imagenes": [],
+    "disponibleWeb": false
+  },
+  {
+    "codigo": "001003006",
+    "nombre": "DEADPOOL SEMI",
+    "nombreCatalogo": "DEADPOOL SEMI",
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "semi",
+    "publicos": [
+      "ninos"
+    ],
+    "subcategoriaNav": "semi",
+    "tallas": [
+      2,
+      4,
+      6,
+      8,
+      10,
+      12
+    ],
+    "precio": null,
+    "imagenes": [],
+    "disponibleWeb": false
+  },
+  {
+    "codigo": "001003007",
+    "nombre": "SUPERMAN SEMI",
+    "nombreCatalogo": "SUPERMAN SEMI",
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "semi",
+    "publicos": [
+      "ninos"
+    ],
+    "subcategoriaNav": "semi",
+    "tallas": [
+      2,
+      4,
+      6,
+      8,
+      10,
+      12
+    ],
+    "precio": null,
+    "imagenes": [],
+    "disponibleWeb": false
+  },
+  {
+    "codigo": "001003008",
+    "nombre": "STAR WEAR BLANCO SEMI",
+    "nombreCatalogo": "STAR WEAR BLANCO SEMI",
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "semi",
+    "publicos": [
+      "ninos"
+    ],
+    "subcategoriaNav": "semi",
+    "tallas": [
+      2,
+      4,
+      6,
+      8,
+      10,
+      12
+    ],
+    "precio": null,
+    "imagenes": [],
+    "disponibleWeb": false
+  },
+  {
+    "codigo": "001003009",
+    "nombre": "STAR WEAR NEGRO SEMI",
+    "nombreCatalogo": "STAR WEAR NEGRO SEMI",
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "semi",
+    "publicos": [
+      "ninos"
+    ],
+    "subcategoriaNav": "semi",
+    "tallas": [
+      2,
+      4,
+      6,
+      8,
+      10,
+      12
+    ],
+    "precio": null,
+    "imagenes": [],
+    "disponibleWeb": false
+  },
+  {
+    "codigo": "001003010",
+    "nombre": "CAPITAN AMERICA SEMI",
+    "nombreCatalogo": "CAPITAN AMERICA SEMI",
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "semi",
+    "publicos": [
+      "ninos"
+    ],
+    "subcategoriaNav": "semi",
+    "tallas": [
+      2,
+      4,
+      6,
+      8,
+      10,
+      12
+    ],
+    "precio": null,
+    "imagenes": [],
+    "disponibleWeb": false
+  },
+  {
+    "codigo": "001003011",
+    "nombre": "VENOM NEGRO SEMI",
+    "nombreCatalogo": "VENOM NEGRO SEMI",
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "semi",
+    "publicos": [
+      "ninos"
+    ],
+    "subcategoriaNav": "semi",
+    "tallas": [
+      2,
+      4,
+      6,
+      8,
+      10,
+      12
+    ],
+    "precio": null,
+    "imagenes": [],
+    "disponibleWeb": false
+  },
+  {
+    "codigo": "001003012",
+    "nombre": "HULK SEMI",
+    "nombreCatalogo": "HULK SEMI",
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "semi",
+    "publicos": [
+      "ninos"
+    ],
+    "subcategoriaNav": "semi",
+    "tallas": [
+      2,
+      4,
+      6,
+      8,
+      10,
+      12
+    ],
+    "precio": null,
+    "imagenes": [],
+    "disponibleWeb": false
+  },
+  {
+    "codigo": "001003013",
+    "nombre": "THOR SEMI",
+    "nombreCatalogo": "THOR SEMI",
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "semi",
+    "publicos": [
+      "ninos"
+    ],
+    "subcategoriaNav": "semi",
+    "tallas": [
+      2,
+      4,
+      6,
+      8,
+      10,
+      12
+    ],
+    "precio": null,
+    "imagenes": [],
+    "disponibleWeb": false
+  },
+  {
+    "codigo": "001005008",
+    "nombre": "TRUSA WOLVERINE",
+    "nombreCatalogo": "TRUSA WOLVERINE",
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "trusa-adulto",
+    "publicos": [
+      "caballeros"
+    ],
+    "subcategoriaNav": "trusas",
+    "tallas": [
+      "S",
+      "M",
+      "L",
+      "XL"
+    ],
+    "precio": 119900,
+    "imagenes": [],
+    "disponibleWeb": false
+  },
+  {
+    "codigo": "001007001",
+    "nombre": "THOR ADULTO",
+    "nombreCatalogo": "THOR ADULTO",
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "super-adulto",
+    "publicos": [
+      "caballeros"
+    ],
+    "subcategoriaNav": "super-acolchados",
+    "tallas": [
+      "S",
+      "M",
+      "L",
+      "XL"
+    ],
+    "precio": null,
+    "imagenes": [],
+    "disponibleWeb": false
+  },
+  {
+    "codigo": "001007002",
+    "nombre": "IRON SPIDERMAN",
+    "nombreCatalogo": "IRON SPIDERMAN",
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "super-adulto",
+    "publicos": [
+      "caballeros"
+    ],
+    "subcategoriaNav": "super-acolchados",
+    "tallas": [
+      "S",
+      "M",
+      "L",
+      "XL"
+    ],
+    "precio": null,
+    "imagenes": [],
+    "disponibleWeb": false
+  },
+  {
+    "codigo": "001007003",
+    "nombre": "SPIDERMAN CLASICO",
+    "nombreCatalogo": "SPIDERMAN CLASICO",
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "super-adulto",
+    "publicos": [
+      "caballeros"
+    ],
+    "subcategoriaNav": "super-acolchados",
+    "tallas": [
+      "S",
+      "M",
+      "L",
+      "XL"
+    ],
+    "precio": null,
+    "imagenes": [],
+    "disponibleWeb": false
+  },
+  {
+    "codigo": "001007004",
+    "nombre": "VENON NEGRO",
+    "nombreCatalogo": "VENON NEGRO",
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "super-adulto",
+    "publicos": [
+      "caballeros"
+    ],
+    "subcategoriaNav": "super-acolchados",
+    "tallas": [
+      "S",
+      "M",
+      "L",
+      "XL"
+    ],
+    "precio": null,
+    "imagenes": [],
+    "disponibleWeb": false
+  },
+  {
+    "codigo": "001007005",
+    "nombre": "SUPERMAN ADULTO SUB",
+    "nombreCatalogo": "SUPERMAN ADULTO SUB",
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "super-adulto",
+    "publicos": [
+      "caballeros"
+    ],
+    "subcategoriaNav": "super-acolchados",
+    "tallas": [
+      "S",
+      "M",
+      "L",
+      "XL"
+    ],
+    "precio": null,
+    "imagenes": [],
+    "disponibleWeb": false
+  },
+  {
+    "codigo": "001007006",
+    "nombre": "DEADPOOL ADULTO",
+    "nombreCatalogo": "DEADPOOL ADULTO",
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "super-adulto",
+    "publicos": [
+      "caballeros"
+    ],
+    "subcategoriaNav": "super-acolchados",
+    "tallas": [
+      "S",
+      "M",
+      "L",
+      "XL"
+    ],
+    "precio": null,
+    "imagenes": [],
+    "disponibleWeb": false
+  },
+  {
+    "codigo": "001007007",
+    "nombre": "CAPITAN AMERICA",
+    "nombreCatalogo": "CAPITAN AMERICA",
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "super-adulto",
+    "publicos": [
+      "caballeros"
+    ],
+    "subcategoriaNav": "super-acolchados",
+    "tallas": [
+      "S",
+      "M",
+      "L",
+      "XL"
+    ],
+    "precio": null,
+    "imagenes": [],
+    "disponibleWeb": false
+  },
+  {
+    "codigo": "001007008",
+    "nombre": "BATMAN CLASICO",
+    "nombreCatalogo": "BATMAN CLASICO",
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "super-adulto",
+    "publicos": [
+      "caballeros"
+    ],
+    "subcategoriaNav": "super-acolchados",
+    "tallas": [
+      "S",
+      "M",
+      "L",
+      "XL"
+    ],
+    "precio": null,
+    "imagenes": [],
+    "disponibleWeb": false
+  },
+  {
+    "codigo": "001007009",
+    "nombre": "SUPERMAN ADULTO BOR",
+    "nombreCatalogo": "SUPERMAN ADULTO BOR",
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "super-adulto",
+    "publicos": [
+      "caballeros"
+    ],
+    "subcategoriaNav": "super-acolchados",
+    "tallas": [
+      "S",
+      "M",
+      "L",
+      "XL"
+    ],
+    "precio": null,
+    "imagenes": [],
+    "disponibleWeb": false
+  },
+  {
+    "codigo": "001008004",
+    "nombre": "VESTIDO NIÑA MERLINA",
+    "nombreCatalogo": "VESTIDO NIÑA MERLINA",
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "vestidos",
+    "publicos": [
+      "ninas"
+    ],
+    "subcategoriaNav": "vestidos",
+    "tallas": [
+      4,
+      6,
+      8,
+      10,
+      12,
+      14
+    ],
+    "precio": 119900,
+    "imagenes": [],
+    "disponibleWeb": false
+  },
+  {
+    "codigo": "001008005",
+    "nombre": "VESTIDO DAMA MARAVILLA",
+    "nombreCatalogo": "VESTIDO DAMA MARAVILLA",
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "vestidos",
+    "publicos": [
+      "damas"
+    ],
+    "subcategoriaNav": "vestidos",
+    "tallas": [
+      "S",
+      "M",
+      "L",
+      "XL"
+    ],
+    "precio": 119900,
+    "imagenes": [],
+    "disponibleWeb": false
+  },
+  {
+    "codigo": "001008006",
+    "nombre": "VESTIDO DAMA SUPERCHICA",
+    "nombreCatalogo": "VESTIDO DAMA SUPERCHICA",
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "vestidos",
+    "publicos": [
+      "damas"
+    ],
+    "subcategoriaNav": "vestidos",
+    "tallas": [
+      "S",
+      "M",
+      "L",
+      "XL"
+    ],
+    "precio": 119900,
+    "imagenes": [],
+    "disponibleWeb": false
+  },
+  {
+    "codigo": "001008007",
+    "nombre": "VESTIDO DAMA MUJER ARAÑA",
+    "nombreCatalogo": "VESTIDO DAMA MUJER ARAÑA",
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "vestidos",
+    "publicos": [
+      "damas"
+    ],
+    "subcategoriaNav": "vestidos",
+    "tallas": [
+      "S",
+      "M",
+      "L",
+      "XL"
+    ],
+    "precio": 119900,
+    "imagenes": [],
+    "disponibleWeb": false
+  },
+  {
+    "codigo": "001008008",
+    "nombre": "VESTIDO DAMA BATICHICA",
+    "nombreCatalogo": "VESTIDO DAMA BATICHICA",
+    "etiq": null,
+    "linea": "disfraces",
+    "grupo": "vestidos",
+    "publicos": [
+      "damas"
+    ],
+    "subcategoriaNav": "vestidos",
+    "tallas": [
+      "S",
+      "M",
+      "L",
+      "XL"
+    ],
+    "precio": 119900,
+    "imagenes": [],
+    "disponibleWeb": false
+  },
+  {
+    "codigo": "002001001",
+    "nombre": "CHAQUETA IRON SPIDERMAN",
+    "nombreCatalogo": "CHAQUETA IRON SPIDERMAN",
+    "etiq": null,
+    "linea": "chaquetas",
+    "grupo": "chaqueta",
+    "publicos": [],
+    "subcategoriaNav": null,
+    "tallas": [],
+    "precio": null,
+    "imagenes": [],
+    "disponibleWeb": false
+  },
+  {
+    "codigo": "002001002",
+    "nombre": "CHAQUETA SPIDERMAN CLASICO",
+    "nombreCatalogo": "CHAQUETA SPIDERMAN CLASICO",
+    "etiq": null,
+    "linea": "chaquetas",
+    "grupo": "chaqueta",
+    "publicos": [],
+    "subcategoriaNav": null,
+    "tallas": [],
+    "precio": null,
+    "imagenes": [],
+    "disponibleWeb": false
+  },
+  {
+    "codigo": "002001003",
+    "nombre": "CHAQUETA CAPITAN AMERICA",
+    "nombreCatalogo": "CHAQUETA CAPITAN AMERICA",
+    "etiq": null,
+    "linea": "chaquetas",
+    "grupo": "chaqueta",
+    "publicos": [],
+    "subcategoriaNav": null,
+    "tallas": [],
+    "precio": null,
+    "imagenes": [],
+    "disponibleWeb": false
+  },
+  {
+    "codigo": "002001004",
+    "nombre": "CHAQUETA IRON MAN",
+    "nombreCatalogo": "CHAQUETA IRON MAN",
+    "etiq": null,
+    "linea": "chaquetas",
+    "grupo": "chaqueta",
+    "publicos": [],
+    "subcategoriaNav": null,
+    "tallas": [],
+    "precio": null,
+    "imagenes": [],
+    "disponibleWeb": false
+  },
+  {
+    "codigo": "002001005",
+    "nombre": "CHAQUETA MILES MORALES",
+    "nombreCatalogo": "CHAQUETA MILES MORALES",
+    "etiq": null,
+    "linea": "chaquetas",
+    "grupo": "chaqueta",
+    "publicos": [],
+    "subcategoriaNav": null,
+    "tallas": [],
+    "precio": null,
+    "imagenes": [],
+    "disponibleWeb": false
+  },
+  {
+    "codigo": "002001006",
+    "nombre": "CHAQUETA FLASH",
+    "nombreCatalogo": "CHAQUETA FLASH",
+    "etiq": null,
+    "linea": "chaquetas",
+    "grupo": "chaqueta",
+    "publicos": [],
+    "subcategoriaNav": null,
+    "tallas": [],
+    "precio": null,
+    "imagenes": [],
+    "disponibleWeb": false
+  },
+  {
+    "codigo": "002001007",
+    "nombre": "CHAQUETA VENON NEGRO",
+    "nombreCatalogo": "CHAQUETA VENON NEGRO",
+    "etiq": null,
+    "linea": "chaquetas",
+    "grupo": "chaqueta",
+    "publicos": [],
+    "subcategoriaNav": null,
+    "tallas": [],
+    "precio": null,
+    "imagenes": [],
+    "disponibleWeb": false
+  },
+  {
+    "codigo": "002001008",
+    "nombre": "CHAQUETA DEADPOOL",
+    "nombreCatalogo": "CHAQUETA DEADPOOL",
+    "etiq": null,
+    "linea": "chaquetas",
+    "grupo": "chaqueta",
+    "publicos": [],
+    "subcategoriaNav": null,
+    "tallas": [],
+    "precio": null,
+    "imagenes": [],
+    "disponibleWeb": false
+  },
+  {
+    "codigo": "002001009",
+    "nombre": "CHAQUETA SPIDERMAN NEGRO",
+    "nombreCatalogo": "CHAQUETA SPIDERMAN NEGRO",
+    "etiq": null,
+    "linea": "chaquetas",
+    "grupo": "chaqueta",
+    "publicos": [],
+    "subcategoriaNav": null,
+    "tallas": [],
+    "precio": null,
+    "imagenes": [],
+    "disponibleWeb": false
+  },
+  {
+    "codigo": "002001010",
+    "nombre": "CHAQUETA HITACHI",
+    "nombreCatalogo": "CHAQUETA HITACHI",
+    "etiq": null,
+    "linea": "chaquetas",
+    "grupo": "chaqueta",
+    "publicos": [],
+    "subcategoriaNav": null,
+    "tallas": [],
+    "precio": null,
+    "imagenes": [],
+    "disponibleWeb": false
+  }
+]

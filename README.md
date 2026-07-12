@@ -18,7 +18,9 @@ app/
   assets/css/      tokens.css (design system) · main.css (reset)
   components/      ui/ · layout/ · product/ · category/ · home/
   composables/     useSiteNav.ts · useProducts.ts   <-- fuente de datos
-  data/            products.json · categories.json  <-- datos REALES del catálogo 2026 (precios provisionales, ver abajo)
+  data/            catalogo.json (canónico: codificación oficial del cliente, 1 ítem = 1 referencia)
+                   navegacion.json (árbol públicos/subcategorías, aún sin UI) · categories.json
+                   (precios provisionales, ver abajo)
   insumos/         fuentes del cliente (PDF/Excel/imágenes) — LOCAL-ONLY: fuera del git (.gitignore), no se publican ni entran al build; respaldar por fuera del repo
   layouts/         default.vue (navbar + trust + footer)
   pages/           index · categoria/[slug] · producto/[slug] · carrito · design-system · preview
@@ -52,9 +54,13 @@ tiñe la página completa (el carrito CON ítems va limpio).
 
 ## ⚠️ Datos reales con PRECIOS PROVISIONALES
 
-`app/data/products.json` contiene los **55 productos reales** del CATÁLOGO KUSTOM 2026
-(fuentes en `app/insumos/`, que NO se publican ni entran al build). Dos salvedades
-que hay que resolver con el cliente antes de salir a producción:
+`app/data/catalogo.json` contiene las **108 referencias** de la codificación oficial
+del cliente (`CODIGOS DE REFERENCIAS.xlsx` en `app/insumos/`, que NO se publica ni
+entra al build): 67 visibles (`disponibleWeb: true` — los 55 productos del sitio; las
+ex "gamas dobles" son dos ítems enlazados por `parejaDe` que la vista re-une vía
+`shared/utils/catalogo.ts`) y 41 ocultas sin foto ni precio confirmado (SEMI,
+Súper Adulto, vestidos dama, chaquetas…). El sitio solo muestra `disponibleWeb: true`.
+Dos salvedades que hay que resolver con el cliente antes de salir a producción:
 
 ### 1. Los precios son PROVISIONALES (inventados para diseño)
 
@@ -74,36 +80,48 @@ WhatsApp). Se cargaron precios de relleno, planos por tipo de producto:
 | Bebés · Animales | $79.900 |
 | Bebés · Línea Plus (Stitch, Gato con Botas) | $89.900 |
 
-Cuando llegue la lista oficial, se reemplazan en `products.json` (campos `price` y
-`gamas[].price`). No hay `regularPrice` (no se inventaron descuentos).
+Cuando llegue la lista oficial, se reemplazan en `catalogo.json` (campo `precio` de
+cada referencia). No hay `regularPrice` (no se inventaron descuentos).
 
 También es provisional el **umbral de envío gratis** del drawer del carrito:
 `FREE_SHIPPING_THRESHOLD = 200_000` COP en `app/stores/cart.ts` — confirmar con el cliente.
 
-### 2. Códigos provisionales (sufijo `-P`) — confirmar con el cliente
+### 2. Códigos provisionales (sufijo `-P`) — estado tras el Excel oficial (jul 2026)
 
-El catálogo trae 7 códigos con problemas (en ceros, duplicados o malformados). Se
-generaron códigos provisionales siguiendo la secuencia de cada línea:
+La codificación oficial (`CODIGOS DE REFERENCIAS.xlsx`) resolvió 3 de los 7
+provisionales originales y obligó a reasignar otros:
 
-| Producto | Código provisional | Problema en el catálogo |
+**Resueltos (ya con código real):**
+
+| Producto | Antes | Ahora |
 |---|---|---|
-| Capitana América (vestido) | `001008004-P` | venía en ceros (000000000) |
-| Lady Bug (trusa infantil) | `001006004-P` | venía en ceros (000000000) |
-| Elastic Girl (trusa infantil) | `001006005-P` | venía malformado (10010010002, 11 dígitos) |
-| Shinobu (anime) | `001004007-P` | duplicaba el de Michael Jackson (001004005) |
-| Katrina (trusa adulto) | `001005012-P` | duplicaba el de Esqueleto Mujer (001005005) |
-| Stitch (bebés) | `001011006-P` | duplicaba el de Vaquita (001011005) |
-| Gato con Botas (bebés) | `001011007-P` | duplicaba el de Vaquita (001011005) |
+| Shinobu (anime) | `001004007-P` | `001004005` |
+| Katrina (trusa adulto) | `001005012-P` | `001005006` |
+| Gato con Botas (bebés) | `001011007-P` | `001010001` (pasa al grupo Animales Plus) |
 
-Además: el tercer ninja aparece en el catálogo como **"Ninja Rojo" repetido**
-(COD 001009003) pero su foto es **dorada** — se cargó como "Ninja Dorado", a
-confirmar nombre con el cliente.
+**Siguen provisionales — confirmar con el cliente:**
+
+| Producto | Código provisional | Situación |
+|---|---|---|
+| Capitana América (vestido) | `001008009-P` (antes `001008004-P`) | no está en el Excel; su antiguo provisional chocaba con Merlina real (`001008004`) |
+| Michael Jackson | `001004008-P` (antes `001004005`) | no está en el Excel; su antiguo código real es de Shinobu. Grupo `personajes` tampoco existe en la codificación |
+| Stitch (bebés) | `001010002-P` (antes `001011006-P`) | no está en el Excel; movido a la familia Animales Plus (010), que es su grupo real |
+| Lady Bug (trusa infantil) | `001006004-P` | no está en el Excel (Trusa Infantil solo trae 3 refs) |
+| Elastic Girl (trusa infantil) | `001006005-P` | no está en el Excel |
+
+El Excel confirma **"Ninja Dorada"** (001009003) — el nombre que se había asumido.
+
+Supuestos de las 41 referencias ocultas (sin base en el sitio, revisar al activarlas):
+tallas de SEMI heredadas de Línea Eco; tallas de vestidos dama `S–XL`; precio `null`
+en SEMI, Súper Adulto y chaquetas (sin grupo equivalente del cual heredar); chaquetas
+sin tallas ni público asignado (fuera de la navegación).
 
 Otras notas de la carga:
-- **Gamas**: Súper Acolchado y Línea Eco son gamas del mismo producto (12 héroes en
-  ambas). Cada gama lleva su propio `code`, `price`, `sizes` (SA tiene talla 0, Eco no)
-  y `image`. El "Venom" de la Línea Eco (001002004) corresponde por foto al **Venom
-  Negro**.
+- **Gamas**: en `catalogo.json` Súper Acolchado y Línea Eco son DOS referencias
+  (cada una con su `codigo`, `precio`, `tallas` — SA tiene talla 0, Eco no — e
+  imagen); el ítem Eco apunta a su par con `parejaDe` y la PDP los muestra como un
+  producto con selector de gama (12 héroes en ambas). El "Venom" de la Línea Eco
+  (001002004) corresponde por foto al **Venom Negro**.
 - **Unisex**: ninjas, Michael Jackson y Esqueleto infantil viven en `ninos` Y `ninas`
   (campo `categorySlugs`).
 - **Fotos**: 63 salen del Excel (800×800). Batman SA, Batman Eco, Gokú y Spider Gwen
@@ -117,14 +135,17 @@ Otras notas de la carga:
 
 ### Punto único a cambiar: `app/composables/useProducts.ts`
 
-**Hoy** lee de un JSON local:
+**Hoy** lee de un JSON local (el canónico `catalogo.json`, adaptado a la forma
+legacy `Product` con `catalogoToProducts`):
 
 ```ts
-import productsData from '~/data/products.json'
+import { catalogoToProducts } from '~~/shared/utils/catalogo'
+import catalogoData from '~/data/catalogo.json'
 import categoriesData from '~/data/categories.json'
 
+const products = catalogoToProducts(catalogoData as unknown as ProductoCatalogo[])
+
 export const useProducts = () => {
-  const products = productsData as Product[]
   const categories = categoriesData as Category[]
   // ...
 }

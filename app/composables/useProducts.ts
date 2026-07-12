@@ -1,14 +1,24 @@
 import type { Product, Category } from '~~/shared/types/woo'
-import productsData from '~/data/products.json'
+import type { ProductoCatalogo } from '~~/shared/types/catalogo'
+import { catalogoToProducts } from '~~/shared/utils/catalogo'
+import catalogoData from '~/data/catalogo.json'
 import categoriesData from '~/data/categories.json'
 
 /**
  * Fuente de datos del catálogo. HOY lee de JSON local (mock).
- * En Fase D solo se cambia el origen (server/api -> WooCommerce);
+ * El canónico es catalogo.json (codificación oficial del cliente, 1 ítem =
+ * 1 referencia, incluye refs ocultas con disponibleWeb: false); las vistas
+ * siguen consumiendo la forma legacy `Product` que reconstruye
+ * catalogoToProducts (las parejas super+eco vuelven a ser un producto con
+ * dos gamas). En Fase D solo se cambia el origen (server/api -> WooCommerce);
  * la firma del composable y las vistas quedan iguales.
  */
+
+// El JSON importado ensancha los literales a string; el modelo real es ProductoCatalogo.
+const productsFromCatalogo = catalogoToProducts(catalogoData as unknown as ProductoCatalogo[])
+
 export const useProducts = () => {
-  const products = productsData as Product[]
+  const products = productsFromCatalogo
   const categories = categoriesData as Category[]
 
   // Hoy los datos son síncronos (JSON), así que pending = false.

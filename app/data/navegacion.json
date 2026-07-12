@@ -1,0 +1,112 @@
+{
+  "publicos": [
+    {
+      "slug": "bebes",
+      "nombre": "Bebés",
+      "subcategorias": [
+        {
+          "slug": "peluches-plus",
+          "nombre": "Peluches Plus"
+        },
+        {
+          "slug": "peluches-linea",
+          "nombre": "Peluches de Línea"
+        }
+      ]
+    },
+    {
+      "slug": "ninos",
+      "nombre": "Niños",
+      "subcategorias": [
+        {
+          "slug": "super",
+          "nombre": "Súper Acolchados"
+        },
+        {
+          "slug": "economico",
+          "nombre": "Línea Entrada"
+        },
+        {
+          "slug": "semi",
+          "nombre": "Semi Acolchados",
+          "provisional": true,
+          "nota": "Ubicación bajo Niños pendiente de confirmar con el cliente"
+        },
+        {
+          "slug": "anime-ninos",
+          "nombre": "Anime"
+        },
+        {
+          "slug": "trusas",
+          "nombre": "Trusas"
+        },
+        {
+          "slug": "ninjas",
+          "nombre": "Ninjas"
+        }
+      ]
+    },
+    {
+      "slug": "ninas",
+      "nombre": "Niñas",
+      "subcategorias": [
+        {
+          "slug": "vestidos",
+          "nombre": "Vestidos"
+        },
+        {
+          "slug": "trusas",
+          "nombre": "Trusas"
+        },
+        {
+          "slug": "anime-ninas",
+          "nombre": "Anime"
+        },
+        {
+          "slug": "princesas",
+          "nombre": "Princesas",
+          "placeholder": true
+        }
+      ]
+    },
+    {
+      "slug": "damas",
+      "nombre": "Damas",
+      "subcategorias": [
+        {
+          "slug": "vestidos",
+          "nombre": "Vestidos"
+        },
+        {
+          "slug": "trusas",
+          "nombre": "Trusas"
+        },
+        {
+          "slug": "princesas",
+          "nombre": "Princesas",
+          "placeholder": true
+        }
+      ]
+    },
+    {
+      "slug": "caballeros",
+      "nombre": "Caballeros",
+      "subcategorias": [
+        {
+          "slug": "super-acolchados",
+          "nombre": "Súper Acolchados"
+        },
+        {
+          "slug": "trusas",
+          "nombre": "Trusas"
+        }
+      ]
+    },
+    {
+      "slug": "combos",
+      "nombre": "Combos",
+      "placeholder": true,
+      "subcategorias": []
+    }
+  ]
+}
