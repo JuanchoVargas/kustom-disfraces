@@ -97,6 +97,8 @@ const perks = [
       <!-- ===================== GALERÍA ===================== -->
       <div class="gallery">
         <div class="gallery__main">
+          <!-- fit inside: las fotos no cuadradas muestran el disfraz COMPLETO
+               (la galería usa object-fit contain sobre fondo blanco) -->
           <NuxtImg
             v-if="currentImage"
             :src="currentImage"
@@ -104,6 +106,7 @@ const perks = [
             class="gallery__photo"
             width="800"
             height="800"
+            fit="inside"
           />
           <PhotoPlaceholder v-else :caption="`[ ${product.name} ]`" />
         </div>

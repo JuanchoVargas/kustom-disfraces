@@ -16,8 +16,8 @@
 const PHRASES = [
   'Disfraces para cada historia',
   'Súper Acolchado',
-  'Línea Eco',
-  'Niños · Niñas · Adultos · Bebés',
+  'Línea Entrada',
+  'Bebés · Niños · Niñas · Damas · Caballeros',
 ]
 const UNITS = 12 // 3 ciclos completos de las 4 frases
 
@@ -34,7 +34,7 @@ const ICON_COLORS = ['var(--turq)', 'var(--yellow)', 'var(--fucsia)']
 </script>
 
 <template>
-  <div class="marquee" aria-label="Disfraces para cada historia — Súper Acolchado, Línea Eco, para niños, niñas, adultos y bebés">
+  <div class="marquee" aria-label="Disfraces para cada historia — Súper Acolchado, Línea Entrada, para bebés, niños, niñas, damas y caballeros">
     <div class="marquee__band">
       <div class="marquee__track">
         <span

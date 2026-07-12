@@ -1,7 +1,7 @@
 [
-  { "id": 1, "name": "Niños", "slug": "ninos", "images": ["/images/products/spider-man-clasico-super-acolchado.webp"] },
-  { "id": 2, "name": "Niñas", "slug": "ninas", "images": ["/images/products/batichica.webp"] },
-  { "id": 3, "name": "Damas", "slug": "damas", "images": ["/images/products/spider-woman-adulto.webp"] },
-  { "id": 4, "name": "Caballeros", "slug": "caballeros", "images": ["/images/products/venom-negro-adulto.webp"] },
-  { "id": 5, "name": "Bebés", "slug": "bebes", "images": ["/images/products/pollito.webp"] }
+  { "id": 1, "name": "Bebés", "slug": "bebes", "images": ["/images/products/pollito.webp"] },
+  { "id": 2, "name": "Niños", "slug": "ninos", "images": ["/images/products/spider-man-clasico-super-acolchado.webp"] },
+  { "id": 3, "name": "Niñas", "slug": "ninas", "images": ["/images/products/batichica.webp"] },
+  { "id": 4, "name": "Damas", "slug": "damas", "images": ["/images/products/spider-woman-adulto.webp"] },
+  { "id": 5, "name": "Caballeros", "slug": "caballeros", "images": ["/images/products/venom-negro-adulto.webp"] }
 ]

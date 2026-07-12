@@ -36,7 +36,9 @@ const to = computed(() => `/producto/${props.product.slug}`)
       </button>
 
       <NuxtLink :to="to" class="plink" :aria-label="product.name">
-        <NuxtImg v-if="product.images?.[0]" :src="product.images[0]" :alt="product.name" class="pphoto" width="400" height="400" />
+        <!-- pos top: las fotos no cuadradas (Gokú 201x624, Batman, Spider Gwen)
+             se recortan desde arriba (cabeza visible); las 800x800 no se tocan -->
+        <NuxtImg v-if="product.images?.[0]" :src="product.images[0]" :alt="product.name" class="pphoto" width="400" height="400" :modifiers="{ pos: 'top' }" />
         <PhotoPlaceholder v-else :caption="`[ ${product.name} ]\nfoto 1:1`" />
       </NuxtLink>
     </div>

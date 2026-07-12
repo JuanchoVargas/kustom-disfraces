@@ -9,13 +9,14 @@ export interface NavLink {
 }
 
 export const useSiteNav = () => {
-  // Públicos de la taxonomía oficial (Combos aparecerá cuando tenga productos)
+  // Públicos de la taxonomía oficial, en el ORDEN canónico del navbar
+  // (Combos aparecerá cuando tenga productos)
   const categories: NavLink[] = [
+    { label: 'Bebés', slug: 'bebes' },
     { label: 'Niños', slug: 'ninos' },
     { label: 'Niñas', slug: 'ninas' },
     { label: 'Damas', slug: 'damas' },
     { label: 'Caballeros', slug: 'caballeros' },
-    { label: 'Bebés', slug: 'bebes' },
   ]
 
   const info: { label: string, to: string }[] = [
