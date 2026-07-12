@@ -38,7 +38,7 @@
   },
   {
     "codigo": "001002008",
-    "nombre": "Spider-Man Clásico (Línea Eco)",
+    "nombre": "Spider-Man Clásico Línea Entrada",
     "nombreCatalogo": "SPIDERMAN CLASICO DE LINEA",
     "etiq": null,
     "linea": "disfraces",
@@ -61,7 +61,17 @@
     ],
     "disponibleWeb": true,
     "parejaDe": "001001001",
-    "descripcionGama": "Versión ligera del mismo diseño, ideal para un evento puntual."
+    "descripcionGama": "Versión ligera del mismo diseño, ideal para un evento puntual.",
+    "slug": "spider-man-clasico-linea-entrada",
+    "idWeb": 56,
+    "descripcion": "El trepamuros de siempre: enterizo rojo y azul con telaraña, máscara y cubrebotas.",
+    "incluye": [
+      "Máscara",
+      "Enterizo",
+      "Cubrebotas"
+    ],
+    "temporada": "Todo el año",
+    "destacado": false
   },
   {
     "codigo": "001001006",
@@ -102,7 +112,7 @@
   },
   {
     "codigo": "001002011",
-    "nombre": "Iron Spider-Man (Línea Eco)",
+    "nombre": "Iron Spider-Man Línea Entrada",
     "nombreCatalogo": "IRON SPIDERMAN DE LINEA",
     "etiq": null,
     "linea": "disfraces",
@@ -125,7 +135,17 @@
     ],
     "disponibleWeb": true,
     "parejaDe": "001001006",
-    "descripcionGama": "Versión ligera del mismo diseño, ideal para un evento puntual."
+    "descripcionGama": "Versión ligera del mismo diseño, ideal para un evento puntual.",
+    "slug": "iron-spider-man-linea-entrada",
+    "idWeb": 57,
+    "descripcion": "La armadura arácnida de Infinity War con detalles dorados.",
+    "incluye": [
+      "Máscara",
+      "Enterizo",
+      "Cubrebotas"
+    ],
+    "temporada": "Todo el año",
+    "destacado": false
   },
   {
     "codigo": "001001004",
@@ -166,7 +186,7 @@
   },
   {
     "codigo": "001002001",
-    "nombre": "Spider-Man Negro (Línea Eco)",
+    "nombre": "Spider-Man Negro Línea Entrada",
     "nombreCatalogo": "SPIDERMAN NEGRO DE LINEA",
     "etiq": null,
     "linea": "disfraces",
@@ -189,7 +209,17 @@
     ],
     "disponibleWeb": true,
     "parejaDe": "001001004",
-    "descripcionGama": "Versión ligera del mismo diseño, ideal para un evento puntual."
+    "descripcionGama": "Versión ligera del mismo diseño, ideal para un evento puntual.",
+    "slug": "spider-man-negro-linea-entrada",
+    "idWeb": 58,
+    "descripcion": "La versión oscura del arácnido, con detalles en rojo.",
+    "incluye": [
+      "Máscara",
+      "Enterizo",
+      "Cubrebotas"
+    ],
+    "temporada": "Todo el año",
+    "destacado": false
   },
   {
     "codigo": "001001002",
@@ -230,7 +260,7 @@
   },
   {
     "codigo": "001002007",
-    "nombre": "Spider-Man Miles Morales (Línea Eco)",
+    "nombre": "Spider-Man Miles Morales Línea Entrada",
     "nombreCatalogo": "MILES MORALES DE LINEA",
     "etiq": null,
     "linea": "disfraces",
@@ -253,7 +283,17 @@
     ],
     "disponibleWeb": true,
     "parejaDe": "001001002",
-    "descripcionGama": "Versión ligera del mismo diseño, ideal para un evento puntual."
+    "descripcionGama": "Versión ligera del mismo diseño, ideal para un evento puntual.",
+    "slug": "spider-man-miles-morales-linea-entrada",
+    "idWeb": 59,
+    "descripcion": "El Spider-Man de Brooklyn: traje negro con araña roja.",
+    "incluye": [
+      "Máscara",
+      "Enterizo",
+      "Cubrebotas"
+    ],
+    "temporada": "Todo el año",
+    "destacado": false
   },
   {
     "codigo": "001001015",
@@ -295,7 +335,7 @@
   },
   {
     "codigo": "001002012",
-    "nombre": "Superman (Línea Eco)",
+    "nombre": "Superman Línea Entrada",
     "nombreCatalogo": "SUPERMAN DE LINEA",
     "etiq": null,
     "linea": "disfraces",
@@ -318,7 +358,18 @@
     ],
     "disponibleWeb": true,
     "parejaDe": "001001015",
-    "descripcionGama": "Versión ligera del mismo diseño, ideal para un evento puntual."
+    "descripcionGama": "Versión ligera del mismo diseño, ideal para un evento puntual.",
+    "slug": "superman-linea-entrada",
+    "idWeb": 60,
+    "descripcion": "El hombre de acero con capa — incluye capa extra para tu mascota.",
+    "incluye": [
+      "Capa",
+      "Enterizo",
+      "Cubrebotas",
+      "Capa para mascota"
+    ],
+    "temporada": "Todo el año",
+    "destacado": false
   },
   {
     "codigo": "001001012",
@@ -359,7 +410,7 @@
   },
   {
     "codigo": "001002014",
-    "nombre": "Iron Man (Línea Eco)",
+    "nombre": "Iron Man Línea Entrada",
     "nombreCatalogo": "IRONMAN DE LINEA",
     "etiq": null,
     "linea": "disfraces",
@@ -382,7 +433,17 @@
     ],
     "disponibleWeb": true,
     "parejaDe": "001001012",
-    "descripcionGama": "Versión ligera del mismo diseño, ideal para un evento puntual."
+    "descripcionGama": "Versión ligera del mismo diseño, ideal para un evento puntual.",
+    "slug": "iron-man-linea-entrada",
+    "idWeb": 61,
+    "descripcion": "La armadura roja y dorada de Tony Stark.",
+    "incluye": [
+      "Máscara",
+      "Enterizo",
+      "Cubrebotas"
+    ],
+    "temporada": "Todo el año",
+    "destacado": false
   },
   {
     "codigo": "001001007",
@@ -423,7 +484,7 @@
   },
   {
     "codigo": "001002006",
-    "nombre": "Capitán América (Línea Eco)",
+    "nombre": "Capitán América Línea Entrada",
     "nombreCatalogo": "CAPITAN AMERICA DE LINEA",
     "etiq": null,
     "linea": "disfraces",
@@ -446,7 +507,17 @@
     ],
     "disponibleWeb": true,
     "parejaDe": "001001007",
-    "descripcionGama": "Versión ligera del mismo diseño, ideal para un evento puntual."
+    "descripcionGama": "Versión ligera del mismo diseño, ideal para un evento puntual.",
+    "slug": "capitan-america-linea-entrada",
+    "idWeb": 62,
+    "descripcion": "El primer vengador, con la estrella al pecho.",
+    "incluye": [
+      "Máscara",
+      "Enterizo",
+      "Cubrebotas"
+    ],
+    "temporada": "Todo el año",
+    "destacado": false
   },
   {
     "codigo": "001001016",
@@ -487,7 +558,7 @@
   },
   {
     "codigo": "001002003",
-    "nombre": "Thor (Línea Eco)",
+    "nombre": "Thor Línea Entrada",
     "nombreCatalogo": "THOR DE LINEA",
     "etiq": null,
     "linea": "disfraces",
@@ -510,7 +581,17 @@
     ],
     "disponibleWeb": true,
     "parejaDe": "001001016",
-    "descripcionGama": "Versión ligera del mismo diseño, ideal para un evento puntual."
+    "descripcionGama": "Versión ligera del mismo diseño, ideal para un evento puntual.",
+    "slug": "thor-linea-entrada",
+    "idWeb": 63,
+    "descripcion": "El dios del trueno con capa y armadura asgardiana.",
+    "incluye": [
+      "Enterizo",
+      "Capa",
+      "Cubrebotas"
+    ],
+    "temporada": "Todo el año",
+    "destacado": false
   },
   {
     "codigo": "001001005",
@@ -551,7 +632,7 @@
   },
   {
     "codigo": "001002005",
-    "nombre": "Flash (Línea Eco)",
+    "nombre": "Flash Línea Entrada",
     "nombreCatalogo": "FLASH DE LINEA",
     "etiq": null,
     "linea": "disfraces",
@@ -574,7 +655,17 @@
     ],
     "disponibleWeb": true,
     "parejaDe": "001001005",
-    "descripcionGama": "Versión ligera del mismo diseño, ideal para un evento puntual."
+    "descripcionGama": "Versión ligera del mismo diseño, ideal para un evento puntual.",
+    "slug": "flash-linea-entrada",
+    "idWeb": 64,
+    "descripcion": "El velocista escarlata de Central City.",
+    "incluye": [
+      "Máscara",
+      "Enterizo",
+      "Cubrebotas"
+    ],
+    "temporada": "Todo el año",
+    "destacado": false
   },
   {
     "codigo": "001001008",
@@ -616,7 +707,7 @@
   },
   {
     "codigo": "001002010",
-    "nombre": "Batman (Línea Eco)",
+    "nombre": "Batman Línea Entrada",
     "nombreCatalogo": "BATMAN DE LINEA",
     "etiq": null,
     "linea": "disfraces",
@@ -639,7 +730,18 @@
     ],
     "disponibleWeb": true,
     "parejaDe": "001001008",
-    "descripcionGama": "Versión ligera del mismo diseño, ideal para un evento puntual."
+    "descripcionGama": "Versión ligera del mismo diseño, ideal para un evento puntual.",
+    "slug": "batman-linea-entrada",
+    "idWeb": 65,
+    "descripcion": "El caballero de la noche con capa y máscara.",
+    "incluye": [
+      "Máscara",
+      "Enterizo",
+      "Capa",
+      "Cubrebotas"
+    ],
+    "temporada": "Todo el año",
+    "destacado": false
   },
   {
     "codigo": "001001009",
@@ -680,7 +782,7 @@
   },
   {
     "codigo": "001002004",
-    "nombre": "Venom Negro (Línea Eco)",
+    "nombre": "Venom Negro Línea Entrada",
     "nombreCatalogo": "VENOM DE LINEA",
     "etiq": null,
     "linea": "disfraces",
@@ -703,7 +805,17 @@
     ],
     "disponibleWeb": true,
     "parejaDe": "001001009",
-    "descripcionGama": "Versión ligera del mismo diseño, ideal para un evento puntual."
+    "descripcionGama": "Versión ligera del mismo diseño, ideal para un evento puntual.",
+    "slug": "venom-negro-linea-entrada",
+    "idWeb": 66,
+    "descripcion": "El simbionte clásico: negro con araña blanca.",
+    "incluye": [
+      "Máscara",
+      "Enterizo",
+      "Cubrebotas"
+    ],
+    "temporada": "Todo el año",
+    "destacado": false
   },
   {
     "codigo": "001001013",
@@ -744,7 +856,7 @@
   },
   {
     "codigo": "001002002",
-    "nombre": "Deadpool (Línea Eco)",
+    "nombre": "Deadpool Línea Entrada",
     "nombreCatalogo": "DEADPOOL DE LINEA",
     "etiq": null,
     "linea": "disfraces",
@@ -767,7 +879,17 @@
     ],
     "disponibleWeb": true,
     "parejaDe": "001001013",
-    "descripcionGama": "Versión ligera del mismo diseño, ideal para un evento puntual."
+    "descripcionGama": "Versión ligera del mismo diseño, ideal para un evento puntual.",
+    "slug": "deadpool-linea-entrada",
+    "idWeb": 67,
+    "descripcion": "El mercenario bocón en rojo y negro.",
+    "incluye": [
+      "Máscara",
+      "Enterizo",
+      "Cubrebotas"
+    ],
+    "temporada": "Todo el año",
+    "destacado": false
   },
   {
     "codigo": "001001003",

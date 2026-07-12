@@ -38,7 +38,6 @@ const sizeRank = (s: number | string) => {
   return i === -1 ? SIZE_ORDER.length : i
 }
 const allSizes = computed(() => [...new Set(all.value.flatMap(p => p.sizes))].sort((a, b) => sizeRank(a) - sizeRank(b)))
-const allGamas = computed(() => [...new Set(all.value.flatMap(p => p.gamas?.map(g => g.label) ?? []))])
 const allSeasons = computed(() => [...new Set(all.value.map(p => p.season).filter(Boolean) as string[])])
 const priceRanges = [
   { label: 'Menos de $80.000', min: 0, max: 79999 },
@@ -48,7 +47,6 @@ const priceRanges = [
 
 // ---------- estado de filtros ----------
 const fSizes = ref<(number | string)[]>([])
-const fGamas = ref<string[]>([])
 const fSeasons = ref<string[]>([])
 const fRange = ref<number | null>(null) // índice de priceRanges
 const sort = ref<'rel' | 'price-asc' | 'price-desc'>('rel')
@@ -61,19 +59,17 @@ function toggle<T>(arr: Ref<T[]>, val: T) {
 }
 function clearFilters() {
   fSizes.value = []
-  fGamas.value = []
   fSeasons.value = []
   fRange.value = null
 }
 const activeFilterCount = computed(() =>
-  fSizes.value.length + fGamas.value.length + fSeasons.value.length + (fRange.value !== null ? 1 : 0),
+  fSizes.value.length + fSeasons.value.length + (fRange.value !== null ? 1 : 0),
 )
 
 // ---------- filtrado + orden ----------
 const filtered = computed(() => {
   let list = all.value.filter((p) => {
     if (fSizes.value.length && !p.sizes.some(s => fSizes.value.includes(s))) return false
-    if (fGamas.value.length && !(p.gamas ?? []).some(g => fGamas.value.includes(g.label))) return false
     if (fSeasons.value.length && !(p.season && fSeasons.value.includes(p.season))) return false
     if (fRange.value !== null) {
       const r = priceRanges[fRange.value]
@@ -157,14 +153,6 @@ const hasMore = computed(() => visible.value < filtered.value.length)
               @click="toggle(fSizes, s)"
             >{{ s }}</button>
           </div>
-        </div>
-
-        <div v-if="allGamas.length" class="fgroup">
-          <h3>Gama</h3>
-          <label v-for="g in allGamas" :key="g" class="fcheck">
-            <input type="checkbox" :checked="fGamas.includes(g)" @change="toggle(fGamas, g)">
-            <span>{{ g }}</span>
-          </label>
         </div>
 
         <div class="fgroup">

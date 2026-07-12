@@ -36,7 +36,6 @@ export default defineEventHandler(async (): Promise<Product[]> => {
   //   price: Number(w.price),
   //   regularPrice: w.on_sale ? Number(w.regular_price) : undefined,
   //   sizes: ... // de los atributos/variaciones de Woo
-  //   gamas: ...
   //   badges: ...
   //   images: w.images?.map((i: any) => i.src) ?? [],
   //   categorySlug: w.categories?.[0]?.slug ?? '',

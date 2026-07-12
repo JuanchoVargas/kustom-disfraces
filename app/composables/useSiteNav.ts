@@ -9,10 +9,12 @@ export interface NavLink {
 }
 
 export const useSiteNav = () => {
+  // Públicos de la taxonomía oficial (Combos aparecerá cuando tenga productos)
   const categories: NavLink[] = [
     { label: 'Niños', slug: 'ninos' },
     { label: 'Niñas', slug: 'ninas' },
-    { label: 'Adultos', slug: 'adultos' },
+    { label: 'Damas', slug: 'damas' },
+    { label: 'Caballeros', slug: 'caballeros' },
     { label: 'Bebés', slug: 'bebes' },
   ]
 

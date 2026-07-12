@@ -65,23 +65,25 @@ Bebés · Niños · Niñas · Damas · Caballeros · Combos. Decisiones:
   Princesas, Semi, vestidos de dama…) no aparecen en la navegación y la PLP
   del público vacío responde 404 — cuando el catálogo los active
   (`disponibleWeb: true`) aparecen solos, sin tocar UI (`useCatalogNav`).
-- **Pares super+eco**: el producto unificado cuenta en AMBAS subcategorías
-  (`subcategoriasNav` es la unión): Thor sale en "Súper Acolchados" y en
-  "Línea Entrada".
+- **Súper y Línea Entrada son productos SEPARADOS** (decisión del cliente,
+  jul 2026): cada uno con su card, PDP, precio y tallas ("Thor" $129.900 y
+  "Thor Línea Entrada" $89.900). No hay selector de gama: la PDP muestra un
+  enlace cruzado discreto entre pares (`pareja` en el adaptador, vía
+  `parejaDe` del catálogo). El filtro lateral "Gama" se eliminó (redundante
+  con los chips de subcategoría).
 - **PROVISIONAL — `/categoria/adultos` → 301 → `/categoria/damas`**
   (routeRules en `nuxt.config.ts`): la antigua categoría se dividió en
   damas/caballeros; se redirige al público con más catálogo hoy. Revisar
-  cuando caballeros crezca o exista una página puente. La Home (banda de
-  categorías) y el footer siguen usando las 4 categorías legacy y funcionan
-  vía esta redirección — pendiente decidir su rediseño.
+  cuando caballeros crezca o exista una página puente. Home y footer ya
+  usan los 5 públicos; la redirección queda para enlaces externos viejos.
 
 ## ⚠️ Datos reales con PRECIOS PROVISIONALES
 
 `app/data/catalogo.json` contiene las **108 referencias** de la codificación oficial
 del cliente (`CODIGOS DE REFERENCIAS.xlsx` en `app/insumos/`, que NO se publica ni
-entra al build): 67 visibles (`disponibleWeb: true` — los 55 productos del sitio; las
-ex "gamas dobles" son dos ítems enlazados por `parejaDe` que la vista re-une vía
-`shared/utils/catalogo.ts`) y 41 ocultas sin foto ni precio confirmado (SEMI,
+entra al build): 67 visibles (`disponibleWeb: true` — **67 productos web**, porque
+Súper y Línea Entrada son productos separados; los pares se enlazan con `parejaDe`
+solo para el cruce de la PDP) y 41 ocultas sin foto ni precio confirmado (SEMI,
 Súper Adulto, vestidos dama, chaquetas…). El sitio solo muestra `disponibleWeb: true`.
 Dos salvedades que hay que resolver con el cliente antes de salir a producción:
 
@@ -140,11 +142,12 @@ en SEMI, Súper Adulto y chaquetas (sin grupo equivalente del cual heredar); cha
 sin tallas ni público asignado (fuera de la navegación).
 
 Otras notas de la carga:
-- **Gamas**: en `catalogo.json` Súper Acolchado y Línea Eco son DOS referencias
-  (cada una con su `codigo`, `precio`, `tallas` — SA tiene talla 0, Eco no — e
-  imagen); el ítem Eco apunta a su par con `parejaDe` y la PDP los muestra como un
-  producto con selector de gama (12 héroes en ambas). El "Venom" de la Línea Eco
-  (001002004) corresponde por foto al **Venom Negro**.
+- **Líneas Súper / Entrada**: en `catalogo.json` Súper Acolchado y Línea Entrada
+  (la antigua "Línea Eco") son DOS referencias y DOS productos web (cada una con
+  su `codigo`, `precio`, `tallas` — SA tiene talla 0, Entrada no — e imagen);
+  el ítem de Entrada apunta a su par con `parejaDe` para el enlace cruzado de la
+  PDP (12 héroes en ambas líneas). El "Venom" de la Línea Entrada (001002004)
+  corresponde por foto al **Venom Negro**.
 - **Unisex**: ninjas, Michael Jackson y Esqueleto infantil viven en `ninos` Y `ninas`
   (campo `categorySlugs`).
 - **Fotos**: 63 salen del Excel (800×800). Batman SA, Batman Eco, Gokú y Spider Gwen

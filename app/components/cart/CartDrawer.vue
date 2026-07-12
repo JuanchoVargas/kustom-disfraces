@@ -107,10 +107,10 @@ const waCheckout = computed(() => {
               <div class="up__row">
                 <article v-for="s in suggestions" :key="s.slug" class="up__card">
                   <NuxtLink :to="`/producto/${s.slug}`" class="up__img" @click="cart.closeDrawer()">
-                    <img :src="s.gamas?.[0]?.image ?? s.images?.[0]" :alt="s.name">
+                    <img :src="s.images?.[0]" :alt="s.name">
                   </NuxtLink>
                   <p class="up__name">{{ s.name }}</p>
-                  <p class="up__price">{{ formatCOP(s.gamas?.[0]?.price ?? s.price) }}</p>
+                  <p class="up__price">{{ formatCOP(s.price) }}</p>
                   <NuxtLink :to="`/producto/${s.slug}`" class="up__add" :aria-label="`Ver ${s.name}`" @click="cart.closeDrawer()">
                     Ver
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">

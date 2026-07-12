@@ -183,7 +183,9 @@ watch(() => route.fullPath, () => {
         <input type="search" placeholder="Buscar disfraces, tallas, personajes…" >
       </label>
 
-      <div v-if="!onCategoryPage" class="chiprow">
+      <!-- chips rápidos: se ocultan en la PLP (las tabs ya están) y con el
+           menú abierto (el acordeón es el canónico — no duplicar controles) -->
+      <div v-if="!onCategoryPage && !menuOpen" class="chiprow">
         <NuxtLink
           v-for="c in publicos"
           :key="c.slug"

@@ -10,21 +10,12 @@ export interface ProductBadge {
   label: string
 }
 
-export interface ProductGama {
-  /** Ej: "Súper Acolchado" */
-  label: string
-  /** Color del punto (token CSS, ej: "var(--purple)") */
-  color: string
-  /** Descripción del acabado (se muestra en la PDP) */
-  description?: string
-  /** Precio de esta gama en COP (si difiere del precio base) — ⚠ hoy PROVISIONAL, ver README */
-  price?: number
-  /** Código de producto de esta gama (sufijo -P = provisional, pendiente cliente) */
-  code?: string
-  /** Tallas de esta gama (Súper Acolchado incluye 0; Eco no) */
-  sizes?: (number | string)[]
-  /** Foto propia de la gama (la PDP la cambia al seleccionar) */
-  image?: string
+/** Enlace cruzado entre un producto Súper y su versión Línea Entrada */
+export interface ProductPareja {
+  slug: string
+  name: string
+  /** Qué es el producto ENLAZADO: 'super' (premium) o 'economico' (Línea Entrada) */
+  tipo: 'super' | 'economico'
 }
 
 export interface Product {
@@ -41,8 +32,6 @@ export interface Product {
   sizes: (number | string)[]
   /** Tallas agotadas (subconjunto de sizes) */
   soldOutSizes?: (number | string)[]
-  /** Gamas / acabados ofrecidos */
-  gamas?: ProductGama[]
   /** Qué incluye el disfraz (del catálogo 2026) */
   includes?: string[]
   badges?: ProductBadge[]
@@ -60,9 +49,10 @@ export interface Product {
   season?: string
   /** Públicos de la taxonomía oficial (bebes|ninos|ninas|damas|caballeros) — navbar/PLP */
   publicos?: string[]
-  /** Subcategorías de navegación; en pares super+eco es la UNIÓN de ambas (Thor
-   *  aparece en "Súper Acolchados" Y "Línea Entrada") */
+  /** Subcategorías de navegación del producto */
   subcategoriasNav?: string[]
+  /** Su par Súper/Línea Entrada, si existe — enlace cruzado en la PDP */
+  pareja?: ProductPareja
 }
 
 export interface Category {

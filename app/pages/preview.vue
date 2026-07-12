@@ -5,14 +5,13 @@ useHead({ title: 'Preview · Componentes de dominio' })
 const { products, categories } = useProducts()
 
 const size = ref<string | number | null>(6)
-const gama = ref<string | null>('Súper Acolchado')
 </script>
 
 <template>
   <main class="pv">
     <header class="pv__head">
       <h1 class="pv__title">Componentes de dominio</h1>
-      <p class="pv__sub">ProductCard · CategoryCard · SizeSelector · GamaSelector · KoBlock</p>
+      <p class="pv__sub">ProductCard · CategoryCard · SizeSelector · KoBlock</p>
     </header>
 
     <section class="pv__section">
@@ -32,11 +31,6 @@ const gama = ref<string | null>('Súper Acolchado')
     <section class="pv__section">
       <h2 class="pv__h2">SizeSelector <small>(seleccionada: {{ size ?? '—' }} · talla 10 agotada)</small></h2>
       <SizeSelector v-model="size" />
-    </section>
-
-    <section class="pv__section">
-      <h2 class="pv__h2">GamaSelector <small>(seleccionada: {{ gama ?? '—' }})</small></h2>
-      <GamaSelector v-model="gama" />
     </section>
 
     <section class="pv__section">

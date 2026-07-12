@@ -8,10 +8,10 @@ import categoriesData from '~/data/categories.json'
  * Fuente de datos del catálogo. HOY lee de JSON local (mock).
  * El canónico es catalogo.json (codificación oficial del cliente, 1 ítem =
  * 1 referencia, incluye refs ocultas con disponibleWeb: false); las vistas
- * siguen consumiendo la forma legacy `Product` que reconstruye
- * catalogoToProducts (las parejas super+eco vuelven a ser un producto con
- * dos gamas). En Fase D solo se cambia el origen (server/api -> WooCommerce);
- * la firma del composable y las vistas quedan iguales.
+ * consumen la forma `Product` que proyecta catalogoToProducts — Súper y
+ * Línea Entrada son productos SEPARADOS, enlazados solo por el cruce
+ * `pareja` de la PDP. En Fase D solo se cambia el origen (server/api ->
+ * WooCommerce); la firma del composable y las vistas quedan iguales.
  */
 
 // El JSON importado ensancha los literales a string; el modelo real es ProductoCatalogo.

@@ -22,34 +22,21 @@ const category = computed(() => categoryBySlug(product.value!.categorySlug))
 // ---------- selección ----------
 const size = ref<number | string | null>(null)
 
-// Gama inicial: la primera, o la que pida la URL (?gama=eco) — enlazable desde campañas
-const normalize = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
-const gamaFromQuery = typeof route.query.gama === 'string'
-  ? product.value?.gamas?.find(g => normalize(g.label).includes(normalize(route.query.gama as string)))?.label
-  : undefined
-const gama = ref<string | null>(gamaFromQuery ?? product.value?.gamas?.[0]?.label ?? null)
-
-const selectedGama = computed(() => product.value?.gamas?.find(g => g.label === gama.value))
-const currentPrice = computed(() => selectedGama.value?.price ?? product.value?.price ?? 0)
+const currentPrice = computed(() => product.value?.price ?? 0)
 const savings = computed(() => {
   const reg = product.value?.regularPrice
   return reg && reg > currentPrice.value ? reg - currentPrice.value : 0
 })
+const currentImage = computed(() => product.value?.images?.[0])
 
-// Tallas, foto y código siguen a la gama elegida (Súper Acolchado trae talla 0; Eco no)
-const currentSizes = computed(() => selectedGama.value?.sizes ?? product.value?.sizes ?? [])
-const currentImage = computed(() => selectedGama.value?.image ?? product.value?.images?.[0])
-const currentCode = computed(() => selectedGama.value?.code ?? product.value?.code)
-watch(gama, () => {
-  if (size.value !== null && !currentSizes.value.includes(size.value)) size.value = null
-})
-
-// ---------- galería: 1 foto por gama; con varias gamas los thumbs cambian la gama ----------
-const gallery = computed(() => {
-  const gamas = product.value?.gamas ?? []
-  const withImage = gamas.filter(g => g.image)
-  if (withImage.length > 1) return withImage.map(g => ({ src: g.image!, label: g.label }))
-  return []
+// ---------- enlace cruzado Súper <-> Línea Entrada ----------
+// Las líneas son productos SEPARADOS (decisión del cliente); si este producto
+// tiene par, se ofrece un enlace discreto a la otra versión.
+const parejaPrompt = computed(() => {
+  if (!product.value?.pareja) return null
+  return product.value.pareja.tipo === 'economico'
+    ? '¿Buscas la versión económica?'
+    : '¿Buscas el acabado premium?'
 })
 
 // ---------- agregar al carrito ----------
@@ -68,7 +55,6 @@ function addToCart() {
     price: currentPrice.value,
     image: currentImage.value,
     size: size.value,
-    gama: gama.value ?? undefined,
     quantity: 1,
   })
   added.value = true
@@ -121,32 +107,25 @@ const perks = [
           />
           <PhotoPlaceholder v-else :caption="`[ ${product.name} ]`" />
         </div>
-        <div v-if="gallery.length" class="gallery__thumbs">
-          <button
-            v-for="g in gallery"
-            :key="g.label"
-            type="button"
-            class="thumb"
-            :class="{ on: gama === g.label }"
-            :aria-label="`Ver foto de la gama ${g.label}`"
-            @click="gama = g.label"
-          >
-            <img :src="g.src" :alt="`${product.name} — ${g.label}`" class="thumb__img">
-          </button>
-        </div>
       </div>
 
       <!-- ===================== INFO ===================== -->
       <div class="info">
         <NuxtLink :to="`/categoria/${product.categorySlug}`" class="info__cat">{{ category?.name }}</NuxtLink>
         <h1 class="info__name">{{ product.name }}</h1>
-        <p v-if="currentCode" class="info__code">COD {{ currentCode }}</p>
+        <p v-if="product.code" class="info__code">COD {{ product.code }}</p>
 
         <div class="info__price">
           <span class="info__now">{{ formatCOP(currentPrice) }}</span>
           <s v-if="product.regularPrice" class="info__old">{{ formatCOP(product.regularPrice) }}</s>
           <KBadge v-if="savings" variant="sale">Ahorras {{ formatCOP(savings) }}</KBadge>
         </div>
+
+        <!-- enlace cruzado discreto a la otra línea (Súper <-> Línea Entrada) -->
+        <p v-if="product.pareja" class="info__pareja">
+          {{ parejaPrompt }}
+          <NuxtLink :to="`/producto/${product.pareja.slug}`" class="info__parejalink">{{ product.pareja.name }} →</NuxtLink>
+        </p>
 
         <p v-if="product.description" class="info__desc">{{ product.description }}</p>
 
@@ -159,12 +138,7 @@ const perks = [
             <span>Talla</span>
             <span v-if="needsSize" class="field__hint">Elige una talla</span>
           </div>
-          <SizeSelector v-model="size" :sizes="currentSizes" :disabled="product.soldOutSizes ?? []" />
-        </div>
-
-        <div v-if="product.gamas?.length" class="field">
-          <div class="field__label"><span>Gama / acabado</span></div>
-          <GamaSelector v-model="gama" :gamas="product.gamas" detailed />
+          <SizeSelector v-model="size" :sizes="product.sizes" :disabled="product.soldOutSizes ?? []" />
         </div>
 
         <div class="actions">
@@ -232,29 +206,6 @@ const perks = [
   object-fit: contain;
   display: block;
 }
-.gallery__thumbs {
-  display: flex;
-  gap: var(--space-3);
-  margin-top: var(--space-3);
-}
-.thumb {
-  width: 72px;
-  height: 72px;
-  border-radius: var(--r-md);
-  overflow: hidden;
-  border: 2px solid var(--line);
-  cursor: pointer;
-  padding: 0;
-  background: #fff;
-}
-.thumb.on { border-color: var(--purple); }
-.thumb__img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  display: block;
-}
-
 /* ---------- info ---------- */
 .info__cat {
   font-weight: 700;
@@ -296,6 +247,21 @@ const perks = [
   font-weight: 500;
   font-size: var(--text-md);
   color: var(--mut-2);
+}
+/* enlace cruzado Súper <-> Línea Entrada (discreto, bajo el precio) */
+.info__pareja {
+  font-size: 13px;
+  color: var(--mut);
+  margin: calc(var(--space-4) * -0.5) 0 var(--space-4);
+}
+.info__parejalink {
+  font-weight: 700;
+  color: var(--purple);
+  text-decoration: none;
+}
+.info__parejalink:hover {
+  color: var(--purple-d);
+  text-decoration: underline;
 }
 .info__desc {
   color: var(--mut);

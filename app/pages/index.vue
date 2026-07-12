@@ -4,7 +4,7 @@ const { reveal } = useSiteMotion()
 
 useHead({
   title: 'Kustom Disfraces — Disfraces para cada historia en Bogotá',
-  meta: [{ name: 'description', content: 'Disfraces de calidad para niños, niñas, adultos y bebés en Bogotá. Superhéroes, anime, animales y más. Envío a toda Colombia.' }],
+  meta: [{ name: 'description', content: 'Disfraces de calidad para niños, niñas, damas, caballeros y bebés en Bogotá. Superhéroes, anime, animales y más. Envío a toda Colombia.' }],
 })
 </script>
 
@@ -91,12 +91,13 @@ useHead({
 
 .cat-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  /* 5 públicos en una fila (desktop) */
+  grid-template-columns: repeat(5, 1fr);
   gap: var(--space-5);
 }
 
 @media (max-width: 1023px) {
-  .cat-grid { grid-template-columns: repeat(4, 1fr); }
+  .cat-grid { grid-template-columns: repeat(3, 1fr); }
 }
 @media (max-width: 460px) {
   .cat-grid { grid-template-columns: repeat(2, 1fr); }

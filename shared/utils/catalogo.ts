@@ -1,54 +1,22 @@
-import type { Product, ProductGama } from '../types/woo'
+import type { Product } from '../types/woo'
 import type { ProductoCatalogo } from '../types/catalogo'
 
 /**
- * Reconstruye la forma legacy `Product[]` (la que consumen Home/PLP/PDP/carrito)
- * desde el catálogo oficial. Las parejas super+economico (`parejaDe`) vuelven a
- * ser UN producto con dos gamas, idéntico al modelo anterior — la UI no cambia.
+ * Proyecta el catálogo oficial a la forma `Product` que consumen las vistas.
+ * Súper y Línea Entrada son productos SEPARADOS (decisión del cliente): cada
+ * ítem visible es su propia card/PDP con su precio y tallas. `parejaDe` ya no
+ * re-une nada — solo alimenta el enlace cruzado discreto de la PDP
+ * ("¿Buscas la versión económica?" ↔ acabado premium).
  */
-
-const PUBLICO_A_CATEGORIA: Record<string, string> = {
-  bebes: 'bebes',
-  ninos: 'ninos',
-  ninas: 'ninas',
-  damas: 'adultos',
-  caballeros: 'adultos',
-}
-
-const GAMA_META = {
-  super: { label: 'Súper Acolchado', color: 'var(--purple)' },
-  economico: { label: 'Línea Eco', color: 'var(--turq)' },
-} as const
-
-const toGama = (item: ProductoCatalogo): ProductGama => {
-  const meta = GAMA_META[item.grupo as keyof typeof GAMA_META]
-  return {
-    label: meta.label,
-    color: meta.color,
-    description: item.descripcionGama,
-    price: item.precio ?? undefined,
-    code: item.codigo,
-    sizes: item.tallas,
-    image: item.imagenes[0],
-  }
-}
-
 export const catalogoToProducts = (catalogo: ProductoCatalogo[]): Product[] => {
   const visibles = catalogo.filter(i => i.disponibleWeb)
-  const ecoDe = new Map(visibles.filter(i => i.parejaDe).map(i => [i.parejaDe as string, i]))
+  const byCodigo = new Map(visibles.map(i => [i.codigo, i]))
+  const ecoDeSuper = new Map(visibles.filter(i => i.parejaDe).map(i => [i.parejaDe as string, i]))
 
   return visibles
-    .filter(i => !i.parejaDe) // los eco emparejados se re-unen a su super
     .map((item) => {
-      const categorySlugs = [...new Set(item.publicos.map(p => PUBLICO_A_CATEGORIA[p] as string))]
-      const eco = ecoDe.get(item.codigo)
-
-      // super/economico llevan selector de gama (aunque exista una sola)
-      let gamas: ProductGama[] | undefined
-      if (item.grupo === 'super' || item.grupo === 'economico') {
-        gamas = [toGama(item)]
-        if (eco) gamas.push(toGama(eco))
-      }
+      // pareja del enlace cruzado: el eco apunta a su super y viceversa
+      const pareja = item.parejaDe ? byCodigo.get(item.parejaDe) : ecoDeSuper.get(item.codigo)
 
       const product: Product = {
         id: item.idWeb as number,
@@ -59,16 +27,22 @@ export const catalogoToProducts = (catalogo: ProductoCatalogo[]): Product[] => {
         sizes: item.tallas,
         includes: item.incluye,
         images: item.imagenes,
-        categorySlug: categorySlugs[0] as string,
-        categorySlugs,
+        categorySlug: item.publicos[0] as string,
+        categorySlugs: item.publicos,
         description: item.descripcion,
         season: item.temporada,
         publicos: item.publicos,
-        subcategoriasNav: [...new Set([item.subcategoriaNav, eco?.subcategoriaNav ?? null]
-          .filter((s): s is string => s !== null))],
+        subcategoriasNav: item.subcategoriaNav ? [item.subcategoriaNav] : [],
       }
-      if (gamas) product.gamas = gamas
       if (item.destacado) product.featured = true
+      if (pareja) {
+        product.pareja = {
+          slug: pareja.slug as string,
+          name: pareja.nombre,
+          // tipo de la PAREJA enlazada (no del producto actual)
+          tipo: item.parejaDe ? 'super' : 'economico',
+        }
+      }
       return product
     })
     .sort((a, b) => a.id - b.id)

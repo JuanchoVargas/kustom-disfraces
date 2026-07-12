@@ -7,10 +7,10 @@
 const { products } = useProducts()
 const { reveal } = useSiteMotion()
 
-// Gama premium: prioriza los featured del catálogo y toma 4
+// Línea premium: prioriza los featured del catálogo y toma 4
 const items = computed(() =>
   products
-    .filter(p => p.gamas?.some(g => g.label === 'Súper Acolchado'))
+    .filter(p => p.subcategoriasNav?.includes('super'))
     .sort((a, b) => Number(b.featured ?? false) - Number(a.featured ?? false))
     .slice(0, 4),
 )
