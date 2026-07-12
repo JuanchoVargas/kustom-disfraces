@@ -5,7 +5,8 @@
  */
 const props = defineProps<{ activeSlug: string }>()
 
-const { categories } = useSiteNav()
+// Públicos de la taxonomía oficial; los vacíos (Combos) se auto-ocultan.
+const { publicos } = useCatalogNav()
 
 // En mobile (scroll horizontal) la tab activa debe quedar visible al cargar.
 // Se ajusta scrollLeft del contenedor (no scrollIntoView: movería la página).
@@ -21,14 +22,14 @@ onMounted(() => {
 <template>
   <nav ref="track" class="cattabs" aria-label="Categorías">
     <NuxtLink
-      v-for="c in categories"
+      v-for="c in publicos"
       :key="c.slug"
       :to="`/categoria/${c.slug}`"
       class="cattab"
       :class="{ on: c.slug === props.activeSlug }"
       :aria-current="c.slug === props.activeSlug ? 'page' : undefined"
     >
-      {{ c.label }}
+      {{ c.nombre }}
     </NuxtLink>
   </nav>
 </template>

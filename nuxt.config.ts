@@ -23,6 +23,13 @@ export default defineNuxtConfig({
     '~/assets/css/main.css',
   ],
 
+  // PROVISIONAL: la antigua categoría "adultos" se dividió en damas/caballeros
+  // (nueva taxonomía). Se redirige al público con más catálogo hoy (damas);
+  // revisar cuando caballeros tenga más productos o exista página puente.
+  routeRules: {
+    '/categoria/adultos': { redirect: { to: '/categoria/damas', statusCode: 301 } },
+  },
+
   // Transición de página global (fade corto). CSS en main.css.
   app: {
     pageTransition: { name: 'page', mode: 'out-in' },

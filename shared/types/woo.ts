@@ -58,6 +58,11 @@ export interface Product {
   description?: string
   /** Temporada (filtro de la PLP): "Halloween", "Día de Muertos", "Todo el año"… */
   season?: string
+  /** Públicos de la taxonomía oficial (bebes|ninos|ninas|damas|caballeros) — navbar/PLP */
+  publicos?: string[]
+  /** Subcategorías de navegación; en pares super+eco es la UNIÓN de ambas (Thor
+   *  aparece en "Súper Acolchados" Y "Línea Entrada") */
+  subcategoriasNav?: string[]
 }
 
 export interface Category {

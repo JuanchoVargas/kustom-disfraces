@@ -41,12 +41,12 @@ export const catalogoToProducts = (catalogo: ProductoCatalogo[]): Product[] => {
     .filter(i => !i.parejaDe) // los eco emparejados se re-unen a su super
     .map((item) => {
       const categorySlugs = [...new Set(item.publicos.map(p => PUBLICO_A_CATEGORIA[p] as string))]
+      const eco = ecoDe.get(item.codigo)
 
       // super/economico llevan selector de gama (aunque exista una sola)
       let gamas: ProductGama[] | undefined
       if (item.grupo === 'super' || item.grupo === 'economico') {
         gamas = [toGama(item)]
-        const eco = ecoDe.get(item.codigo)
         if (eco) gamas.push(toGama(eco))
       }
 
@@ -63,6 +63,9 @@ export const catalogoToProducts = (catalogo: ProductoCatalogo[]): Product[] => {
         categorySlugs,
         description: item.descripcion,
         season: item.temporada,
+        publicos: item.publicos,
+        subcategoriasNav: [...new Set([item.subcategoriaNav, eco?.subcategoriaNav ?? null]
+          .filter((s): s is string => s !== null))],
       }
       if (gamas) product.gamas = gamas
       if (item.destacado) product.featured = true

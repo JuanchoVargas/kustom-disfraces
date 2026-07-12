@@ -1,5 +1,8 @@
 <script setup lang="ts">
-const { categories, contact } = useSiteNav()
+const { contact } = useSiteNav()
+// Públicos de la taxonomía oficial con sus subcategorías; los vacíos
+// (Combos, Princesas…) se auto-ocultan en useCatalogNav.
+const { publicos } = useCatalogNav()
 
 // Contador real desde el store de carrito (Pinia).
 const cart = useCartStore()
@@ -24,6 +27,33 @@ const activeSlug = computed(() => {
 // En la PLP las CategoryTabs ya muestran las categorías: la fila de chips
 // del navbar mobile se oculta ahí para no duplicar (en Home y demás sigue).
 const onCategoryPage = computed(() => activeSlug.value !== null)
+
+// ---------- desplegable desktop (hover/focus, Escape cierra) ----------
+const openDrop = ref<string | null>(null)
+// focusout: cerrar solo si el foco salió del item completo (permite tabular
+// por los links del desplegable sin que se cierre)
+function onNavFocusOut(e: FocusEvent) {
+  const wrap = e.currentTarget as HTMLElement
+  if (!wrap.contains(e.relatedTarget as Node)) openDrop.value = null
+}
+function onNavEscape(e: KeyboardEvent) {
+  if (!openDrop.value) return
+  // devolver el foco al trigger ANTES de cerrar: su focusin reabre el
+  // desplegable y el null posterior lo deja cerrado (orden importa)
+  ;(e.currentTarget as HTMLElement).querySelector<HTMLElement>('a')?.focus()
+  openDrop.value = null
+}
+
+// ---------- menú mobile (acordeón de categorías) ----------
+const menuOpen = ref(false)
+const expanded = ref<string | null>(null) // una categoría expandida a la vez
+
+// Al navegar se cierra todo (desplegable, menú y acordeón)
+watch(() => route.fullPath, () => {
+  openDrop.value = null
+  menuOpen.value = false
+  expanded.value = null
+})
 </script>
 
 <template>
@@ -35,12 +65,40 @@ const onCategoryPage = computed(() => activeSlug.value !== null)
       </NuxtLink>
 
       <div class="links">
-        <NuxtLink
-          v-for="c in categories"
+        <div
+          v-for="c in publicos"
           :key="c.slug"
-          :to="`/categoria/${c.slug}`"
-          :class="{ on: c.slug === activeSlug }"
-        >{{ c.label }}</NuxtLink>
+          class="navitem"
+          @mouseenter="openDrop = c.slug"
+          @mouseleave="openDrop = null"
+          @focusin="openDrop = c.slug"
+          @focusout="onNavFocusOut"
+          @keydown.escape.stop="onNavEscape"
+        >
+          <NuxtLink
+            :to="`/categoria/${c.slug}`"
+            :class="{ on: c.slug === activeSlug }"
+            :aria-expanded="openDrop === c.slug"
+            aria-haspopup="true"
+          >
+            {{ c.nombre }}
+            <svg class="caret" :class="{ up: openDrop === c.slug }" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          </NuxtLink>
+
+          <div v-show="openDrop === c.slug" class="drop">
+            <div class="drop__card">
+              <NuxtLink :to="`/categoria/${c.slug}`" class="drop__all">Ver todo {{ c.nombre }}</NuxtLink>
+              <NuxtLink
+                v-for="s in c.subcategorias"
+                :key="s.slug"
+                :to="{ path: `/categoria/${c.slug}`, query: { sub: s.slug } }"
+                class="drop__link"
+              >{{ s.nombre }}<span class="drop__count">{{ s.count }}</span></NuxtLink>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div class="icons">
@@ -75,9 +133,27 @@ const onCategoryPage = computed(() => activeSlug.value !== null)
   <div class="m">
     <nav class="nav">
       <div class="top">
-        <NuxtLink to="/" class="logo">
-          <img src="/images/logo-kustom.png" alt="Kustom — Disfraces y Trajes típicos" class="logoimg">
-        </NuxtLink>
+        <div class="topleft">
+          <button
+            type="button"
+            class="iconbtn"
+            :aria-label="menuOpen ? 'Cerrar menú' : 'Abrir menú'"
+            :aria-expanded="menuOpen"
+            aria-controls="mobile-menu"
+            @click="menuOpen = !menuOpen"
+          >
+            <svg v-if="!menuOpen" width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+              <path d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+            <svg v-else width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
+          </button>
+
+          <NuxtLink to="/" class="logo">
+            <img src="/images/logo-kustom.png" alt="Kustom — Disfraces y Trajes típicos" class="logoimg">
+          </NuxtLink>
+        </div>
 
         <div class="icons">
           <button type="button" class="iconbtn" aria-label="Abrir carrito" @click="cart.openDrawer()">
@@ -109,12 +185,39 @@ const onCategoryPage = computed(() => activeSlug.value !== null)
 
       <div v-if="!onCategoryPage" class="chiprow">
         <NuxtLink
-          v-for="c in categories"
+          v-for="c in publicos"
           :key="c.slug"
           :to="`/categoria/${c.slug}`"
           class="chip"
           :class="{ on: c.slug === activeSlug }"
-        >{{ c.label }}</NuxtLink>
+        >{{ c.nombre }}</NuxtLink>
+      </div>
+
+      <!-- menú: categorías como acordeón -->
+      <div v-show="menuOpen" id="mobile-menu" class="menu" @keydown.escape="menuOpen = false">
+        <div v-for="c in publicos" :key="c.slug" class="menu__item">
+          <button
+            type="button"
+            class="menu__cat"
+            :aria-expanded="expanded === c.slug"
+            @click="expanded = expanded === c.slug ? null : c.slug"
+          >
+            {{ c.nombre }}
+            <svg class="caret" :class="{ up: expanded === c.slug }" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          </button>
+
+          <div v-show="expanded === c.slug" class="menu__subs">
+            <NuxtLink :to="`/categoria/${c.slug}`" class="menu__sub menu__sub--all">Ver todo {{ c.nombre }}</NuxtLink>
+            <NuxtLink
+              v-for="s in c.subcategorias"
+              :key="s.slug"
+              :to="{ path: `/categoria/${c.slug}`, query: { sub: s.slug } }"
+              class="menu__sub"
+            >{{ s.nombre }}<span class="menu__count">{{ s.count }}</span></NuxtLink>
+          </div>
+        </div>
       </div>
     </nav>
   </div>
@@ -146,6 +249,8 @@ const onCategoryPage = computed(() => activeSlug.value !== null)
   flex: 1;
   justify-content: center;
 }
+/* item con desplegable: ancla del posicionamiento */
+.d .navitem { position: relative; }
 .d .nav .links a {
   font-weight: 600;
   font-size: 13.5px;
@@ -171,6 +276,72 @@ const onCategoryPage = computed(() => activeSlug.value !== null)
   outline: 2px solid var(--turq);
   outline-offset: 2px;
 }
+
+/* ---------- desplegable de subcategorías (desktop) ---------- */
+/* Wrapper transparente con padding-top: puente de hover entre el link y la
+   card (sin él, el mouseleave en el hueco cierra el desplegable). */
+.d .drop {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  padding-top: 8px;
+  z-index: 30;
+}
+.d .drop__card {
+  min-width: 216px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-card);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+}
+.d .drop__all,
+.d .drop__link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  text-decoration: none;
+  padding: 9px 12px;
+  border-radius: 9px;
+  white-space: nowrap;
+}
+.d .drop__all {
+  color: var(--purple);
+  border-bottom: 1px solid var(--line);
+  border-radius: 9px 9px 0 0;
+  margin-bottom: 4px;
+}
+.d .drop__all:hover,
+.d .drop__link:hover {
+  background: var(--hueso);
+  color: var(--purple);
+}
+.d .drop__all:focus-visible,
+.d .drop__link:focus-visible {
+  outline: 2px solid var(--turq);
+  outline-offset: -2px;
+}
+.d .drop__count {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--mut);
+}
+.caret {
+  transition: transform var(--dur-fast) var(--ease-out);
+  flex-shrink: 0;
+}
+.caret.up { transform: rotate(180deg); }
+@media (prefers-reduced-motion: reduce) {
+  .caret { transition: none; }
+}
+
 .d .nav .icons {
   display: flex;
   align-items: center;
@@ -194,6 +365,12 @@ const onCategoryPage = computed(() => activeSlug.value !== null)
   align-items: center;
   justify-content: space-between;
   gap: 10px;
+}
+.m .topleft {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
 }
 .m .nav .icons {
   display: flex;
@@ -247,6 +424,61 @@ const onCategoryPage = computed(() => activeSlug.value !== null)
 .m .chip:focus-visible {
   outline: 2px solid var(--turq);
   outline-offset: 2px;
+}
+
+/* ---------- menú mobile: acordeón de categorías ---------- */
+.m .menu {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--line);
+  padding-top: 4px;
+}
+.m .menu__item + .menu__item { border-top: 1px solid var(--line); }
+.m .menu__cat {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 13px 4px;
+  border: 0;
+  background: transparent;
+  font-family: var(--ff-body);
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--ink);
+  cursor: pointer;
+}
+.m .menu__cat:focus-visible {
+  outline: 2px solid var(--turq);
+  outline-offset: -2px;
+}
+.m .menu__subs {
+  display: flex;
+  flex-direction: column;
+  padding: 0 4px 10px;
+}
+.m .menu__sub {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink);
+  text-decoration: none;
+  padding: 10px 12px;
+  border-radius: 9px;
+}
+.m .menu__sub--all { color: var(--purple); }
+.m .menu__sub:hover { background: var(--hueso); }
+.m .menu__sub:focus-visible {
+  outline: 2px solid var(--turq);
+  outline-offset: -2px;
+}
+.m .menu__count {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--mut);
 }
 
 /* ===================== compartido: logo + iconbtn + cartdot ===================== */

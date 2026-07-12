@@ -30,8 +30,10 @@ export const useProducts = () => {
 
   // Un producto puede vivir en varias categorías (unisex -> ninos Y ninas)
   const byCategory = (slug: string) => products.filter(p => (p.categorySlugs ?? [p.categorySlug]).includes(slug))
+  // Públicos de la taxonomía oficial (la PLP navega por estos; ver useCatalogNav)
+  const byPublico = (slug: string) => products.filter(p => p.publicos?.includes(slug))
   const bySlug = (slug: string) => products.find(p => p.slug === slug)
   const categoryBySlug = (slug: string) => categories.find(c => c.slug === slug)
 
-  return { products, categories, featured, pending, byCategory, bySlug, categoryBySlug }
+  return { products, categories, featured, pending, byCategory, byPublico, bySlug, categoryBySlug }
 }

@@ -52,6 +52,29 @@ tiñe la página completa (el carrito CON ítems va limpio).
 
 ---
 
+## 🧭 Navegación por públicos (nueva taxonomía)
+
+El navbar (desktop con desplegables, mobile con menú acordeón + chips), las
+CategoryTabs y la PLP navegan por los **públicos** de `navegacion.json`:
+Bebés · Niños · Niñas · Damas · Caballeros · Combos. Decisiones:
+
+- **Subcategoría por query param**: `/categoria/ninos?sub=trusas`. URL
+  compartible, las tabs siguen siendo rutas y un `sub` desconocido equivale a
+  "Todos". El contador de la PLP refleja el filtro activo.
+- **Auto-ocultado**: públicos y subcategorías sin productos visibles (Combos,
+  Princesas, Semi, vestidos de dama…) no aparecen en la navegación y la PLP
+  del público vacío responde 404 — cuando el catálogo los active
+  (`disponibleWeb: true`) aparecen solos, sin tocar UI (`useCatalogNav`).
+- **Pares super+eco**: el producto unificado cuenta en AMBAS subcategorías
+  (`subcategoriasNav` es la unión): Thor sale en "Súper Acolchados" y en
+  "Línea Entrada".
+- **PROVISIONAL — `/categoria/adultos` → 301 → `/categoria/damas`**
+  (routeRules en `nuxt.config.ts`): la antigua categoría se dividió en
+  damas/caballeros; se redirige al público con más catálogo hoy. Revisar
+  cuando caballeros crezca o exista una página puente. La Home (banda de
+  categorías) y el footer siguen usando las 4 categorías legacy y funcionan
+  vía esta redirección — pendiente decidir su rediseño.
+
 ## ⚠️ Datos reales con PRECIOS PROVISIONALES
 
 `app/data/catalogo.json` contiene las **108 referencias** de la codificación oficial

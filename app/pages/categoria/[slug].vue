@@ -2,20 +2,33 @@
 const route = useRoute()
 const slug = computed(() => route.params.slug as string)
 
-const { byCategory, categoryBySlug, pending } = useProducts()
+const { byPublico, pending } = useProducts()
+const { publicoBySlug } = useCatalogNav()
 
 // Skeletons: hoy se fuerzan con ?skeleton=1; en Fase D los activa `pending`.
 const showSkeleton = computed(() => pending.value || route.query.skeleton === '1')
 
-const category = computed(() => categoryBySlug(slug.value))
-const all = computed(() => byCategory(slug.value))
-
-// 404 si la categoría no existe
-if (!category.value) {
+// La PLP navega por PÚBLICOS (taxonomía oficial). Los vacíos (Combos) se
+// auto-ocultan de la navegación y también responden 404 hasta tener productos.
+const publico = computed(() => publicoBySlug(slug.value))
+if (!publico.value) {
   throw createError({ statusCode: 404, statusMessage: 'Categoría no encontrada', fatal: true })
 }
 
-useHead(() => ({ title: `${category.value?.name} — Kustom Disfraces` }))
+// Subcategoría activa vía query param (?sub=trusas) — URL compartible y las
+// tabs siguen siendo rutas. Un valor desconocido equivale a "Todos".
+const activeSub = computed(() => {
+  const q = route.query.sub
+  return typeof q === 'string' && publico.value?.subcategorias.some(s => s.slug === q) ? q : null
+})
+
+const all = computed(() => {
+  const base = byPublico(slug.value)
+  return activeSub.value ? base.filter(p => p.subcategoriasNav?.includes(activeSub.value as string)) : base
+})
+
+const subNombre = computed(() => publico.value?.subcategorias.find(s => s.slug === activeSub.value)?.nombre)
+useHead(() => ({ title: `${publico.value?.nombre}${subNombre.value ? ` · ${subNombre.value}` : ''} — Kustom Disfraces` }))
 
 // ---------- opciones de filtro (derivadas de los productos de la categoría) ----------
 // Orden canónico de tallas del catálogo (mezcla "Bebé", números y S-XL)
@@ -90,14 +103,32 @@ const hasMore = computed(() => visible.value < filtered.value.length)
     <Breadcrumb
       :items="[
         { label: 'Inicio', to: '/' },
-        { label: category?.name ?? '' },
+        { label: publico?.nombre ?? '' },
       ]"
     />
 
     <CategoryTabs :active-slug="slug" class="plp__tabs" />
 
+    <!-- chips de subcategoría del público actual ("Todos" = sin filtro) -->
+    <nav v-if="publico && publico.subcategorias.length" class="subchips" aria-label="Subcategorías">
+      <NuxtLink
+        :to="`/categoria/${slug}`"
+        class="subchip"
+        :class="{ on: !activeSub }"
+        :aria-current="!activeSub ? 'true' : undefined"
+      >Todos</NuxtLink>
+      <NuxtLink
+        v-for="s in publico.subcategorias"
+        :key="s.slug"
+        :to="{ path: `/categoria/${slug}`, query: { sub: s.slug } }"
+        class="subchip"
+        :class="{ on: activeSub === s.slug }"
+        :aria-current="activeSub === s.slug ? 'true' : undefined"
+      >{{ s.nombre }}</NuxtLink>
+    </nav>
+
     <header class="plp__header">
-      <h1 class="plp__title">{{ category?.name }}</h1>
+      <h1 class="plp__title">{{ publico?.nombre }}<span v-if="subNombre" class="plp__sub"> · {{ subNombre }}</span></h1>
       <p class="plp__count">{{ filtered.length }} {{ filtered.length === 1 ? 'producto' : 'productos' }}</p>
     </header>
 
@@ -191,6 +222,47 @@ const hasMore = computed(() => visible.value < filtered.value.length)
 }
 .plp__tabs {
   margin-top: var(--space-4);
+}
+
+/* ---------- chips de subcategoría ---------- */
+.subchips {
+  display: flex;
+  gap: 7px;
+  margin-top: var(--space-3);
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.subchips::-webkit-scrollbar { display: none; }
+.subchip {
+  flex: 0 0 auto;
+  font-weight: 600;
+  font-size: 12.5px;
+  padding: 6px 14px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-pill);
+  white-space: nowrap;
+  background: #fff;
+  color: var(--ink);
+  text-decoration: none;
+  transition: border-color var(--dur-fast) var(--ease-out);
+}
+.subchip:hover { border-color: var(--ink); }
+.subchip:focus-visible {
+  outline: 2px solid var(--turq);
+  outline-offset: 2px;
+}
+.subchip.on {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: #fff;
+}
+.plp__sub {
+  color: var(--mut);
+  font-size: var(--text-xl);
+}
+@media (prefers-reduced-motion: reduce) {
+  .subchip { transition: none; }
 }
 .plp__header {
   display: flex;
