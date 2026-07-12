@@ -1,47 +1,28 @@
-import type { Product } from '~~/shared/types/woo'
+import type { ProductoCatalogo } from '~~/shared/types/catalogo'
 
 /**
- * PROXY a WooCommerce — PLANTILLA para Fase D.
+ * PROXY a WooCommerce — catálogo completo en el esquema interno
+ * (shape de catalogo.json; la UI lo proyecta con catalogoToProducts).
  *
- * Este endpoint corre SOLO en el servidor: las API keys (runtimeConfig, sin
- * rama `public`) nunca llegan al cliente. El frontend llamará a `/api/products`
- * en vez de leer el JSON local (ver app/composables/useProducts.ts y README).
- *
- * Hoy devuelve un error claro hasta que el cliente tenga el hosting + llaves.
+ * - Corre SOLO en el servidor: las API keys (runtimeConfig sin rama `public`)
+ *   nunca llegan al cliente.
+ * - Caché SWR de 10 min (ver server/utils/woo.ts).
+ * - FALLBACK: si Woo no responde o da error, se sirve el catálogo local y se
+ *   loggea el incidente — el sitio nunca se cae por culpa de la API.
+ * - `?categoria=<publico>` filtra por público (bebes|ninos|ninas|damas|caballeros).
  */
-export default defineEventHandler(async (): Promise<Product[]> => {
-  const { wooBaseUrl, wooConsumerKey, wooConsumerSecret } = useRuntimeConfig()
-
-  if (!wooBaseUrl || !wooConsumerKey || !wooConsumerSecret) {
-    throw createError({
-      statusCode: 503,
-      statusMessage: 'WooCommerce aún no configurado. Define NUXT_WOO_* en .env (Fase D).',
-    })
+export default defineEventHandler(async (event): Promise<ProductoCatalogo[]> => {
+  let catalogo: ProductoCatalogo[]
+  try {
+    catalogo = await getWooCatalogo()
+  } catch (err) {
+    console.error('[woo-proxy] Woo no respondió; FALLBACK al catálogo local.', sanitizeWooError(err))
+    catalogo = CATALOGO_LOCAL
   }
 
-  // --- Fase D: descomentar y completar el mapeo Woo -> Product ---
-  //
-  // const raw = await $fetch<any[]>(`${wooBaseUrl}/wp-json/wc/v3/products`, {
-  //   query: {
-  //     consumer_key: wooConsumerKey,
-  //     consumer_secret: wooConsumerSecret,
-  //     per_page: 100,
-  //   },
-  // })
-  //
-  // return raw.map<Product>(w => ({
-  //   id: w.id,
-  //   name: w.name,
-  //   slug: w.slug,
-  //   price: Number(w.price),
-  //   regularPrice: w.on_sale ? Number(w.regular_price) : undefined,
-  //   sizes: ... // de los atributos/variaciones de Woo
-  //   badges: ...
-  //   images: w.images?.map((i: any) => i.src) ?? [],
-  //   categorySlug: w.categories?.[0]?.slug ?? '',
-  //   featured: w.featured,
-  //   description: w.short_description,
-  // }))
-
-  return []
+  const categoria = getQuery(event).categoria
+  if (typeof categoria === 'string' && categoria) {
+    return catalogo.filter(i => i.disponibleWeb && i.publicos.includes(categoria as never))
+  }
+  return catalogo
 })

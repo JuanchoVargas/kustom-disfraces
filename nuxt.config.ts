@@ -59,11 +59,17 @@ export default defineNuxtConfig({
   },
 
   // Seguridad dia 1 (regla #1): claves de WooCommerce SOLO en servidor.
-  // Sin la rama "public" => nunca se serializan al cliente. Se inyectan por
-  // variables de entorno en runtime (ver nombres NUXT_* a la derecha).
+  // Sin la rama "public" => nunca se serializan al cliente. Los defaults
+  // salen del .env en build (nuxi lo carga solo); en runtime se pueden
+  // sobreescribir con las variables NUXT_* equivalentes.
   runtimeConfig: {
-    wooBaseUrl: '',        // -> NUXT_WOO_BASE_URL
-    wooConsumerKey: '',    // -> NUXT_WOO_CONSUMER_KEY
-    wooConsumerSecret: '', // -> NUXT_WOO_CONSUMER_SECRET
+    wooBaseUrl: process.env.WOO_API_URL || '',              // -> NUXT_WOO_BASE_URL
+    wooConsumerKey: process.env.WOO_CONSUMER_KEY || '',     // -> NUXT_WOO_CONSUMER_KEY
+    wooConsumerSecret: process.env.WOO_CONSUMER_SECRET || '', // -> NUXT_WOO_CONSUMER_SECRET
+    public: {
+      // Origen del catálogo: 'local' (catalogo.json) | 'woo' (proxy /api/products).
+      // Default LOCAL — el switch a woo se hace tras verificar paridad (README).
+      dataSource: process.env.DATA_SOURCE || 'local',       // -> NUXT_PUBLIC_DATA_SOURCE
+    },
   },
 })

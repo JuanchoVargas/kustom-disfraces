@@ -5,25 +5,36 @@ import catalogoData from '~/data/catalogo.json'
 import categoriesData from '~/data/categories.json'
 
 /**
- * Fuente de datos del catálogo. HOY lee de JSON local (mock).
- * El canónico es catalogo.json (codificación oficial del cliente, 1 ítem =
- * 1 referencia, incluye refs ocultas con disponibleWeb: false); las vistas
- * consumen la forma `Product` que proyecta catalogoToProducts — Súper y
- * Línea Entrada son productos SEPARADOS, enlazados solo por el cruce
- * `pareja` de la PDP. En Fase D solo se cambia el origen (server/api ->
- * WooCommerce); la firma del composable y las vistas quedan iguales.
+ * Fuente de datos del catálogo. El canónico es el shape ProductoCatalogo
+ * (1 ítem = 1 referencia oficial; Súper y Línea Entrada separados, enlazados
+ * solo por el cruce `pareja` de la PDP).
+ *
+ * Fase D: con DATA_SOURCE=woo el plugin app/plugins/catalogo.ts hidrata
+ * useState('catalogo-remoto') desde el proxy /api/products (WooCommerce);
+ * con DATA_SOURCE=local (default) se usa el catalogo.json empaquetado.
+ * La firma del composable y las vistas no cambian en ningún modo.
  */
 
-// El JSON importado ensancha los literales a string; el modelo real es ProductoCatalogo.
-const productsFromCatalogo = catalogoToProducts(catalogoData as unknown as ProductoCatalogo[])
+const CATALOGO_LOCAL = catalogoData as unknown as ProductoCatalogo[]
+
+// memo por identidad de la fuente: la proyección solo se recalcula cuando
+// cambia el array de origen (local <-> remoto hidratado)
+let memoSource: ProductoCatalogo[] | null = null
+let memoProducts: Product[] = []
 
 export const useProducts = () => {
-  const products = productsFromCatalogo
+  const remoto = useState<ProductoCatalogo[] | null>('catalogo-remoto', () => null)
+  const source = remoto.value ?? CATALOGO_LOCAL
+  if (source !== memoSource) {
+    memoSource = source
+    memoProducts = catalogoToProducts(source)
+  }
+  const products = memoProducts
   const categories = categoriesData as Category[]
 
-  // Hoy los datos son síncronos (JSON), así que pending = false.
-  // En Fase D, esto será el `pending` de useFetch('/api/...') y los
-  // skeletons (que ya consumen este flag) pasan a ser los loading reales.
+  // Hoy los datos llegan resueltos antes del render (JSON local o payload del
+  // plugin), así que pending = false; los skeletons quedan listos para estados
+  // de carga reales si el catálogo pasa a cargarse en cliente.
   const pending = ref(false)
 
   const featured = products.filter(p => p.featured)

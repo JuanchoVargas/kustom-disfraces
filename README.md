@@ -158,62 +158,47 @@ Otras notas de la carga:
   no tienen foto en el Excel: se extrajeron del PDF del catálogo (menor resolución,
   ~300–500px — pedir al cliente las fotos originales de esos 4).
 
-## 🔌 Conexión con WooCommerce (Fase D)
+## 🔌 Conexión con WooCommerce (Fase D — IMPLEMENTADA, en modo local)
 
-> El frontend está construido contra el tipo de dominio `Product`/`Category` (`shared/types/woo.ts`).
-> Las vistas (Home, PLP, PDP, carrito) **no cambian**: solo cambia de dónde salen los datos.
+> WooCommerce vive en `api.disfraceskustom.com` (headless; el raíz y `www`
+> apuntan SIEMPRE a Vercel). Las vistas no cambian según el origen de datos.
 
-### Punto único a cambiar: `app/composables/useProducts.ts`
+### Flag de origen: `DATA_SOURCE=local|woo` (.env)
 
-**Hoy** lee de un JSON local (el canónico `catalogo.json`, adaptado a la forma
-legacy `Product` con `catalogoToProducts`):
+- **`local` (default actual)**: el catálogo sale de `app/data/catalogo.json`.
+- **`woo`**: el plugin `app/plugins/catalogo.ts` trae el catálogo del proxy
+  `/api/products` durante el SSR y lo hidrata al cliente (`useState`);
+  `useProducts` sigue síncrono y la UI no se entera del cambio.
 
-```ts
-import { catalogoToProducts } from '~~/shared/utils/catalogo'
-import catalogoData from '~/data/catalogo.json'
-import categoriesData from '~/data/categories.json'
+⚠️ **NO cambiar a `woo` sin correr la verificación de paridad** (abajo) y
+revisar el resultado. En Vercel el flag runtime es `NUXT_PUBLIC_DATA_SOURCE`.
 
-const products = catalogoToProducts(catalogoData as unknown as ProductoCatalogo[])
+### El proxy: `server/api/products` (+ `/api/products/<slug>`, `?categoria=`)
 
-export const useProducts = () => {
-  const categories = categoriesData as Category[]
-  // ...
-}
+Las API keys **NUNCA** van al cliente: viven en `runtimeConfig` server-only,
+alimentadas por `.env` (`WOO_API_URL`, `WOO_CONSUMER_KEY`, `WOO_CONSUMER_SECRET`;
+en runtime se pueden sobreescribir con `NUXT_WOO_BASE_URL`, `NUXT_WOO_CONSUMER_KEY`,
+`NUXT_WOO_CONSUMER_SECRET`).
+
+- **Adaptador** (`server/utils/woo.ts`): merge por SKU — Woo es la autoridad
+  COMERCIAL (publish/draft, precio, tallas, nombre, destacado) y el catálogo
+  local aporta la taxonomía web (públicos, subcategorías, slugs, descripciones,
+  pareja). Las **imágenes se sirven del propio frontend**, no de WordPress.
+  Draft o sin producto en Woo ⇒ `disponibleWeb: false` (paridad con el modelo).
+- **Caché**: `defineCachedFunction` de Nitro con SWR de **10 min** — el hosting
+  compartido recibe a lo sumo un refresco por ventana, no un hit por visita.
+- **Fallback**: si Woo no responde, el proxy loggea el incidente y sirve el
+  catálogo local — el sitio nunca se cae por culpa de la API.
+
+### Verificación de paridad (antes del switch)
+
+```bash
+npm run build && node .output/server/index.mjs   # terminal 1
+node scripts/paridad-woo.mjs http://localhost:3000  # terminal 2
 ```
 
-**En Fase D** se reemplaza por un fetch al proxy del servidor (que es quien habla con Woo):
-
-```ts
-export const useProducts = async () => {
-  const { data: products } = await useFetch<Product[]>('/api/products')
-  const { data: categories } = await useFetch<Category[]>('/api/categories')
-  // mismas funciones derivadas (featured, byCategory, bySlug…)
-}
-```
-
-(Los componentes ya consumen `Product`, así que no se tocan.)
-
-### El proxy: `server/api/` + claves seguras
-
-Las API keys de WooCommerce **NUNCA** van al cliente. Viven en `runtimeConfig`
-(server-only) en `nuxt.config.ts` y se inyectan por variables de entorno:
-
-```
-# .env (no se commitea)
-NUXT_WOO_BASE_URL=https://tienda-del-cliente.com
-NUXT_WOO_CONSUMER_KEY=ck_xxx
-NUXT_WOO_CONSUMER_SECRET=cs_xxx
-```
-
-El endpoint `server/api/products.get.ts` (plantilla incluida) las usa para
-llamar a la REST API de Woo (`/wp-json/wc/v3/products`), mapea la respuesta al
-tipo `Product` y la devuelve al cliente — sin exponer nunca las llaves.
-
-### Checklist Fase D
-1. Crear `.env` con las 3 variables `NUXT_WOO_*`.
-2. Completar el mapeo Woo → `Product` en `server/api/products.get.ts` y `categories.get.ts`.
-3. Cambiar `useProducts.ts` de import JSON a `useFetch('/api/...')`.
-4. (Opcional) Borrar `app/data/*.json`.
+Compara visibles local vs Woo: mismos slugs, precios y tallas. Sale con código
+0 solo si hay paridad total.
 
 ### Pendientes Fase D
 - **Wishlist**: UI existente pero oculta (`ENABLE_WISHLIST = false` en
