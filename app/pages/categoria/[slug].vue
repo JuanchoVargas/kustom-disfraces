@@ -91,10 +91,11 @@ const hasMore = computed(() => visible.value < filtered.value.length)
 </script>
 
 <template>
-  <div>
-  <!-- PLP SIN patrón (regla de marca: las fotos de producto mandan);
-       fondo Blanco Hueso sólido del body. El div raíz único se queda:
-       un comentario a nivel raíz rompe pageTransition en dev. -->
+  <div class="textured">
+  <!-- Fondo crema texturizado global (decisión del cliente, jul 2026);
+       las fotos de producto siguen mandando: cards siempre sobre blanco.
+       El div raíz único se queda: un comentario a nivel raíz rompe
+       pageTransition en dev. -->
   <div class="plp">
     <Breadcrumb
       :items="[

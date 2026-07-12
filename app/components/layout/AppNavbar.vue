@@ -380,7 +380,8 @@ watch(() => route.fullPath, () => {
   gap: 6px;
   flex-shrink: 0;
 }
-.m .logoimg { height: 38px; }
+/* +26% con compensación (48 - 10 = 38 efectivos, la fila .top no crece) */
+.m .logoimg { height: 48px; margin-block: -5px; }
 .m .search {
   display: flex;
   align-items: center;
@@ -490,11 +491,14 @@ watch(() => route.fullPath, () => {
   text-decoration: none;
   flex-shrink: 0;
 }
-/* Logo-Kustom.png (wordmark negro + tagline, fondo transparente) */
+/* Logo-Kustom.png (wordmark negro + tagline, fondo transparente).
+   +26% de tamaño (marketing jul 2026) SIN crecer el navbar: el margen
+   vertical negativo compensa el alto extra (58 - 12 = 46 efectivos). */
 .logoimg {
-  height: 46px;
+  height: 58px;
   width: auto;
   display: block;
+  margin-block: -6px;
 }
 .iconbtn {
   width: 38px;

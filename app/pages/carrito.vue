@@ -21,8 +21,8 @@ const waCheckout = computed(() => {
 </script>
 
 <template>
-  <div>
-  <!-- Carrito SIN patrón de página (flujo de checkout: hueso sólido).
+  <div class="textured">
+  <!-- Fondo crema texturizado global (decisión del cliente, jul 2026).
        El pattern-morado vive SOLO en .empty (estado especial con KO).
        Div raíz único: gotcha pageTransition. -->
   <div class="cart">

@@ -741,7 +741,8 @@
       "Cubrebotas"
     ],
     "temporada": "Todo el año",
-    "destacado": false
+    "destacado": false,
+    "fotoIndividual": true
   },
   {
     "codigo": "001001009",
@@ -1147,7 +1148,8 @@
       "Manillas"
     ],
     "destacado": false,
-    "temporada": "Todo el año"
+    "temporada": "Todo el año",
+    "fotoIndividual": true
   },
   {
     "codigo": "001004001",
@@ -1289,8 +1291,7 @@
     "linea": "disfraces",
     "grupo": "ninja",
     "publicos": [
-      "ninos",
-      "ninas"
+      "ninos"
     ],
     "subcategoriaNav": "ninjas",
     "tallas": [
@@ -1326,8 +1327,7 @@
     "linea": "disfraces",
     "grupo": "ninja",
     "publicos": [
-      "ninos",
-      "ninas"
+      "ninos"
     ],
     "subcategoriaNav": "ninjas",
     "tallas": [
@@ -1363,8 +1363,7 @@
     "linea": "disfraces",
     "grupo": "ninja",
     "publicos": [
-      "ninos",
-      "ninas"
+      "ninos"
     ],
     "subcategoriaNav": "ninjas",
     "tallas": [
@@ -1400,8 +1399,7 @@
     "linea": "disfraces",
     "grupo": "personajes",
     "publicos": [
-      "ninos",
-      "ninas"
+      "ninos"
     ],
     "subcategoriaNav": null,
     "tallas": [

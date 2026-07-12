@@ -78,9 +78,10 @@ const perks = [
 </script>
 
 <template>
-  <div>
-  <!-- PDP SIN patrón (regla de marca: las fotos de producto mandan);
-       fondo Blanco Hueso sólido del body. Div raíz único: gotcha pageTransition. -->
+  <div class="textured">
+  <!-- Fondo crema texturizado global (decisión del cliente, jul 2026);
+       la galería y las cards siguen sobre blanco (las fotos mandan).
+       Div raíz único: gotcha pageTransition. -->
   <div v-if="product" class="pdp">
     <Breadcrumb
       :items="[

@@ -53,6 +53,8 @@ export interface Product {
   subcategoriasNav?: string[]
   /** Su par Súper/Línea Entrada, si existe — enlace cruzado en la PDP */
   pareja?: ProductPareja
+  /** Foto de figura única (sin frente+espalda): los crops "solo frontal" no aplican */
+  fotoIndividual?: boolean
 }
 
 export interface Category {

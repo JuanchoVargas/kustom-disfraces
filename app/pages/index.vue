@@ -25,10 +25,8 @@ useHead({
   <div class="textured">
 
   <!-- Marquee del eslogan (único uso en el sitio) -->
+  <!-- La TrustBar ya no va aquí: el layout la pinta encima del footer -->
   <SloganMarquee />
-
-  <!-- TrustBar tras el hero (en la Home el layout no la pinta arriba) -->
-  <TrustBar />
 
   <!-- ===================== CATEGORÍAS ===================== -->
   <section class="section">

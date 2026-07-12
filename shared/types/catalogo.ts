@@ -45,6 +45,9 @@ export interface ProductoCatalogo {
   precio: number | null
   /** Vacío = fotos pendientes del cliente */
   imagenes: string[]
+  /** true = la foto es de figura ÚNICA (extraída del PDF, sin frente+espalda);
+   *  los recortes "solo frontal" de la Home no le aplican */
+  fotoIndividual?: boolean
   /** Solo los true se muestran en el sitio */
   disponibleWeb: boolean
 

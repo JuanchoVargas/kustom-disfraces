@@ -1,18 +1,16 @@
 <script setup lang="ts">
-// En la Homepage la TrustBar va DESPUÉS del hero (la renderiza index.vue);
-// en el resto de páginas va aquí, bajo el navbar.
-const route = useRoute()
-const trustInLayout = computed(() => route.path !== '/')
+// TrustBar: encima del footer en TODAS las páginas (ajuste del equipo de
+// marketing, jul 2026). Antes iba bajo el navbar (y tras el hero en la Home).
 </script>
 
 <template>
   <div class="shell">
     <AnnouncementBar />
     <AppNavbar />
-    <TrustBar v-if="trustInLayout" />
     <main class="shell__main">
       <slot />
     </main>
+    <TrustBar />
     <AppFooter />
     <CartDrawer />
   </div>

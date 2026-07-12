@@ -36,19 +36,23 @@ shared/
 ## 🎨 Regla de marca: patrones (dónde va cada tile)
 
 Los tres tiles de `public/images/` tienen usos cerrados. Si un patrón aparece
-fuera de su lugar, es un bug (ya pasó una vez: una tarea metió `.textured` en
-PLP/PDP/carrito/error y hubo que revertirlo).
+fuera de su lugar, es un bug.
+
+> **Actualización 2026-07-12 (decisión del cliente):** el fondo crema
+> texturizado se extendió a TODO el sitio (Homepage + PLP + PDP + carrito),
+> con la misma `--pattern-opacity` de siempre (NO subirla). La regla anterior
+> ("PLP/PDP/carrito sin patrón") queda derogada.
 
 | Patrón | Uso permitido | Cómo |
 |---|---|---|
-| `pattern-crema` | **Solo secciones de la Homepage** | utilidad `.textured` (main.css), intensidad vía `--pattern-opacity` (tokens.css) |
+| `pattern-crema` | **Global: Homepage, PLP, PDP y carrito** (desde 2026-07-12) | utilidad `.textured` (main.css) en la raíz de cada página, intensidad vía `--pattern-opacity` (tokens.css) — sin subirla |
 | `pattern-morado` | **Banda KO de la Homepage + estados especiales donde aparece KO** (404/500 en `error.vue`, carrito vacío en `carrito.vue`) | tile opaco del pack, intensidad de fábrica |
 | `pattern-ink` | **Solo el footer** | tile opaco del pack, intensidad de fábrica |
 
-**PLP, PDP y carrito/checkout van SIN patrón, siempre**: fondo Blanco Hueso
-sólido (`--hueso`). Las fotos de producto mandan; el fondo no compite con ellas.
-El morado de los estados especiales acompaña a KO en su card/bloque — nunca
-tiñe la página completa (el carrito CON ítems va limpio).
+**Sigue intacto**: las fotos de producto mandan — cards, galerías de la PDP y
+filas del carrito van SIEMPRE sobre blanco sólido; la textura vive solo en el
+fondo de página. El morado de los estados especiales acompaña a KO en su
+card/bloque — nunca tiñe la página completa.
 
 ---
 
