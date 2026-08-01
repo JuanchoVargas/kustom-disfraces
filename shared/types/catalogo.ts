@@ -41,7 +41,8 @@ export interface ProductoCatalogo {
   /** Subcategoría del árbol de navegacion.json (null = sin ubicación aún) */
   subcategoriaNav: string | null
   tallas: (number | string)[]
-  /** Precio COP — ⚠ PROVISIONAL (ver README). null = sin base aún, pendiente cliente. */
+  /** Precio COP de la lista oficial del cliente (jul 2026, ver README). null =
+   *  grupo sin precio oficial (SEMI, Súper Adulto, vestidos dama, chaquetas). */
   precio: number | null
   /** Vacío = fotos pendientes del cliente */
   imagenes: string[]

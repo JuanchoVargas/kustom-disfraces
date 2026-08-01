@@ -20,7 +20,7 @@ app/
   composables/     useSiteNav.ts · useProducts.ts   <-- fuente de datos
   data/            catalogo.json (canónico: codificación oficial del cliente, 1 ítem = 1 referencia)
                    navegacion.json (árbol públicos/subcategorías, aún sin UI) · categories.json
-                   (precios provisionales, ver abajo)
+                   (precios oficiales del cliente, ver abajo)
   insumos/         fuentes del cliente (PDF/Excel/imágenes) — LOCAL-ONLY: fuera del git (.gitignore), no se publican ni entran al build; respaldar por fuera del repo
   layouts/         default.vue (navbar + trust + footer)
   pages/           index · categoria/[slug] · producto/[slug] · carrito · design-system · preview
@@ -81,39 +81,50 @@ Bebés · Niños · Niñas · Damas · Caballeros · Combos. Decisiones:
   cuando caballeros crezca o exista una página puente. Home y footer ya
   usan los 5 públicos; la redirección queda para enlaces externos viejos.
 
-## ⚠️ Datos reales con PRECIOS PROVISIONALES
+## 💲 Precios oficiales del cliente (cargados jul 2026)
 
-`app/data/catalogo.json` contiene las **108 referencias** de la codificación oficial
+`app/data/catalogo.json` contiene las **109 referencias** de la codificación oficial
 del cliente (`CODIGOS DE REFERENCIAS.xlsx` en `app/insumos/`, que NO se publica ni
 entra al build): 67 visibles (`disponibleWeb: true` — **67 productos web**, porque
 Súper y Línea Entrada son productos separados; los pares se enlazan con `parejaDe`
-solo para el cruce de la PDP) y 41 ocultas sin foto ni precio confirmado (SEMI,
+solo para el cruce de la PDP) y 42 ocultas sin foto ni precio confirmado (SEMI,
 Súper Adulto, vestidos dama, chaquetas…). El sitio solo muestra `disponibleWeb: true`.
-Dos salvedades que hay que resolver con el cliente antes de salir a producción:
 
-### 1. Los precios son PROVISIONALES (inventados para diseño)
+### 1. Los precios son los REALES de la lista del cliente
 
-Ni el catálogo PDF ni el Excel traen precios (el catálogo remite a "Cotiza aquí" por
-WhatsApp). Se cargaron precios de relleno, planos por tipo de producto:
+Los `precio` de `catalogo.json` provienen de `DISFRACES PRECIOS.xlsx`
+(`app/insumos/`, local-only). Cada valor sale de una celda del Excel — no hay precios
+inventados. No hay `regularPrice` (la lista no trae descuentos). Precios por grupo:
 
-| Tipo | Precio provisional |
+| Tipo | Precio oficial |
 |---|---|
-| Súper Acolchado (gama) | $129.900 |
-| Línea Eco (gama) | $89.900 |
-| Vestidos superheroínas | $119.900 |
-| Trusas infantiles | $99.900 |
-| Anime (conjuntos) | $139.900 |
-| Ninjas | $109.900 |
-| Personajes (Michael Jackson) | $129.900 |
-| Trusas adultos | $119.900 |
-| Bebés · Animales | $79.900 |
-| Bebés · Línea Plus (Stitch, Gato con Botas) | $89.900 |
+| Súper Acolchado | $120.000 (Iron Spider-Man, Spider-Man Clásico, Miles Morales y Batman $130.000; Aquaman $99.000) |
+| Línea Entrada | $65.000 |
+| Vestidos superheroínas (niña) | $85.000 |
+| Trusas infantiles | Spider Gwen y Elastic Girl $80.000 · Katrina y Esqueleto $70.000 · Lady Bug $65.000 |
+| Anime (conjuntos) | Shinobu $130.000 (resto **pendiente**, ver abajo) |
+| Ninjas | $80.000 |
+| Personajes (Michael Jackson) | $120.000 |
+| Trusas adultos | $150.000 |
+| Bebés · Animales (Línea) | $89.000 |
+| Bebés · Línea Plus (Stitch, Gato con Botas) | $110.000 |
 
-Cuando llegue la lista oficial, se reemplazan en `catalogo.json` (campo `precio` de
-cada referencia). No hay `regularPrice` (no se inventaron descuentos).
+**Pendientes de confirmación (NO actualizados — el Excel trae un cero de menos):**
+Pantera Negra (Excel $12.000, debería ser ~$120.000) y los 5 anime Nezuko, Rengoku,
+Tanjiro, Tomioka y Zenitzu (Excel $13.000, debería ser ~$130.000). Conservan su precio
+anterior hasta que el cliente confirme el valor.
 
-También es provisional el **umbral de envío gratis** del drawer del carrito:
-`FREE_SHIPPING_THRESHOLD = 200_000` COP en `app/stores/cart.ts` — confirmar con el cliente.
+**Sin precio en el Excel:** Spider Gwen (trusa adulto, `001005010`) está visible pero
+no aparece en la lista de precios; conserva su cifra anterior ($119.900) a la espera de
+decisión (definir precio u ocultar).
+
+**Grupos sin precio oficial** (siguen ocultos, `disponibleWeb: false`): SEMI, Súper
+Adulto y chaquetas (`precio: null`); vestidos dama (no están en el Excel; conservan una
+cifra heredada, no oficial — no se muestran). Se resuelven cuando el cliente los active.
+
+El **umbral de envío gratis** del drawer del carrito
+(`FREE_SHIPPING_THRESHOLD = 200_000` COP en `app/stores/cart.ts`) sigue por confirmar
+con el cliente — es un ajuste de logística, no un precio de producto.
 
 ### 2. Códigos provisionales (sufijo `-P`) — estado tras el Excel oficial (jul 2026)
 
@@ -137,10 +148,11 @@ provisionales originales y obligó a reasignar otros:
 | Stitch (bebés) | `001010002-P` (antes `001011006-P`) | no está en el Excel; movido a la familia Animales Plus (010), que es su grupo real |
 | Lady Bug (trusa infantil) | `001006004-P` | no está en el Excel (Trusa Infantil solo trae 3 refs) |
 | Elastic Girl (trusa infantil) | `001006005-P` | no está en el Excel |
+| Kokushibo (anime) | `001004007-P` | ref nueva del Excel de precios; código libre (el `001004007` de Shinobu se reasignó). Oculta, sin precio confirmado |
 
 El Excel confirma **"Ninja Dorada"** (001009003) — el nombre que se había asumido.
 
-Supuestos de las 41 referencias ocultas (sin base en el sitio, revisar al activarlas):
+Supuestos de las 42 referencias ocultas (sin base en el sitio, revisar al activarlas):
 tallas de SEMI heredadas de Línea Eco; tallas de vestidos dama `S–XL`; precio `null`
 en SEMI, Súper Adulto y chaquetas (sin grupo equivalente del cual heredar); chaquetas
 sin tallas ni público asignado (fuera de la navegación).

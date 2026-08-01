@@ -35,8 +35,8 @@ export default defineNuxtConfig({
     pageTransition: { name: 'page', mode: 'out-in' },
     head: {
       meta: [
-        // PROVISIONAL: quitar en el lanzamiento oficial cuando los precios
-        // sean reales (el dominio ya es público pero no debe indexarse aún)
+        // Pre-lanzamiento: el dominio ya es público pero no debe indexarse aún.
+        // Quitar en el lanzamiento oficial (decisión del cliente).
         { name: 'robots', content: 'noindex, nofollow' },
       ],
     },

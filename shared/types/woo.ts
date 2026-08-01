@@ -24,7 +24,7 @@ export interface Product {
   slug: string
   /** Código de producto del catálogo (sufijo -P = provisional, pendiente cliente) */
   code?: string
-  /** Precio actual en COP (entero, sin separadores) — ⚠ hoy PROVISIONAL, ver README */
+  /** Precio actual en COP (entero, sin separadores). Lista oficial del cliente (ver README). */
   price: number
   /** Precio anterior tachado, si está en oferta */
   regularPrice?: number
