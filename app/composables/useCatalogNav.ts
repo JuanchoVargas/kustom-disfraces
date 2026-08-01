@@ -18,6 +18,8 @@ export interface NavPublico {
   slug: string
   nombre: string
   count: number
+  /** público "por llenar" (placeholder) — se oculta del menú si no tiene productos */
+  placeholder: boolean
   subcategorias: NavSubcategoria[]
 }
 
@@ -33,6 +35,7 @@ export const useCatalogNav = () => {
         slug: pub.slug,
         nombre: pub.nombre,
         count: prods.length,
+        placeholder: pub.placeholder ?? false,
         subcategorias: pub.subcategorias
           .map(s => ({
             slug: s.slug,
@@ -42,7 +45,10 @@ export const useCatalogNav = () => {
           .filter(s => s.count > 0),
       }
     })
-    .filter(pub => pub.count > 0)
+    // se muestran las categorías CON productos o las "core" (no placeholder):
+    // así Caballeros aparece aunque esté vacío (lleva al "muy pronto"), pero
+    // Combos (placeholder) sigue oculto hasta tener productos.
+    .filter(pub => pub.count > 0 || !pub.placeholder)
 
   const publicoBySlug = (slug: string) => publicos.find(p => p.slug === slug)
   // Público DEFINIDO en la taxonomía aunque esté vacío (para distinguir
