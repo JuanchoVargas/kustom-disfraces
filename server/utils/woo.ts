@@ -112,16 +112,17 @@ const buildCatalogoFromWoo = async (): Promise<ProductoCatalogo[]> => {
 
 const bySkuNeedsLookup = (p: WooProduct) => p.price === '' || Number.isNaN(Number(p.price)) || Number(p.price) <= 0
 
-/** Catálogo Woo->interno cacheado 10 min (una entrada, key 'all'): el hosting
+/** Catálogo Woo->interno cacheado 2 min (una entrada, key 'all'): el hosting
  *  compartido recibe como máximo un refresco por ventana, no uno por visita.
  *  swr:false — al expirar revalida de forma SÍNCRONA (espera la respuesta fresca
  *  de Woo) en vez de servir stale. En serverless (Vercel) la revalidación en
  *  background del SWR moría al devolver la respuesta y dejaba datos viejos
  *  sirviéndose indefinidamente; con swr:false una request por ventana bloquea
- *  ~1-2s para traer lo fresco y el resto sale de caché. */
+ *  ~1-2s para traer lo fresco y el resto sale de caché. maxAge 120 = los cambios
+ *  de precio/stock en Woo se reflejan en ~2 min (ver README). */
 export const getWooCatalogo = defineCachedFunction(buildCatalogoFromWoo, {
   name: 'woo-catalogo',
-  maxAge: 600,
+  maxAge: 120,
   swr: false,
   getKey: () => 'all',
 })

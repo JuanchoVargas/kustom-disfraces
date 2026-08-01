@@ -197,8 +197,17 @@ en runtime se pueden sobreescribir con `NUXT_WOO_BASE_URL`, `NUXT_WOO_CONSUMER_K
   local aporta la taxonomía web (públicos, subcategorías, slugs, descripciones,
   pareja). Las **imágenes se sirven del propio frontend**, no de WordPress.
   Draft o sin producto en Woo ⇒ `disponibleWeb: false` (paridad con el modelo).
-- **Caché**: `defineCachedFunction` de Nitro con SWR de **10 min** — el hosting
-  compartido recibe a lo sumo un refresco por ventana, no un hit por visita.
+- **Caché**: `defineCachedFunction` de Nitro, `maxAge` **2 min** y `swr: false`
+  (revalidación síncrona: al expirar, la primera request de la ventana bloquea
+  ~1-2s y trae datos frescos de Woo, en vez de servir stale). En serverless el
+  `swr: true` revalidaba en background y esa tarea moría al devolver la respuesta,
+  dejando datos viejos; por eso se desactivó. El hosting compartido recibe a lo
+  sumo un refresco por ventana, no un hit por visita.
+
+  > **Los cambios de precio/stock hechos en WooCommerce se reflejan en el sitio
+  > en ~2 minutos** (ventana de caché del proxy). Es el comportamiento esperado
+  > — no es un bug. Para propagación más rápida, bajar `maxAge` en
+  > `server/utils/woo.ts` (a mayor costo de llamadas a Woo).
 - **Fallback**: si Woo no responde, el proxy loggea el incidente y sirve el
   catálogo local — el sitio nunca se cae por culpa de la API.
 
