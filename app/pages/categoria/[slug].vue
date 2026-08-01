@@ -3,17 +3,19 @@ const route = useRoute()
 const slug = computed(() => route.params.slug as string)
 
 const { byPublico, pending } = useProducts()
-const { publicoBySlug } = useCatalogNav()
+const { publicoBySlug, knownPublico } = useCatalogNav()
 
 // Skeletons: hoy se fuerzan con ?skeleton=1; en Fase D los activa `pending`.
 const showSkeleton = computed(() => pending.value || route.query.skeleton === '1')
 
-// La PLP navega por PÚBLICOS (taxonomía oficial). Los vacíos (Combos) se
-// auto-ocultan de la navegación y también responden 404 hasta tener productos.
-const publico = computed(() => publicoBySlug(slug.value))
-if (!publico.value) {
+// La PLP navega por PÚBLICOS (taxonomía oficial). Un slug que NO existe en la
+// taxonomía -> 404; un público definido pero SIN productos -> estado "muy pronto".
+const known = computed(() => knownPublico(slug.value))
+if (!known.value) {
   throw createError({ statusCode: 404, statusMessage: 'Categoría no encontrada', fatal: true })
 }
+const categoryEmpty = computed(() => byPublico(slug.value).length === 0)
+const publico = computed(() => publicoBySlug(slug.value))
 
 // Subcategoría activa vía query param (?sub=trusas) — URL compartible y las
 // tabs siguen siendo rutas. Un valor desconocido equivale a "Todos".
@@ -40,7 +42,7 @@ const banner = computed(() => CATEGORY_BANNERS[slug.value])
 const catCount = computed(() => byPublico(slug.value).length)
 
 const subNombre = computed(() => publico.value?.subcategorias.find(s => s.slug === activeSub.value)?.nombre)
-useHead(() => ({ title: `${publico.value?.nombre}${subNombre.value ? ` · ${subNombre.value}` : ''} — Kustom Disfraces` }))
+useHead(() => ({ title: `${known.value?.nombre}${subNombre.value ? ` · ${subNombre.value}` : ''} — Kustom Disfraces` }))
 
 // ---------- opciones de filtro (derivadas de los productos de la categoría) ----------
 // Orden canónico de tallas del catálogo (mezcla "Bebé", números y S-XL)
@@ -112,12 +114,24 @@ const hasMore = computed(() => visible.value < filtered.value.length)
     <Breadcrumb
       :items="[
         { label: 'Inicio', to: '/' },
-        { label: publico?.nombre ?? '' },
+        { label: known?.nombre ?? '' },
       ]"
     />
 
     <CategoryTabs :active-slug="slug" class="plp__tabs" />
 
+    <!-- categoría definida pero SIN productos: KO + mensaje "muy pronto" -->
+    <section v-if="categoryEmpty" class="soon">
+      <img src="/images/ko/ko-paz.webp" alt="KO, la mascota de Kustom" class="soon__ko" width="200" height="200">
+      <h1 class="soon__title">{{ known?.nombre }}: ¡muy pronto!</h1>
+      <p class="soon__text">
+        Estamos preparando los disfraces para {{ known?.nombre?.toLowerCase() }}.
+        Vuelve pronto — ya casi están listos.
+      </p>
+      <KButton variant="primary" to="/">Explorar otros disfraces</KButton>
+    </section>
+
+    <template v-else>
     <!-- chips de subcategoría del público actual ("Todos" = sin filtro) -->
     <nav v-if="publico && publico.subcategorias.length" class="subchips" aria-label="Subcategorías">
       <NuxtLink
@@ -222,6 +236,7 @@ const hasMore = computed(() => visible.value < filtered.value.length)
         </div>
       </div>
     </div>
+    </template>
   </div>
   </div>
 </template>
@@ -234,6 +249,35 @@ const hasMore = computed(() => visible.value < filtered.value.length)
 }
 .plp__tabs {
   margin-top: var(--space-4);
+}
+
+/* ---------- categoría "muy pronto" (KO) ---------- */
+.soon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--space-3);
+  max-width: 520px;
+  margin: var(--space-6) auto var(--space-8);
+  padding: var(--space-5) var(--space-4);
+}
+.soon__ko {
+  width: 200px;
+  height: auto;
+  margin-bottom: var(--space-2);
+}
+.soon__title {
+  font-family: var(--ff-display);
+  font-weight: 400;
+  font-size: var(--text-3xl);
+  color: var(--ink);
+}
+.soon__text {
+  color: var(--mut);
+  font-size: var(--text-md);
+  line-height: 1.55;
+  margin-bottom: var(--space-2);
 }
 
 /* ---------- chips de subcategoría ---------- */

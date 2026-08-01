@@ -45,6 +45,9 @@ export const useCatalogNav = () => {
     .filter(pub => pub.count > 0)
 
   const publicoBySlug = (slug: string) => publicos.find(p => p.slug === slug)
+  // Público DEFINIDO en la taxonomía aunque esté vacío (para distinguir
+  // "categoría por llenar" de "slug inexistente" -> 404). Devuelve nombre.
+  const knownPublico = (slug: string) => nav.publicos.find(p => p.slug === slug)
 
-  return { publicos, publicoBySlug }
+  return { publicos, publicoBySlug, knownPublico }
 }
