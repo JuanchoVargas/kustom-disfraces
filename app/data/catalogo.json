@@ -1226,7 +1226,9 @@
     ],
     "precio": 130000,
     "imagenes": [
-      "/images/products/tanjiro.webp"
+      "/images/products/tanjiro.webp",
+      "/images/products/tanjiro-2.webp",
+      "/images/products/tanjiro-3.webp"
     ],
     "disponibleWeb": true,
     "idWeb": 20,
@@ -1259,7 +1261,9 @@
     ],
     "precio": 130000,
     "imagenes": [
-      "/images/products/zenitzu.webp"
+      "/images/products/zenitzu.webp",
+      "/images/products/zenitzu-2.webp",
+      "/images/products/zenitzu-3.webp"
     ],
     "disponibleWeb": true,
     "idWeb": 21,
@@ -1292,7 +1296,9 @@
     ],
     "precio": 130000,
     "imagenes": [
-      "/images/products/tomioka.webp"
+      "/images/products/tomioka.webp",
+      "/images/products/tomioka-2.webp",
+      "/images/products/tomioka-3.webp"
     ],
     "disponibleWeb": true,
     "idWeb": 22,
@@ -1325,7 +1331,9 @@
     ],
     "precio": 130000,
     "imagenes": [
-      "/images/products/rengoku.webp"
+      "/images/products/rengoku.webp",
+      "/images/products/rengoku-2.webp",
+      "/images/products/rengoku-3.webp"
     ],
     "disponibleWeb": true,
     "idWeb": 23,
@@ -1359,7 +1367,9 @@
     ],
     "precio": 80000,
     "imagenes": [
-      "/images/products/ninja-azul.webp"
+      "/images/products/ninja-azul.webp",
+      "/images/products/ninja-azul-2.webp",
+      "/images/products/ninja-azul-3.webp"
     ],
     "disponibleWeb": true,
     "idWeb": 24,
@@ -1395,7 +1405,9 @@
     ],
     "precio": 80000,
     "imagenes": [
-      "/images/products/ninja-rojo.webp"
+      "/images/products/ninja-rojo.webp",
+      "/images/products/ninja-rojo-2.webp",
+      "/images/products/ninja-rojo-3.webp"
     ],
     "disponibleWeb": true,
     "idWeb": 25,
@@ -1431,7 +1443,9 @@
     ],
     "precio": 80000,
     "imagenes": [
-      "/images/products/ninja-dorado.webp"
+      "/images/products/ninja-dorado.webp",
+      "/images/products/ninja-dorado-2.webp",
+      "/images/products/ninja-dorado-3.webp"
     ],
     "disponibleWeb": true,
     "idWeb": 26,
@@ -1468,7 +1482,9 @@
     ],
     "precio": 120000,
     "imagenes": [
-      "/images/products/michael-jackson.webp"
+      "/images/products/michael-jackson.webp",
+      "/images/products/michael-jackson-2.webp",
+      "/images/products/michael-jackson-3.webp"
     ],
     "disponibleWeb": true,
     "idWeb": 27,
@@ -1507,7 +1523,9 @@
     ],
     "precio": 70000,
     "imagenes": [
-      "/images/products/esqueleto-infantil.webp"
+      "/images/products/esqueleto-infantil.webp",
+      "/images/products/esqueleto-infantil-2.webp",
+      "/images/products/esqueleto-infantil-3.webp"
     ],
     "disponibleWeb": true,
     "idWeb": 28,
@@ -1542,7 +1560,9 @@
     ],
     "precio": 85000,
     "imagenes": [
-      "/images/products/batichica.webp"
+      "/images/products/batichica.webp",
+      "/images/products/batichica-2.webp",
+      "/images/products/batichica-3.webp"
     ],
     "disponibleWeb": true,
     "idWeb": 29,
@@ -1578,7 +1598,9 @@
     ],
     "precio": 85000,
     "imagenes": [
-      "/images/products/mujer-maravilla.webp"
+      "/images/products/mujer-maravilla.webp",
+      "/images/products/mujer-maravilla-2.webp",
+      "/images/products/mujer-maravilla-3.webp"
     ],
     "disponibleWeb": true,
     "idWeb": 30,
@@ -1614,7 +1636,9 @@
     ],
     "precio": 85000,
     "imagenes": [
-      "/images/products/super-chica.webp"
+      "/images/products/super-chica.webp",
+      "/images/products/super-chica-2.webp",
+      "/images/products/super-chica-3.webp"
     ],
     "disponibleWeb": true,
     "idWeb": 31,
@@ -1649,7 +1673,9 @@
     ],
     "precio": 85000,
     "imagenes": [
-      "/images/products/capitana-america.webp"
+      "/images/products/capitana-america.webp",
+      "/images/products/capitana-america-2.webp",
+      "/images/products/capitana-america-3.webp"
     ],
     "disponibleWeb": true,
     "idWeb": 32,
@@ -1685,7 +1711,9 @@
     ],
     "precio": 80000,
     "imagenes": [
-      "/images/products/spider-woman.webp"
+      "/images/products/spider-woman.webp",
+      "/images/products/spider-woman-2.webp",
+      "/images/products/spider-woman-3.webp"
     ],
     "disponibleWeb": true,
     "idWeb": 33,
@@ -1722,7 +1750,9 @@
     ],
     "precio": 65000,
     "imagenes": [
-      "/images/products/lady-bug.webp"
+      "/images/products/lady-bug.webp",
+      "/images/products/lady-bug-2.webp",
+      "/images/products/lady-bug-3.webp"
     ],
     "disponibleWeb": true,
     "idWeb": 34,
@@ -1758,7 +1788,9 @@
     ],
     "precio": 80000,
     "imagenes": [
-      "/images/products/elastic-girl.webp"
+      "/images/products/elastic-girl.webp",
+      "/images/products/elastic-girl-2.webp",
+      "/images/products/elastic-girl-3.webp"
     ],
     "disponibleWeb": true,
     "idWeb": 35,
@@ -1794,7 +1826,9 @@
     ],
     "precio": 70000,
     "imagenes": [
-      "/images/products/katrina.webp"
+      "/images/products/katrina.webp",
+      "/images/products/katrina-2.webp",
+      "/images/products/katrina-3.webp"
     ],
     "disponibleWeb": true,
     "idWeb": 36,
@@ -1826,7 +1860,9 @@
     ],
     "precio": 130000,
     "imagenes": [
-      "/images/products/nezuko.webp"
+      "/images/products/nezuko.webp",
+      "/images/products/nezuko-2.webp",
+      "/images/products/nezuko-3.webp"
     ],
     "disponibleWeb": true,
     "idWeb": 37,
@@ -1860,7 +1896,9 @@
     ],
     "precio": 130000,
     "imagenes": [
-      "/images/products/shinobu.webp"
+      "/images/products/shinobu.webp",
+      "/images/products/shinobu-2.webp",
+      "/images/products/shinobu-3.webp"
     ],
     "disponibleWeb": true,
     "idWeb": 38,
@@ -1894,7 +1932,9 @@
     ],
     "precio": 150000,
     "imagenes": [
-      "/images/products/spider-woman-adulto.webp"
+      "/images/products/spider-woman-adulto.webp",
+      "/images/products/spider-woman-adulto-2.webp",
+      "/images/products/spider-woman-adulto-3.webp"
     ],
     "disponibleWeb": true,
     "idWeb": 39,
@@ -1927,7 +1967,9 @@
     ],
     "precio": 150000,
     "imagenes": [
-      "/images/products/iron-spider-woman.webp"
+      "/images/products/iron-spider-woman.webp",
+      "/images/products/iron-spider-woman-2.webp",
+      "/images/products/iron-spider-woman-3.webp"
     ],
     "disponibleWeb": true,
     "idWeb": 40,
@@ -1960,7 +2002,9 @@
     ],
     "precio": 150000,
     "imagenes": [
-      "/images/products/spider-woman-miles-morales.webp"
+      "/images/products/spider-woman-miles-morales.webp",
+      "/images/products/spider-woman-miles-morales-2.webp",
+      "/images/products/spider-woman-miles-morales-3.webp"
     ],
     "disponibleWeb": true,
     "idWeb": 41,
@@ -2027,7 +2071,9 @@
     ],
     "precio": 150000,
     "imagenes": [
-      "/images/products/capitana-america-adulto.webp"
+      "/images/products/capitana-america-adulto.webp",
+      "/images/products/capitana-america-adulto-2.webp",
+      "/images/products/capitana-america-adulto-3.webp"
     ],
     "disponibleWeb": true,
     "idWeb": 43,
@@ -2060,7 +2106,9 @@
     ],
     "precio": 150000,
     "imagenes": [
-      "/images/products/venom-negro-adulto.webp"
+      "/images/products/venom-negro-adulto.webp",
+      "/images/products/venom-negro-adulto-2.webp",
+      "/images/products/venom-negro-adulto-3.webp"
     ],
     "disponibleWeb": true,
     "idWeb": 44,
@@ -2093,7 +2141,9 @@
     ],
     "precio": 150000,
     "imagenes": [
-      "/images/products/deadpool-adulto.webp"
+      "/images/products/deadpool-adulto.webp",
+      "/images/products/deadpool-adulto-2.webp",
+      "/images/products/deadpool-adulto-3.webp"
     ],
     "disponibleWeb": true,
     "idWeb": 45,
@@ -2126,7 +2176,9 @@
     ],
     "precio": 150000,
     "imagenes": [
-      "/images/products/super-woman.webp"
+      "/images/products/super-woman.webp",
+      "/images/products/super-woman-2.webp",
+      "/images/products/super-woman-3.webp"
     ],
     "disponibleWeb": true,
     "idWeb": 46,
@@ -2159,7 +2211,9 @@
     ],
     "precio": 150000,
     "imagenes": [
-      "/images/products/esqueleto-mujer.webp"
+      "/images/products/esqueleto-mujer.webp",
+      "/images/products/esqueleto-mujer-2.webp",
+      "/images/products/esqueleto-mujer-3.webp"
     ],
     "disponibleWeb": true,
     "idWeb": 47,
@@ -2192,7 +2246,9 @@
     ],
     "precio": 150000,
     "imagenes": [
-      "/images/products/katrina-adulto.webp"
+      "/images/products/katrina-adulto.webp",
+      "/images/products/katrina-adulto-2.webp",
+      "/images/products/katrina-adulto-3.webp"
     ],
     "disponibleWeb": true,
     "idWeb": 48,
@@ -2224,7 +2280,9 @@
     ],
     "precio": 89000,
     "imagenes": [
-      "/images/products/pollito.webp"
+      "/images/products/pollito.webp",
+      "/images/products/pollito-2.webp",
+      "/images/products/pollito-3.webp"
     ],
     "disponibleWeb": true,
     "idWeb": 49,
@@ -2257,7 +2315,9 @@
     ],
     "precio": 89000,
     "imagenes": [
-      "/images/products/miquito.webp"
+      "/images/products/miquito.webp",
+      "/images/products/miquito-2.webp",
+      "/images/products/miquito-3.webp"
     ],
     "disponibleWeb": true,
     "idWeb": 50,
@@ -2290,7 +2350,9 @@
     ],
     "precio": 89000,
     "imagenes": [
-      "/images/products/cerdito.webp"
+      "/images/products/cerdito.webp",
+      "/images/products/cerdito-2.webp",
+      "/images/products/cerdito-3.webp"
     ],
     "disponibleWeb": true,
     "idWeb": 51,
@@ -2389,7 +2451,9 @@
     ],
     "precio": 110000,
     "imagenes": [
-      "/images/products/stitch.webp"
+      "/images/products/stitch.webp",
+      "/images/products/stitch-2.webp",
+      "/images/products/stitch-3.webp"
     ],
     "disponibleWeb": true,
     "idWeb": 54,
@@ -2421,7 +2485,9 @@
     ],
     "precio": 110000,
     "imagenes": [
-      "/images/products/gato-con-botas.webp"
+      "/images/products/gato-con-botas.webp",
+      "/images/products/gato-con-botas-2.webp",
+      "/images/products/gato-con-botas-3.webp"
     ],
     "disponibleWeb": true,
     "idWeb": 55,
