@@ -53,12 +53,14 @@ defineProps<Props>()
   font-size: var(--text-md);
 }
 .cathero__img {
+  /* ocupa el espacio a la derecha del wordmark y CENTRA la composición ahí
+     (antes iba pegada al borde derecho) */
+  flex: 1 1 auto;
+  min-width: 0;
   height: 240px;
-  max-width: 60%;
   object-fit: contain;
-  object-position: right center;
+  object-position: center;
   display: block;
-  flex: 0 1 auto;
 }
 
 /* mobile: colapsa a wordmark + composición reducida, sin empujar la grilla */
