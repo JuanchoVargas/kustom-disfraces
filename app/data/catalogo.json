@@ -59,7 +59,9 @@
     ],
     "precio": 65000,
     "imagenes": [
-      "/images/products/spider-man-clasico-eco.webp"
+      "/images/products/spider-man-clasico-linea-entrada.webp",
+      "/images/products/spider-man-clasico-linea-entrada-2.webp",
+      "/images/products/spider-man-clasico-linea-entrada-3.webp"
     ],
     "disponibleWeb": true,
     "parejaDe": "001001001",
@@ -135,7 +137,9 @@
     ],
     "precio": 65000,
     "imagenes": [
-      "/images/products/iron-spider-man-eco.webp"
+      "/images/products/iron-spider-man-linea-entrada.webp",
+      "/images/products/iron-spider-man-linea-entrada-2.webp",
+      "/images/products/iron-spider-man-linea-entrada-3.webp"
     ],
     "disponibleWeb": true,
     "parejaDe": "001001006",
@@ -211,7 +215,9 @@
     ],
     "precio": 65000,
     "imagenes": [
-      "/images/products/spider-man-negro-eco.webp"
+      "/images/products/spider-man-negro-linea-entrada.webp",
+      "/images/products/spider-man-negro-linea-entrada-2.webp",
+      "/images/products/spider-man-negro-linea-entrada-3.webp"
     ],
     "disponibleWeb": true,
     "parejaDe": "001001004",
@@ -287,7 +293,9 @@
     ],
     "precio": 65000,
     "imagenes": [
-      "/images/products/spider-man-miles-morales-eco.webp"
+      "/images/products/spider-man-miles-morales-linea-entrada.webp",
+      "/images/products/spider-man-miles-morales-linea-entrada-2.webp",
+      "/images/products/spider-man-miles-morales-linea-entrada-3.webp"
     ],
     "disponibleWeb": true,
     "parejaDe": "001001002",
@@ -364,7 +372,7 @@
     ],
     "precio": 65000,
     "imagenes": [
-      "/images/products/superman-eco.webp"
+      "/images/products/superman-linea-entrada.webp"
     ],
     "disponibleWeb": true,
     "parejaDe": "001001015",
@@ -441,7 +449,9 @@
     ],
     "precio": 65000,
     "imagenes": [
-      "/images/products/iron-man-eco.webp"
+      "/images/products/iron-man-linea-entrada.webp",
+      "/images/products/iron-man-linea-entrada-2.webp",
+      "/images/products/iron-man-linea-entrada-3.webp"
     ],
     "disponibleWeb": true,
     "parejaDe": "001001012",
@@ -517,7 +527,9 @@
     ],
     "precio": 65000,
     "imagenes": [
-      "/images/products/capitan-america-eco.webp"
+      "/images/products/capitan-america-linea-entrada.webp",
+      "/images/products/capitan-america-linea-entrada-2.webp",
+      "/images/products/capitan-america-linea-entrada-3.webp"
     ],
     "disponibleWeb": true,
     "parejaDe": "001001007",
@@ -593,7 +605,7 @@
     ],
     "precio": 65000,
     "imagenes": [
-      "/images/products/thor-eco.webp"
+      "/images/products/thor-linea-entrada.webp"
     ],
     "disponibleWeb": true,
     "parejaDe": "001001016",
@@ -669,7 +681,9 @@
     ],
     "precio": 65000,
     "imagenes": [
-      "/images/products/flash-eco.webp"
+      "/images/products/flash-linea-entrada.webp",
+      "/images/products/flash-linea-entrada-2.webp",
+      "/images/products/flash-linea-entrada-3.webp"
     ],
     "disponibleWeb": true,
     "parejaDe": "001001005",
@@ -746,7 +760,9 @@
     ],
     "precio": 65000,
     "imagenes": [
-      "/images/products/batman-eco.webp"
+      "/images/products/batman-linea-entrada.webp",
+      "/images/products/batman-linea-entrada-2.webp",
+      "/images/products/batman-linea-entrada-3.webp"
     ],
     "disponibleWeb": true,
     "parejaDe": "001001008",
@@ -824,7 +840,7 @@
     ],
     "precio": 65000,
     "imagenes": [
-      "/images/products/venom-negro-eco.webp"
+      "/images/products/venom-negro-linea-entrada.webp"
     ],
     "disponibleWeb": true,
     "parejaDe": "001001009",
@@ -900,7 +916,9 @@
     ],
     "precio": 65000,
     "imagenes": [
-      "/images/products/deadpool-eco.webp"
+      "/images/products/deadpool-linea-entrada.webp",
+      "/images/products/deadpool-linea-entrada-2.webp",
+      "/images/products/deadpool-linea-entrada-3.webp"
     ],
     "disponibleWeb": true,
     "parejaDe": "001001013",
@@ -1170,7 +1188,9 @@
     ],
     "precio": 65000,
     "imagenes": [
-      "/images/products/goku.webp"
+      "/images/products/goku.webp",
+      "/images/products/goku-2.webp",
+      "/images/products/goku-3.webp"
     ],
     "disponibleWeb": true,
     "idWeb": 19,
