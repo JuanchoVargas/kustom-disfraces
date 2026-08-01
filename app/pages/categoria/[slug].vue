@@ -33,9 +33,7 @@ const CATEGORY_BANNERS: Record<string, { wordmark: string, wordmarkAlt: string, 
   ninos: { wordmark: '/images/headers/superheroes.webp', wordmarkAlt: 'Disfraces Súper Héroes', image: '/images/hero/heroes-8.webp', imageAlt: 'Niños con disfraces de superhéroes', countLabel: 'disfraces para niños' },
   ninas: { wordmark: '/images/headers/heroinas.webp', wordmarkAlt: 'Disfraces Súper Heroínas', image: '/images/hero/heroina-8.webp', imageAlt: 'Niñas con disfraces de heroínas', countLabel: 'disfraces para niñas' },
   bebes: { wordmark: '/images/headers/bebes.webp', wordmarkAlt: 'Disfraces para Bebés', image: '/images/hero/bebes-foto-8.webp', imageAlt: 'Bebés con disfraces de animalitos', countLabel: 'disfraces para bebés' },
-  // Damas y Caballeros: sin composición propia -> se usa la de Combos/Parejas
-  damas: { wordmark: '/images/headers/combos.webp', wordmarkAlt: 'Supercombos y parejas', image: '/images/hero/parejas-8.webp', imageAlt: 'Combos de disfraces: Batichicos, Capitanas y Súper Familia', countLabel: 'disfraces para damas' },
-  caballeros: { wordmark: '/images/headers/combos.webp', wordmarkAlt: 'Supercombos y parejas', image: '/images/hero/parejas-8.webp', imageAlt: 'Combos de disfraces: Batichicos, Capitanas y Súper Familia', countLabel: 'disfraces para caballeros' },
+  // Damas y Caballeros: pendientes de asset propio de disenoweb (sin banner por ahora).
 }
 const banner = computed(() => CATEGORY_BANNERS[slug.value])
 // Total de la categoría actual (estable, para la cabecera temática)
