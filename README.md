@@ -85,9 +85,9 @@ Bebés · Niños · Niñas · Damas · Caballeros · Combos. Decisiones:
 
 `app/data/catalogo.json` contiene las **109 referencias** de la codificación oficial
 del cliente (`CODIGOS DE REFERENCIAS.xlsx` en `app/insumos/`, que NO se publica ni
-entra al build): 67 visibles (`disponibleWeb: true` — **67 productos web**, porque
+entra al build): 66 visibles (`disponibleWeb: true` — **66 productos web**, porque
 Súper y Línea Entrada son productos separados; los pares se enlazan con `parejaDe`
-solo para el cruce de la PDP) y 42 ocultas sin foto ni precio confirmado (SEMI,
+solo para el cruce de la PDP) y 43 ocultas sin foto ni precio confirmado (SEMI,
 Súper Adulto, vestidos dama, chaquetas…). El sitio solo muestra `disponibleWeb: true`.
 
 ### 1. Los precios son los REALES de la lista del cliente
@@ -102,21 +102,21 @@ inventados. No hay `regularPrice` (la lista no trae descuentos). Precios por gru
 | Línea Entrada | $65.000 |
 | Vestidos superheroínas (niña) | $85.000 |
 | Trusas infantiles | Spider Gwen y Elastic Girl $80.000 · Katrina y Esqueleto $70.000 · Lady Bug $65.000 |
-| Anime (conjuntos) | Shinobu $130.000 (resto **pendiente**, ver abajo) |
+| Anime (conjuntos) | $130.000 |
 | Ninjas | $80.000 |
 | Personajes (Michael Jackson) | $120.000 |
 | Trusas adultos | $150.000 |
 | Bebés · Animales (Línea) | $89.000 |
 | Bebés · Línea Plus (Stitch, Gato con Botas) | $110.000 |
 
-**Pendientes de confirmación (NO actualizados — el Excel trae un cero de menos):**
-Pantera Negra (Excel $12.000, debería ser ~$120.000) y los 5 anime Nezuko, Rengoku,
-Tanjiro, Tomioka y Zenitzu (Excel $13.000, debería ser ~$130.000). Conservan su precio
-anterior hasta que el cliente confirme el valor.
+**Corrección de cero faltante (confirmada por el cliente, jul 2026):** el Excel traía
+Pantera Negra en $12.000 y los 5 anime Nezuko, Rengoku, Tanjiro, Tomioka y Zenitzu en
+$13.000 (un cero de menos). El cliente confirmó los valores: Pantera Negra **$120.000**
+y los 5 anime **$130.000** (ya cargados).
 
-**Sin precio en el Excel:** Spider Gwen (trusa adulto, `001005010`) está visible pero
-no aparece en la lista de precios; conserva su cifra anterior ($119.900) a la espera de
-decisión (definir precio u ocultar).
+**Sin precio en el Excel:** Spider Gwen (trusa adulto, `001005010`) no aparece en la
+lista de precios. Queda **oculta** (`disponibleWeb: false`, `precio: null`) hasta que el
+cliente entregue su precio oficial.
 
 **Grupos sin precio oficial** (siguen ocultos, `disponibleWeb: false`): SEMI, Súper
 Adulto y chaquetas (`precio: null`); vestidos dama (no están en el Excel; conservan una
@@ -148,11 +148,11 @@ provisionales originales y obligó a reasignar otros:
 | Stitch (bebés) | `001010002-P` (antes `001011006-P`) | no está en el Excel; movido a la familia Animales Plus (010), que es su grupo real |
 | Lady Bug (trusa infantil) | `001006004-P` | no está en el Excel (Trusa Infantil solo trae 3 refs) |
 | Elastic Girl (trusa infantil) | `001006005-P` | no está en el Excel |
-| Kokushibo (anime) | `001004007-P` | ref nueva del Excel de precios; código libre (el `001004007` de Shinobu se reasignó). Oculta, sin precio confirmado |
+| Kokushibo (anime) | `001004007-P` | ref nueva del Excel de precios; código libre (el `001004007` de Shinobu se reasignó). Precio confirmado $130.000, pero sigue **oculta** (`disponibleWeb: false`) hasta tener foto y código oficial |
 
 El Excel confirma **"Ninja Dorada"** (001009003) — el nombre que se había asumido.
 
-Supuestos de las 42 referencias ocultas (sin base en el sitio, revisar al activarlas):
+Supuestos de las 43 referencias ocultas (sin base en el sitio, revisar al activarlas):
 tallas de SEMI heredadas de Línea Eco; tallas de vestidos dama `S–XL`; precio `null`
 en SEMI, Súper Adulto y chaquetas (sin grupo equivalente del cual heredar); chaquetas
 sin tallas ni público asignado (fuera de la navegación).

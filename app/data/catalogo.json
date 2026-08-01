@@ -912,7 +912,7 @@
       10,
       12
     ],
-    "precio": 129900,
+    "precio": 120000,
     "imagenes": [
       "/images/products/pantera-negra.webp"
     ],
@@ -1168,7 +1168,7 @@
       12,
       14
     ],
-    "precio": 139900,
+    "precio": 130000,
     "imagenes": [
       "/images/products/tanjiro.webp"
     ],
@@ -1201,7 +1201,7 @@
       12,
       14
     ],
-    "precio": 139900,
+    "precio": 130000,
     "imagenes": [
       "/images/products/zenitzu.webp"
     ],
@@ -1234,7 +1234,7 @@
       12,
       14
     ],
-    "precio": 139900,
+    "precio": 130000,
     "imagenes": [
       "/images/products/tomioka.webp"
     ],
@@ -1267,7 +1267,7 @@
       12,
       14
     ],
-    "precio": 139900,
+    "precio": 130000,
     "imagenes": [
       "/images/products/rengoku.webp"
     ],
@@ -1768,7 +1768,7 @@
       12,
       14
     ],
-    "precio": 139900,
+    "precio": 130000,
     "imagenes": [
       "/images/products/nezuko.webp"
     ],
@@ -1935,11 +1935,11 @@
       "L",
       "XL"
     ],
-    "precio": 119900,
+    "precio": null,
     "imagenes": [
       "/images/products/spider-gwen.webp"
     ],
-    "disponibleWeb": true,
+    "disponibleWeb": false,
     "idWeb": 42,
     "slug": "spider-gwen",
     "descripcion": "La spider de blanco y rosa con capota.",
@@ -2397,7 +2397,7 @@
       12,
       14
     ],
-    "precio": null,
+    "precio": 130000,
     "imagenes": [],
     "disponibleWeb": false
   },
