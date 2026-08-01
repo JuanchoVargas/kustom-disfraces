@@ -28,16 +28,14 @@ const items = computed(() =>
       </div>
 
       <div class="feat__grid">
-        <!-- solo foto frontal (marketing jul 2026): crop CSS a la mitad
-             izquierda de la compuesta; NO aplica a fotos de figura única
-             (fotoIndividual: Batman, extraída del PDF) -->
+        <!-- fotos recortadas de figura única (upgrade jul 2026): la card las
+             muestra completas; ya no se recorta la "mitad frontal". -->
         <div
           v-for="(p, i) in items"
           :key="p.id"
           v-motion
           v-bind="reveal(i * 70)"
           class="feat__cell"
-          :class="{ 'feat__cell--frontal': !p.fotoIndividual }"
         >
           <ProductCard :product="p" />
         </div>
@@ -61,16 +59,6 @@ const items = computed(() =>
   justify-content: space-between;
   gap: var(--space-4);
   margin-bottom: var(--space-6);
-}
-/* SOLO FOTO FRONTAL: la caja del img pasa a 50% del ancho (contenedor 1:1 ->
-   proporción 1:2, la de media foto compuesta) y object-position left muestra
-   la mitad frontal completa, centrada sobre el blanco de la card. */
-.feat__cell--frontal :deep(.pphoto) {
-  width: 50%;
-  height: 100%;
-  object-fit: cover;
-  object-position: left center;
-  margin-inline: auto;
 }
 .feat__eyebrow {
   display: block;

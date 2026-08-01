@@ -10,8 +10,8 @@ defineProps<Props>()
 <template>
   <NuxtLink :to="slug ? `/categoria/${slug}` : '#'" class="ccard">
     <div class="cph">
-      <!-- se pide el cuadrado COMPLETO (400x400, sin recorte de ipx) y el CSS
-           muestra solo la mitad frontal de la foto compuesta frente+espalda -->
+      <!-- figura única recortada (upgrade jul 2026): se muestra COMPLETA,
+           centrada sobre el blanco de la card (object-fit contain, sin recorte) -->
       <NuxtImg v-if="image" :src="image" :alt="name" class="cphoto" width="400" height="400" />
       <PhotoPlaceholder v-else :caption="`[ ${name} ]\nfoto 4:5`" />
       <span class="cic">
@@ -48,17 +48,13 @@ defineProps<Props>()
   box-shadow: var(--shadow-lift);
   transform: translateY(-5px);
 }
-/* SOLO FOTO FRONTAL (marketing jul 2026): la caja del img mide media foto
-   (ancho = 50% × alto del contenedor; en 4:5 eso es 62.5% del ancho) y
-   object-position left muestra exactamente la mitad frontal, figura completa,
-   centrada con aire blanco a los lados. Los archivos NO se tocan. */
+/* figura única recortada: se muestra COMPLETA dentro de la card (contain),
+   centrada, con aire blanco arriba/abajo (la foto cuadrada en caja 4:5). */
 .ccard .cphoto {
-  width: 62.5%;
+  width: 100%;
   height: 100%;
-  object-fit: cover;
-  object-position: left center;
+  object-fit: contain;
   display: block;
-  margin-inline: auto;
 }
 .ccard .cic {
   position: absolute;

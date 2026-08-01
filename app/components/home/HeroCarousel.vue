@@ -23,8 +23,8 @@ const slides: Slide[] = [
     ctaSecondary: { label: 'Cómo comprar', to: '/como-comprar' },
     blobA: 'var(--purple)',
     blobB: 'var(--turq)',
-    image: '/images/products/spider-man-clasico-super-acolchado.webp',
-    imageAlt: 'Disfraz Spider-Man Clásico Súper Acolchado, vista frente y espalda',
+    image: '/images/products/spider-man-clasico.webp',
+    imageAlt: 'Disfraz Spider-Man Clásico Súper Acolchado',
   },
   {
     eyebrow: '⭐ Colección Niñas',
@@ -114,10 +114,9 @@ function onLeave() {
           <svg class="motif motif--star" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M12 3.5c.75 4.2 2.55 6 6.75 6.75-4.2.75-6 2.55-6.75 6.75-.75-4.2-2.55-6-6.75-6.75 4.2-.75 6-2.55 6.75-6.75z" />
           </svg>
-          <!-- INTERIM: las fotos traen fondo blanco; mix-blend-mode: multiply
-               (en .hero__img) lo funde con el crema. Cuando existan los
-               recortes transparentes: apuntar :src al recorte y QUITAR el
-               mix-blend-mode — el resto del tratamiento queda igual. -->
+          <!-- Recortes WebP transparentes (upgrade fotográfico jul 2026):
+               object-fit contain muestra la figura completa sobre el crema,
+               sin mix-blend-mode (ya no hay fondo blanco que fundir). -->
           <img :src="current.image" :alt="current.imageAlt" class="hero__img">
         </div>
       </div>
@@ -236,9 +235,6 @@ function onLeave() {
   aspect-ratio: 1 / 1;
   object-fit: contain;
   display: block;
-  /* INTERIM: funde el fondo blanco de la foto con el crema del hero;
-     QUITAR cuando el src sea un recorte PNG/WebP transparente */
-  mix-blend-mode: multiply;
 }
 /* sombra elíptica difusa que asienta el producto (no box-shadow duro) */
 .hero__media::after {

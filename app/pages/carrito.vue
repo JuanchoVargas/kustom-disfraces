@@ -8,7 +8,7 @@ useHead({ title: 'Tu carrito — Kustom Disfraces' })
 // Sembrado de demo para revisar la vista llena (solo con ?demo=1 y carrito vacío).
 onMounted(() => {
   if (route.query.demo && cart.items.length === 0) {
-    cart.add({ productId: 1, name: 'Spider-Man Clásico', slug: 'spider-man-clasico', price: 129900, image: '/images/products/spider-man-clasico-super-acolchado.webp', size: 6, gama: 'Súper Acolchado', quantity: 1 })
+    cart.add({ productId: 1, name: 'Spider-Man Clásico', slug: 'spider-man-clasico', price: 129900, image: '/images/products/spider-man-clasico.webp', size: 6, gama: 'Súper Acolchado', quantity: 1 })
     cart.add({ productId: 49, name: 'Pollito', slug: 'pollito', price: 79900, image: '/images/products/pollito.webp', size: 'Bebé', quantity: 2 })
   }
 })
