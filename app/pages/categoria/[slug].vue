@@ -27,8 +27,16 @@ const all = computed(() => {
   return activeSub.value ? base.filter(p => p.subcategoriasNav?.includes(activeSub.value as string)) : base
 })
 
-// Total de la categoría Niños (estable, para la cabecera temática de esa PLP)
-const ninosCount = computed(() => byPublico('ninos').length)
+// Cabeceras temáticas por categoría (assets disenoweb). Solo las que tienen asset;
+// Damas y Caballeros aún no tienen composición propia.
+const CATEGORY_BANNERS: Record<string, { wordmark: string, wordmarkAlt: string, image: string, imageAlt: string, countLabel: string }> = {
+  ninos: { wordmark: '/images/headers/superheroes.webp', wordmarkAlt: 'Disfraces Súper Héroes', image: '/images/hero/heroes-8.webp', imageAlt: 'Niños con disfraces de superhéroes', countLabel: 'disfraces para niños' },
+  ninas: { wordmark: '/images/headers/heroinas.webp', wordmarkAlt: 'Disfraces Súper Heroínas', image: '/images/hero/heroina-8.webp', imageAlt: 'Niñas con disfraces de heroínas', countLabel: 'disfraces para niñas' },
+  bebes: { wordmark: '/images/headers/bebes.webp', wordmarkAlt: 'Disfraces para Bebés', image: '/images/hero/bebes-foto-8.webp', imageAlt: 'Bebés con disfraces de animalitos', countLabel: 'disfraces para bebés' },
+}
+const banner = computed(() => CATEGORY_BANNERS[slug.value])
+// Total de la categoría actual (estable, para la cabecera temática)
+const catCount = computed(() => byPublico(slug.value).length)
 
 const subNombre = computed(() => publico.value?.subcategorias.find(s => s.slug === activeSub.value)?.nombre)
 useHead(() => ({ title: `${publico.value?.nombre}${subNombre.value ? ` · ${subNombre.value}` : ''} — Kustom Disfraces` }))
@@ -132,15 +140,15 @@ const hasMore = computed(() => visible.value < filtered.value.length)
       <p class="plp__count">{{ filtered.length }} {{ filtered.length === 1 ? 'producto' : 'productos' }}</p>
     </header>
 
-    <!-- cabecera temática SOLO Niños (assets disenoweb, sobre el crema de la PLP) -->
+    <!-- cabecera temática de categoría (assets disenoweb, sobre el crema de la PLP) -->
     <CategoryBanner
-      v-if="slug === 'ninos'"
-      wordmark="/images/headers/superheroes.webp"
-      wordmark-alt="Disfraces Súper Héroes"
-      image="/images/hero/heroes-8.webp"
-      image-alt="Niños con disfraces de superhéroes"
-      :count="ninosCount"
-      count-label="disfraces para niños"
+      v-if="banner"
+      :wordmark="banner.wordmark"
+      :wordmark-alt="banner.wordmarkAlt"
+      :image="banner.image"
+      :image-alt="banner.imageAlt"
+      :count="catCount"
+      :count-label="banner.countLabel"
     />
 
     <!-- toggle filtros (mobile) -->
