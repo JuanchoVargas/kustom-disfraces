@@ -27,6 +27,9 @@ const all = computed(() => {
   return activeSub.value ? base.filter(p => p.subcategoriasNav?.includes(activeSub.value as string)) : base
 })
 
+// Total de la categoría Niños (estable, para la cabecera temática de esa PLP)
+const ninosCount = computed(() => byPublico('ninos').length)
+
 const subNombre = computed(() => publico.value?.subcategorias.find(s => s.slug === activeSub.value)?.nombre)
 useHead(() => ({ title: `${publico.value?.nombre}${subNombre.value ? ` · ${subNombre.value}` : ''} — Kustom Disfraces` }))
 
@@ -128,6 +131,17 @@ const hasMore = computed(() => visible.value < filtered.value.length)
       <h1 class="plp__title">{{ publico?.nombre }}<span v-if="subNombre" class="plp__sub"> · {{ subNombre }}</span></h1>
       <p class="plp__count">{{ filtered.length }} {{ filtered.length === 1 ? 'producto' : 'productos' }}</p>
     </header>
+
+    <!-- cabecera temática SOLO Niños (assets disenoweb, sobre el crema de la PLP) -->
+    <CategoryBanner
+      v-if="slug === 'ninos'"
+      wordmark="/images/headers/superheroes.webp"
+      wordmark-alt="Disfraces Súper Héroes"
+      image="/images/hero/heroes-8.webp"
+      image-alt="Niños con disfraces de superhéroes"
+      :count="ninosCount"
+      count-label="disfraces para niños"
+    />
 
     <!-- toggle filtros (mobile) -->
     <button class="plp__filtertoggle" type="button" @click="showFilters = !showFilters">

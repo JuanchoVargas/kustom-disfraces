@@ -23,32 +23,32 @@ const slides: Slide[] = [
     ctaSecondary: { label: 'Cómo comprar', to: '/como-comprar' },
     blobA: 'var(--purple)',
     blobB: 'var(--turq)',
-    image: '/images/products/spider-man-clasico.webp',
-    imageAlt: 'Disfraz Spider-Man Clásico Súper Acolchado',
+    image: '/images/hero/heroes-8.webp',
+    imageAlt: 'Niños con disfraces de superhéroes: Flash, Iron Man, Pantera Negra, Spider-Man, Miles, Deadpool, Wolverine y Venom',
   },
   {
     eyebrow: '⭐ Colección Niñas',
-    title: 'Heroínas ',
-    accent: 'a su medida',
-    subtitle: 'Vestidos de superheroínas, trusas y personajes de anime. Telas suaves y tallas desde los 2 años.',
+    title: 'Súper ',
+    accent: 'Heroínas',
+    subtitle: 'Vestidos y trusas de las heroínas favoritas: Mujer Maravilla, Ladybug, Spider-Gwen y más. Telas suaves, tallas desde los 2 años.',
     ctaPrimary: { label: 'Ver niñas', to: '/categoria/ninas' },
     ctaSecondary: { label: 'Ver niños', to: '/categoria/ninos' },
     blobA: 'var(--fucsia)',
     blobB: 'var(--purple)',
-    image: '/images/products/mujer-maravilla.webp',
-    imageAlt: 'Disfraz Mujer Maravilla para niña, vestido con capa y tiara',
+    image: '/images/hero/heroina-8.webp',
+    imageAlt: 'Niñas con disfraces de heroínas: Mujer Maravilla, Elastigirl, Ladybug y Spider-Gwen',
   },
   {
     eyebrow: '🐣 Línea Bebés',
-    title: 'Sus primeras ',
-    accent: 'aventuras',
-    subtitle: 'Animalitos abrigados y suaves desde talla Bebé: pollito, vaquita, Stitch y más.',
+    title: 'Los más ',
+    accent: 'pequeños',
+    subtitle: 'Animalitos y peluches suavecitos para los más pequeños: vaquita, Stitch, perrito y gato con botas. Desde talla Bebé.',
     ctaPrimary: { label: 'Ver bebés', to: '/categoria/bebes' },
     ctaSecondary: { label: 'Cómo comprar', to: '/como-comprar' },
     blobA: 'var(--turq)',
     blobB: 'var(--yellow)',
-    image: '/images/products/pollito.webp',
-    imageAlt: 'Disfraz de pollito para bebé, enterizo amarillo con capota',
+    image: '/images/hero/bebes-foto-8.webp',
+    imageAlt: 'Bebés con disfraces de animalitos: vaquita, Stitch, perrito y gato con botas',
   },
 ]
 
@@ -230,11 +230,14 @@ function onLeave() {
 .hero__img {
   position: relative;
   z-index: 1;
-  /* ~25% más grande que el área visible que daba la card 4:3 anterior */
-  width: min(100%, 540px);
-  aspect-ratio: 1 / 1;
+  /* composiciones apaisadas de varios personajes (disenoweb): se muestran
+     COMPLETAS (contain) dentro de la columna, sin recorte ni caja */
+  width: 100%;
+  max-width: 620px;
+  max-height: 400px;
   object-fit: contain;
   display: block;
+  margin-inline: auto;
 }
 /* sombra elíptica difusa que asienta el producto (no box-shadow duro) */
 .hero__media::after {
@@ -313,7 +316,7 @@ function onLeave() {
     gap: var(--space-5);
   }
   .hero__media { order: -1; }
-  .hero__img { width: min(86%, 360px); }
+  .hero__img { width: min(100%, 480px); max-height: 240px; }
   .motif--planet { width: 104px; height: 104px; }
   .motif--star { width: 64px; height: 64px; bottom: 10%; }
   .hero__title { font-size: var(--text-3xl); }
