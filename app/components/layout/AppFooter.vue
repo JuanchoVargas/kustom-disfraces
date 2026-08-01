@@ -2,7 +2,7 @@
 const { categories, info, contact } = useSiteNav()
 
 const social = [
-  { label: 'Instagram', href: '#', icon: '<rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none"/>' },
+  { label: 'Instagram', href: 'https://www.instagram.com/disfraceskustom/', icon: '<rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none"/>' },
   { label: 'Facebook', href: '#', icon: '<path d="M14 8h2V5h-2a3 3 0 0 0-3 3v2H9v3h2v6h3v-6h2l1-3h-3V8a1 1 0 0 1 1-1z"/>' },
   { label: 'TikTok', href: '#', icon: '<path d="M14 4c.4 2.3 1.9 3.8 4 4v3c-1.5 0-2.9-.4-4-1.2V16a5 5 0 1 1-5-5c.3 0 .7 0 1 .1v3.1a2 2 0 1 0 1 1.8V4z"/>' },
   { label: 'WhatsApp', href: contact.whatsapp, icon: '<path d="M21 11.5a8 8 0 0 1-11.6 7.1L4 20l1.4-5.3A8 8 0 1 1 21 11.5z"/>' },
