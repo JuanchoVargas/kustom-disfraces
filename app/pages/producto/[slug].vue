@@ -29,6 +29,42 @@ const savings = computed(() => {
 })
 const currentImage = computed(() => product.value?.images?.[0])
 
+// ---------- galería multi-imagen ----------
+// currentImage (imagen [0]) sigue siendo la del carrito; la galería tiene su
+// propio índice para no tocar el carrito ni el resto de la PDP.
+const galleryImages = computed(() => product.value?.images ?? [])
+const activeIndex = ref(0)
+const activeImage = computed(() => galleryImages.value[activeIndex.value] ?? currentImage.value)
+const hasGallery = computed(() => galleryImages.value.length > 1)
+// al navegar a otro producto (SPA), volver a la primera imagen
+watch(slug, () => { activeIndex.value = 0 })
+
+// ---------- zoom con lupa (inner-zoom sobre la imagen ACTIVA) ----------
+// Solo en dispositivos con hover real (desktop); en táctil no se activa.
+const ZOOM = 2.3
+const zoomOn = ref(false)
+const zoomPos = ref({ x: 50, y: 50 })
+const canHover = ref(false)
+onMounted(() => {
+  canHover.value = window.matchMedia('(hover: hover) and (pointer: fine)').matches
+})
+function onZoomEnter() { if (canHover.value) zoomOn.value = true }
+function onZoomLeave() { zoomOn.value = false }
+function onZoomMove(e: MouseEvent) {
+  if (!zoomOn.value) return
+  const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
+  const x = Math.min(100, Math.max(0, ((e.clientX - r.left) / r.width) * 100))
+  const y = Math.min(100, Math.max(0, ((e.clientY - r.top) / r.height) * 100))
+  zoomPos.value = { x, y }
+}
+// se aplica a la imagen que esté activa en la galería (cambia con las miniaturas).
+// Se mantiene el transform-origin también al salir para que el zoom-out cierre
+// en el mismo punto (sin salto al centro).
+const zoomStyle = computed(() => ({
+  transform: zoomOn.value ? `scale(${ZOOM})` : 'scale(1)',
+  transformOrigin: `${zoomPos.value.x}% ${zoomPos.value.y}%`,
+}))
+
 // ---------- enlace cruzado Súper <-> Línea Entrada ----------
 // Las líneas son productos SEPARADOS (decisión del cliente); si este producto
 // tiene par, se ofrece un enlace discreto a la otra versión.
@@ -97,20 +133,47 @@ const perks = [
     <div class="pdp__top">
       <!-- ===================== GALERÍA ===================== -->
       <div class="gallery">
-        <div class="gallery__main">
+        <div
+          class="gallery__main"
+          :class="{ 'gallery__main--zoom': zoomOn }"
+          @mouseenter="onZoomEnter"
+          @mouseleave="onZoomLeave"
+          @mousemove="onZoomMove"
+        >
           <!-- fit inside: las fotos no cuadradas muestran el disfraz COMPLETO
-               (la galería usa object-fit contain sobre fondo blanco) -->
-          <NuxtImg
-            v-if="currentImage"
-            :src="currentImage"
-            :alt="product.name"
-            class="gallery__photo"
-            width="800"
-            height="800"
-            fit="inside"
-          />
-          <PhotoPlaceholder v-else :caption="`[ ${product.name} ]`" />
+               (la galería usa object-fit contain sobre fondo blanco).
+               Zoom inner: la imagen activa escala siguiendo el cursor (desktop). -->
+          <Transition name="gfade" mode="out-in">
+            <NuxtImg
+              v-if="activeImage"
+              :key="activeImage"
+              :src="activeImage"
+              :alt="product.name"
+              class="gallery__photo"
+              :style="zoomStyle"
+              width="800"
+              height="800"
+              fit="inside"
+            />
+            <PhotoPlaceholder v-else key="ph" :caption="`[ ${product.name} ]`" />
+          </Transition>
         </div>
+
+        <!-- miniaturas: solo si el producto tiene más de 1 ángulo -->
+        <ul v-if="hasGallery" class="thumbs" aria-label="Ángulos del producto">
+          <li v-for="(img, i) in galleryImages" :key="img" class="thumbs__item">
+            <button
+              type="button"
+              class="thumb"
+              :class="{ 'thumb--active': i === activeIndex }"
+              :aria-label="`Ver ángulo ${i + 1} de ${product.name}`"
+              :aria-pressed="i === activeIndex"
+              @click="activeIndex = i"
+            >
+              <NuxtImg :src="img" alt="" class="thumb__img" width="120" height="120" fit="inside" />
+            </button>
+          </li>
+        </ul>
       </div>
 
       <!-- ===================== INFO ===================== -->
@@ -209,6 +272,56 @@ const perks = [
   height: 100%;
   object-fit: contain;
   display: block;
+  transition: transform 0.15s ease;
+}
+/* zoom con lupa: solo donde hay hover real (desktop); en táctil no aplica */
+@media (hover: hover) and (pointer: fine) {
+  .gallery__main--zoom { cursor: zoom-in; }
+}
+/* ---------- miniaturas ---------- */
+.thumbs {
+  list-style: none;
+  padding: 0;
+  margin: var(--space-3) 0 0;
+  display: flex;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+.thumbs__item { margin: 0; }
+.thumb {
+  width: 84px;
+  height: 84px;
+  padding: 0;
+  border-radius: var(--r-md);
+  border: 2px solid var(--line);
+  background: #fff;
+  cursor: pointer;
+  overflow: hidden;
+  display: block;
+  transition: border-color 0.15s ease;
+}
+.thumb:hover { border-color: var(--line-2); }
+.thumb--active { border-color: var(--purple); }
+.thumb:focus-visible {
+  outline: 3px solid var(--turq);
+  outline-offset: 2px;
+}
+.thumb__img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+/* fade suave al cambiar la imagen principal */
+.gfade-enter-active,
+.gfade-leave-active { transition: opacity 0.18s ease; }
+.gfade-enter-from,
+.gfade-leave-to { opacity: 0; }
+@media (prefers-reduced-motion: reduce) {
+  .gfade-enter-active,
+  .gfade-leave-active { transition: none; }
+  .thumb { transition: none; }
+  .gallery__photo { transition: none; }
 }
 /* ---------- info ---------- */
 .info__cat {
@@ -357,5 +470,14 @@ const perks = [
 @media (max-width: 900px) {
   .pdp__top { grid-template-columns: 1fr; gap: var(--space-5); }
   .rel__grid { grid-template-columns: repeat(2, 1fr); }
+  /* miniaturas en fila horizontal scrolleable bajo la imagen principal */
+  .thumbs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: var(--space-2);
+    scrollbar-width: thin;
+  }
+  .thumb { flex: 0 0 auto; }
 }
 </style>

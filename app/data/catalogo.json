@@ -21,7 +21,9 @@
     ],
     "precio": 130000,
     "imagenes": [
-      "/images/products/spider-man-clasico-super-acolchado.webp"
+      "/images/products/spider-man-clasico.webp",
+      "/images/products/spider-man-clasico-2.webp",
+      "/images/products/spider-man-clasico-3.webp"
     ],
     "disponibleWeb": true,
     "idWeb": 1,
@@ -95,7 +97,9 @@
     ],
     "precio": 130000,
     "imagenes": [
-      "/images/products/iron-spider-man-super-acolchado.webp"
+      "/images/products/iron-spider-man.webp",
+      "/images/products/iron-spider-man-2.webp",
+      "/images/products/iron-spider-man-3.webp"
     ],
     "disponibleWeb": true,
     "idWeb": 2,
@@ -169,7 +173,9 @@
     ],
     "precio": 120000,
     "imagenes": [
-      "/images/products/spider-man-negro-super-acolchado.webp"
+      "/images/products/spider-man-negro.webp",
+      "/images/products/spider-man-negro-2.webp",
+      "/images/products/spider-man-negro-3.webp"
     ],
     "disponibleWeb": true,
     "idWeb": 3,
@@ -243,7 +249,9 @@
     ],
     "precio": 130000,
     "imagenes": [
-      "/images/products/spider-man-miles-morales-super-acolchado.webp"
+      "/images/products/spider-man-miles-morales.webp",
+      "/images/products/spider-man-miles-morales-2.webp",
+      "/images/products/spider-man-miles-morales-3.webp"
     ],
     "disponibleWeb": true,
     "idWeb": 4,
@@ -317,7 +325,9 @@
     ],
     "precio": 120000,
     "imagenes": [
-      "/images/products/superman-super-acolchado.webp"
+      "/images/products/superman.webp",
+      "/images/products/superman-2.webp",
+      "/images/products/superman-3.webp"
     ],
     "disponibleWeb": true,
     "idWeb": 5,
@@ -393,7 +403,9 @@
     ],
     "precio": 120000,
     "imagenes": [
-      "/images/products/iron-man-super-acolchado.webp"
+      "/images/products/iron-man.webp",
+      "/images/products/iron-man-2.webp",
+      "/images/products/iron-man-3.webp"
     ],
     "disponibleWeb": true,
     "idWeb": 6,
@@ -467,7 +479,9 @@
     ],
     "precio": 120000,
     "imagenes": [
-      "/images/products/capitan-america-super-acolchado.webp"
+      "/images/products/capitan-america.webp",
+      "/images/products/capitan-america-2.webp",
+      "/images/products/capitan-america-3.webp"
     ],
     "disponibleWeb": true,
     "idWeb": 7,
@@ -541,7 +555,9 @@
     ],
     "precio": 120000,
     "imagenes": [
-      "/images/products/thor-super-acolchado.webp"
+      "/images/products/thor.webp",
+      "/images/products/thor-2.webp",
+      "/images/products/thor-3.webp"
     ],
     "disponibleWeb": true,
     "idWeb": 8,
@@ -615,7 +631,9 @@
     ],
     "precio": 120000,
     "imagenes": [
-      "/images/products/flash-super-acolchado.webp"
+      "/images/products/flash.webp",
+      "/images/products/flash-2.webp",
+      "/images/products/flash-3.webp"
     ],
     "disponibleWeb": true,
     "idWeb": 9,
@@ -689,7 +707,9 @@
     ],
     "precio": 130000,
     "imagenes": [
-      "/images/products/batman-super-acolchado.webp"
+      "/images/products/batman.webp",
+      "/images/products/batman-2.webp",
+      "/images/products/batman-3.webp"
     ],
     "disponibleWeb": true,
     "idWeb": 10,
@@ -766,7 +786,9 @@
     ],
     "precio": 120000,
     "imagenes": [
-      "/images/products/venom-negro-super-acolchado.webp"
+      "/images/products/venom-negro.webp",
+      "/images/products/venom-negro-2.webp",
+      "/images/products/venom-negro-3.webp"
     ],
     "disponibleWeb": true,
     "idWeb": 11,
@@ -840,7 +862,9 @@
     ],
     "precio": 120000,
     "imagenes": [
-      "/images/products/deadpool-super-acolchado.webp"
+      "/images/products/deadpool.webp",
+      "/images/products/deadpool-2.webp",
+      "/images/products/deadpool-3.webp"
     ],
     "disponibleWeb": true,
     "idWeb": 12,
@@ -914,7 +938,9 @@
     ],
     "precio": 120000,
     "imagenes": [
-      "/images/products/pantera-negra.webp"
+      "/images/products/pantera-negra.webp",
+      "/images/products/pantera-negra-2.webp",
+      "/images/products/pantera-negra-3.webp"
     ],
     "disponibleWeb": true,
     "idWeb": 13,
@@ -951,7 +977,9 @@
     ],
     "precio": 120000,
     "imagenes": [
-      "/images/products/hulk.webp"
+      "/images/products/hulk.webp",
+      "/images/products/hulk-2.webp",
+      "/images/products/hulk-3.webp"
     ],
     "disponibleWeb": true,
     "idWeb": 14,
@@ -988,7 +1016,9 @@
     ],
     "precio": 120000,
     "imagenes": [
-      "/images/products/wolverine.webp"
+      "/images/products/wolverine.webp",
+      "/images/products/wolverine-2.webp",
+      "/images/products/wolverine-3.webp"
     ],
     "disponibleWeb": true,
     "idWeb": 15,
@@ -1025,7 +1055,9 @@
     ],
     "precio": 99000,
     "imagenes": [
-      "/images/products/aquaman.webp"
+      "/images/products/aquaman.webp",
+      "/images/products/aquaman-2.webp",
+      "/images/products/aquaman-3.webp"
     ],
     "disponibleWeb": true,
     "idWeb": 16,
@@ -1061,7 +1093,9 @@
     ],
     "precio": 120000,
     "imagenes": [
-      "/images/products/buzz-lightyear.webp"
+      "/images/products/buzz-lightyear.webp",
+      "/images/products/buzz-lightyear-2.webp",
+      "/images/products/buzz-lightyear-3.webp"
     ],
     "disponibleWeb": true,
     "idWeb": 17,
@@ -1098,7 +1132,9 @@
     ],
     "precio": 120000,
     "imagenes": [
-      "/images/products/venom-rojo.webp"
+      "/images/products/venom-rojo.webp",
+      "/images/products/venom-rojo-2.webp",
+      "/images/products/venom-rojo-3.webp"
     ],
     "disponibleWeb": true,
     "idWeb": 18,
