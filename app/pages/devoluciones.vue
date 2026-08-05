@@ -6,7 +6,7 @@ useHead({
 </script>
 
 <template>
-  <ContentPage title="Cambios">
+  <ContentPage title="Cambios" ko="ko-caja">
     <p>Puedes realizar el cambio de las siguientes formas:</p>
     <ul>
       <li>

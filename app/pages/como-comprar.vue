@@ -9,6 +9,7 @@ useHead({
   <ContentPage
     title="Cómo comprar"
     lead="Comprar tu disfraz es muy fácil. Sigue estos pasos:"
+    ko="ko-apunta"
   >
     <ol class="steps">
       <li>Ingresa a la página desde un buscador, redes sociales o un anuncio.</li>

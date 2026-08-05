@@ -6,7 +6,7 @@ useHead({
 </script>
 
 <template>
-  <ContentPage title="Sobre nosotros">
+  <ContentPage title="Sobre nosotros" ko="ko-paz">
     <p>
       Somos una empresa especializada en la confección de disfraces, con más de 11 años
       de experiencia diseñando y fabricando disfraces personalizados para niños, adultos,

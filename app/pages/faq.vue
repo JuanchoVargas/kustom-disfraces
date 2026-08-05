@@ -6,7 +6,7 @@ useHead({
 </script>
 
 <template>
-  <ContentPage title="Preguntas frecuentes">
+  <ContentPage title="Preguntas frecuentes" ko="ko-apunta">
     <div class="qa">
       <p class="qa__q">¿Pueden recrear un personaje específico o un diseño original?</p>
       <p>

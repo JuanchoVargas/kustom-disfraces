@@ -6,7 +6,7 @@ useHead({
 </script>
 
 <template>
-  <ContentPage title="Envíos y entregas">
+  <ContentPage title="Envíos y entregas" ko="ko-caja">
     <p>
       Realizamos entregas en Bogotá y todo Colombia. El cliente recibirá el número de guía
       para hacer seguimiento al envío. Los tiempos de entrega dependen de la empresa

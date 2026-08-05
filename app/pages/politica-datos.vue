@@ -8,7 +8,7 @@ useHead({
 </script>
 
 <template>
-  <ContentPage title="Política de Tratamiento de Datos Personales">
+  <ContentPage title="Política de Tratamiento de Datos Personales" ko="ko-paz" discreet>
     <p class="dates">
       <strong>Fecha de entrada en vigencia:</strong> 01/08/2026 ·
       <strong>Última actualización:</strong> 01/08/2026
