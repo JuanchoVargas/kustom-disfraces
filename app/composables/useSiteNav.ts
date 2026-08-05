@@ -23,14 +23,16 @@ export const useSiteNav = () => {
     { label: 'Sobre nosotros', to: '/sobre-nosotros' },
     { label: 'Cómo comprar', to: '/como-comprar' },
     { label: 'Envíos y entregas', to: '/envios' },
-    { label: 'Cambios y devoluciones', to: '/devoluciones' },
+    { label: 'Cambios', to: '/devoluciones' }, // ruta /devoluciones intacta; solo cambia el nombre visible
     { label: 'Preguntas frecuentes', to: '/faq' },
+    { label: 'Política de tratamiento de datos', to: '/politica-datos' },
   ]
 
   // Contacto oficial
   const contact = {
-    email: 'hola@disfraceskustom.com',
+    email: 'contacto@disfraceskustom.com',
     city: 'Bogotá, Colombia',
+    hours: 'Lunes a sábado, 8:00 a.m. a 7:00 p.m.',
     whatsapp: 'https://wa.me/573144477210', // WhatsApp oficial Kustom
   }
 

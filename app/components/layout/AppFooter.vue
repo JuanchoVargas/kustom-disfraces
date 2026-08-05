@@ -3,8 +3,8 @@ const { categories, info, contact } = useSiteNav()
 
 const social = [
   { label: 'Instagram', href: 'https://www.instagram.com/disfraceskustom/', icon: '<rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none"/>' },
-  { label: 'Facebook', href: '#', icon: '<path d="M14 8h2V5h-2a3 3 0 0 0-3 3v2H9v3h2v6h3v-6h2l1-3h-3V8a1 1 0 0 1 1-1z"/>' },
-  { label: 'TikTok', href: '#', icon: '<path d="M14 4c.4 2.3 1.9 3.8 4 4v3c-1.5 0-2.9-.4-4-1.2V16a5 5 0 1 1-5-5c.3 0 .7 0 1 .1v3.1a2 2 0 1 0 1 1.8V4z"/>' },
+  { label: 'Facebook', href: 'https://www.facebook.com/profile.php?id=61591282154264', icon: '<path d="M14 8h2V5h-2a3 3 0 0 0-3 3v2H9v3h2v6h3v-6h2l1-3h-3V8a1 1 0 0 1 1-1z"/>' },
+  { label: 'TikTok', href: 'https://www.tiktok.com/@disfraceskustom', icon: '<path d="M14 4c.4 2.3 1.9 3.8 4 4v3c-1.5 0-2.9-.4-4-1.2V16a5 5 0 1 1-5-5c.3 0 .7 0 1 .1v3.1a2 2 0 1 0 1 1.8V4z"/>' },
   { label: 'WhatsApp', href: contact.whatsapp, icon: '<path d="M21 11.5a8 8 0 0 1-11.6 7.1L4 20l1.4-5.3A8 8 0 1 1 21 11.5z"/>' },
 ]
 
@@ -21,7 +21,7 @@ const year = 2026
         </div>
         <p class="ftag">Disfraces para cada historia</p>
         <div class="social">
-          <a v-for="s in social" :key="s.label" :href="s.href" class="s" :aria-label="s.label">
+          <a v-for="s in social" :key="s.label" :href="s.href" class="s" :aria-label="s.label" target="_blank" rel="noopener noreferrer">
             <!-- eslint-disable-next-line vue/no-v-html -->
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" v-html="s.icon" />
           </a>
@@ -56,10 +56,10 @@ const year = 2026
         </a>
         <div class="fcontact">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 21s7-5.2 7-11a7 7 0 1 0-14 0c0 5.8 7 11 7 11z" />
-            <circle cx="12" cy="10" r="2.5" />
+            <circle cx="12" cy="12" r="9" />
+            <path d="M12 7v5l3 2" />
           </svg>
-          {{ contact.city }}
+          {{ contact.hours }}
         </div>
       </div>
     </div>
