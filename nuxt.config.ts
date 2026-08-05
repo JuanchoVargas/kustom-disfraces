@@ -66,6 +66,15 @@ export default defineNuxtConfig({
     wooBaseUrl: process.env.WOO_API_URL || '',              // -> NUXT_WOO_BASE_URL
     wooConsumerKey: process.env.WOO_CONSUMER_KEY || '',     // -> NUXT_WOO_CONSUMER_KEY
     wooConsumerSecret: process.env.WOO_CONSUMER_SECRET || '', // -> NUXT_WOO_CONSUMER_SECRET
+    // SMTP para el formulario de mayoristas (solo servidor; nunca al cliente).
+    // Defaults del .env en build; en runtime se sobrescriben con NUXT_SMTP_*.
+    // Sin credenciales configuradas, /api/mayoristas responde 503 "not_configured".
+    smtpHost: process.env.SMTP_HOST || '',                  // -> NUXT_SMTP_HOST (ej: smtp.hostinger.com)
+    smtpPort: process.env.SMTP_PORT || '465',               // -> NUXT_SMTP_PORT (465 SSL / 587 STARTTLS)
+    smtpUser: process.env.SMTP_USER || '',                  // -> NUXT_SMTP_USER (contacto@disfraceskustom.com)
+    smtpPass: process.env.SMTP_PASS || '',                  // -> NUXT_SMTP_PASS (clave del buzón)
+    smtpFrom: process.env.SMTP_FROM || '',                  // -> NUXT_SMTP_FROM (remitente; por defecto = smtpUser)
+    mayoristasTo: process.env.MAYORISTAS_TO || 'contacto@disfraceskustom.com', // -> NUXT_MAYORISTAS_TO
     public: {
       // Origen del catálogo: 'local' (catalogo.json) | 'woo' (proxy /api/products).
       // Default LOCAL — el switch a woo se hace tras verificar paridad (README).

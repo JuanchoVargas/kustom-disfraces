@@ -25,6 +25,7 @@ export const useSiteNav = () => {
     { label: 'Envíos y entregas', to: '/envios' },
     { label: 'Cambios', to: '/devoluciones' }, // ruta /devoluciones intacta; solo cambia el nombre visible
     { label: 'Preguntas frecuentes', to: '/faq' },
+    { label: 'Ventas al por mayor', to: '/mayoristas' },
     { label: 'Política de tratamiento de datos', to: '/politica-datos' },
   ]
 
