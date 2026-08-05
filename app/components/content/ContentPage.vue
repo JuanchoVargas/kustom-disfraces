@@ -48,54 +48,38 @@ defineProps<Props>()
 </template>
 
 <style scoped>
+/* Columna de lectura centrada en la página. Flex column + align-items:center
+   garantiza el centrado de la columna Y del KO en desktop y mobile por igual. */
 .info-wrap {
-  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 .info {
-  position: relative;
-  z-index: 1; /* el texto siempre por encima de KO si llegaran a solaparse */
+  width: 100%;
   max-width: 760px;
-  margin: 0 auto;
-  padding: var(--space-7) var(--space-5) var(--space-8);
+  padding: var(--space-7) var(--space-5) var(--space-6);
 }
 
-/* ---------- KO decorativo ---------- */
-/* Base (mobile / tablet): en flujo normal, DEBAJO del texto y centrado.
-   No empuja de forma extraña porque va al final del contenido. */
+/* ---------- KO decorativo: cierre de página, debajo del texto y centrado ---------- */
+/* Mismo comportamiento en desktop y mobile (más simple y consistente). El
+   margen superior lo separa del último párrafo para que respire. */
 .ko-deco {
   display: block;
-  width: 104px; /* KO es una figura vertical (~0.56 de proporción): ancho contenido */
+  width: 132px; /* KO es una figura vertical (~0.56): ancho contenido, no protagonista */
   height: auto;
-  margin: 0 auto var(--space-7);
+  margin: var(--space-6) 0 var(--space-8);
   opacity: 0.96;
   pointer-events: none;
   animation: ko-float 4.5s var(--ease-out) infinite;
 }
 .ko-deco--discreet {
-  width: 84px;
-  opacity: 0.78;
+  width: 104px;
+  opacity: 0.8;
 }
 @keyframes ko-float {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-7px); }
-}
-
-/* Desktop ancho: KO al costado, en el margen derecho fuera de la columna.
-   El breakpoint (1160px) garantiza margen suficiente para no tocar el texto. */
-@media (min-width: 1160px) {
-  .ko-deco {
-    position: absolute;
-    right: var(--space-6);
-    bottom: var(--space-7);
-    width: 150px;
-    margin: 0;
-    z-index: 0;
-  }
-  .ko-deco--discreet {
-    width: 110px;
-    right: var(--space-5);
-    bottom: var(--space-6);
-  }
 }
 .info__head {
   margin-bottom: var(--space-6);
@@ -205,10 +189,10 @@ defineProps<Props>()
 }
 
 @media (max-width: 720px) {
-  .info { padding: var(--space-6) var(--space-4) var(--space-7); }
+  .info { padding: var(--space-6) var(--space-4) var(--space-5); }
   .info__title { font-size: var(--text-2xl); }
-  .ko-deco { width: 92px; }
-  .ko-deco--discreet { width: 76px; }
+  .ko-deco { width: 116px; margin: var(--space-5) 0 var(--space-7); }
+  .ko-deco--discreet { width: 92px; }
 }
 
 /* accesibilidad: sin flotación si el usuario pide movimiento reducido */
