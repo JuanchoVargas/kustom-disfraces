@@ -61,7 +61,7 @@ watch(() => route.fullPath, () => {
   <div class="d">
     <nav class="nav">
       <NuxtLink to="/" class="logo">
-        <img src="/images/logo-kustom.png" alt="Kustom — Disfraces y Trajes típicos" class="logoimg">
+        <img src="/images/logo-mark-black.webp" alt="Kustom — Disfraces y Trajes típicos" class="logoimg" width="240" height="240">
       </NuxtLink>
 
       <div class="links">
@@ -160,7 +160,7 @@ watch(() => route.fullPath, () => {
           </button>
 
           <NuxtLink to="/" class="logo">
-            <img src="/images/logo-kustom.png" alt="Kustom — Disfraces y Trajes típicos" class="logoimg">
+            <img src="/images/logo-mark-black.webp" alt="Kustom — Disfraces y Trajes típicos" class="logoimg" width="240" height="240">
           </NuxtLink>
         </div>
 
@@ -428,8 +428,8 @@ watch(() => route.fullPath, () => {
   gap: 6px;
   flex-shrink: 0;
 }
-/* +26% con compensación (48 - 10 = 38 efectivos, la fila .top no crece) */
-.m .logoimg { height: 48px; margin-block: -5px; }
+/* Isotipo más grande con compensación (60 - 22 = 38 efectivos: la fila .top no crece) */
+.m .logoimg { height: 60px; margin-block: -11px; }
 .m .search {
   display: flex;
   align-items: center;
@@ -560,14 +560,14 @@ watch(() => route.fullPath, () => {
   text-decoration: none;
   flex-shrink: 0;
 }
-/* Logo-Kustom.png (wordmark negro + tagline, fondo transparente).
-   +26% de tamaño (marketing jul 2026) SIN crecer el navbar: el margen
-   vertical negativo compensa el alto extra (58 - 12 = 46 efectivos). */
+/* Isotipo K/alien (logo-mark-black.webp, cuadrado, fondo transparente).
+   Agrandado a pedido del cliente SIN crecer el navbar: el margen vertical
+   negativo compensa el alto extra y mantiene el alto efectivo (72 - 26 = 46). */
 .logoimg {
-  height: 58px;
+  height: 72px;
   width: auto;
   display: block;
-  margin-block: -6px;
+  margin-block: -13px;
 }
 .iconbtn {
   width: 38px;

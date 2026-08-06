@@ -32,6 +32,7 @@ export const useSiteNav = () => {
   // Contacto oficial
   const contact = {
     email: 'contacto@disfraceskustom.com',
+    phone: '3144477210', // teléfono de contacto (tel: en el footer)
     city: 'Bogotá, Colombia',
     hours: 'Lunes a sábado, 8:00 a.m. a 7:00 p.m.',
     whatsapp: 'https://wa.me/573144477210', // WhatsApp oficial Kustom

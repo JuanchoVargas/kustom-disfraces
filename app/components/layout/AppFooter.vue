@@ -17,7 +17,7 @@ const year = 2026
       <!-- Marca -->
       <div class="foot__brand">
         <div class="flogo">
-          <img src="/images/logo-kustom.png" alt="Kustom — Disfraces y Trajes típicos" class="flogoimg">
+          <img src="/images/logo-mark-white.webp" alt="Kustom — Disfraces y Trajes típicos" class="flogoimg" width="240" height="240">
         </div>
         <p class="ftag">Disfraces para cada historia</p>
         <div class="social">
@@ -53,6 +53,12 @@ const year = 2026
             <path d="m3 7 9 6 9-6" />
           </svg>
           {{ contact.email }}
+        </a>
+        <a class="fcontact" :href="`tel:+57${contact.phone}`">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M6.6 10.8a15 15 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25 11.4 11.4 0 0 0 3.6.6 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1 11.4 11.4 0 0 0 .6 3.6 1 1 0 0 1-.25 1z" />
+          </svg>
+          {{ contact.phone }}
         </a>
         <div class="fcontact">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -102,12 +108,11 @@ const year = 2026
   display: flex;
   line-height: 1;
 }
-/* logo negro sobre fondo carbón -> invertido a blanco */
+/* isotipo K/alien en blanco sobre fondo carbón (sin invertir) */
 .foot .flogoimg {
-  height: 52px;
+  height: 64px;
   width: auto;
   display: block;
-  filter: invert(1);
 }
 .foot .ftag {
   color: #A7A49D;

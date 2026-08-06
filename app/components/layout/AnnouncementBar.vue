@@ -3,9 +3,7 @@
  * AnnouncementBar — barra delgada global sobre el navbar.
  * Sin animación ni botón de cierre (por ahora).
  */
-// ⚠ PROVISIONAL — texto y umbral a confirmar con el cliente
-// (el umbral real vive en FREE_SHIPPING_THRESHOLD, stores/cart.ts)
-const ANNOUNCEMENT_TEXT = 'Envío gratis desde $200.000 · Pago contra entrega'
+const ANNOUNCEMENT_TEXT = 'ENVÍO GRATIS EN BOGOTÁ'
 </script>
 
 <template>
