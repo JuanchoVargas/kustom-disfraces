@@ -102,24 +102,33 @@ watch(() => route.fullPath, () => {
       </div>
 
       <div class="icons">
-        <button class="iconbtn" type="button" aria-label="Buscar">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-            <circle cx="11" cy="11" r="7" />
-            <path d="m20 20-3.2-3.2" />
+        <NuxtLink to="/mayoristas" class="mayolink" :class="{ on: route.path === '/mayoristas' }">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0l-6.2-6.2a2 2 0 0 1-.6-1.4V5a2 2 0 0 1 2-2h5a2 2 0 0 1 1.4.6l6.4 6.4a2 2 0 0 1 0 2.8z" />
+            <circle cx="7.5" cy="7.5" r="1.3" fill="currentColor" stroke="none" />
           </svg>
-        </button>
+          Mayoristas
+        </NuxtLink>
 
         <button type="button" class="iconbtn" aria-label="Abrir carrito" @click="cart.openDrawer()">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M5 7h14l-1.2 11a2 2 0 0 1-2 1.8H8.2a2 2 0 0 1-2-1.8z" />
-            <path d="M9 7a3 3 0 0 1 6 0" />
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="9" cy="21" r="1.6" />
+            <circle cx="19" cy="21" r="1.6" />
+            <path d="M2 3h2.4l2.2 12.1a1.8 1.8 0 0 0 1.8 1.5h8.6a1.8 1.8 0 0 0 1.8-1.4L21 7H5.3" />
           </svg>
           <span v-if="cartCount" class="cartdot" :class="{ pop: popping }">{{ cartCount }}</span>
         </button>
 
+        <button class="iconbtn" type="button" aria-label="Buscar">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="11" cy="11" r="7" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+        </button>
+
         <KButton variant="whatsapp" size="sm" :to="contact.whatsapp">
           <template #icon-left>
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <svg class="wa-ico" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
               <path d="M12 2a10 10 0 0 0-8.6 15l-1.3 4.7 4.8-1.3A10 10 0 1 0 12 2zm0 1.8a8.2 8.2 0 0 1 6.9 12.6l-.2.3.8 2.9-3-.8-.3.2A8.2 8.2 0 1 1 12 3.8zm-3 3.6c-.2 0-.5.1-.7.4-.3.3-1 1-1 2.3s1 2.7 1.1 2.9c.1.2 2 3 4.8 4.2 2.3 1 2.8.8 3.3.7.5 0 1.6-.6 1.8-1.3.2-.6.2-1.2.2-1.3-.1-.1-.3-.2-.6-.3l-2-1c-.3-.1-.5-.1-.7.1l-.7.9c-.1.2-.3.2-.5.1-.3-.1-1.2-.5-2.2-1.4-.8-.7-1.4-1.6-1.5-1.9-.2-.2 0-.4.1-.5l.4-.5.3-.5c.1-.2 0-.4 0-.5l-.9-2.2c-.2-.5-.4-.5-.6-.5z"/>
             </svg>
           </template>
@@ -157,16 +166,17 @@ watch(() => route.fullPath, () => {
 
         <div class="icons">
           <button type="button" class="iconbtn" aria-label="Abrir carrito" @click="cart.openDrawer()">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M5 7h14l-1.2 11a2 2 0 0 1-2 1.8H8.2a2 2 0 0 1-2-1.8z" />
-              <path d="M9 7a3 3 0 0 1 6 0" />
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="9" cy="21" r="1.6" />
+              <circle cx="19" cy="21" r="1.6" />
+              <path d="M2 3h2.4l2.2 12.1a1.8 1.8 0 0 0 1.8 1.5h8.6a1.8 1.8 0 0 0 1.8-1.4L21 7H5.3" />
             </svg>
             <span v-if="cartCount" class="cartdot" :class="{ pop: popping }">{{ cartCount }}</span>
           </button>
 
           <KButton variant="whatsapp" size="sm" :to="contact.whatsapp" aria-label="WhatsApp">
             <template #icon-left>
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <svg class="wa-ico" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                 <path d="M12 2a10 10 0 0 0-8.6 15l-1.3 4.7 4.8-1.3A10 10 0 1 0 12 2zm0 1.8a8.2 8.2 0 0 1 6.9 12.6l-.2.3.8 2.9-3-.8-.3.2A8.2 8.2 0 1 1 12 3.8zm-3 3.6c-.2 0-.5.1-.7.4-.3.3-1 1-1 2.3s1 2.7 1.1 2.9c.1.2 2 3 4.8 4.2 2.3 1 2.8.8 3.3.7.5 0 1.6-.6 1.8-1.3.2-.6.2-1.2.2-1.3-.1-.1-.3-.2-.6-.3l-2-1c-.3-.1-.5-.1-.7.1l-.7.9c-.1.2-.3.2-.5.1-.3-.1-1.2-.5-2.2-1.4-.8-.7-1.4-1.6-1.5-1.9-.2-.2 0-.4.1-.5l.4-.5.3-.5c.1-.2 0-.4 0-.5l-.9-2.2c-.2-.5-.4-.5-.6-.5z"/>
               </svg>
             </template>
@@ -176,9 +186,9 @@ watch(() => route.fullPath, () => {
       </div>
 
       <label class="search">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="color: var(--mut); flex-shrink: 0">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--mut); flex-shrink: 0">
           <circle cx="11" cy="11" r="7" />
-          <path d="m20 20-3.2-3.2" />
+          <line x1="21" y1="21" x2="16.65" y2="16.65" />
         </svg>
         <input type="search" placeholder="Buscar disfraces, tallas, personajes…" >
       </label>
@@ -220,6 +230,15 @@ watch(() => route.fullPath, () => {
             >{{ s.nombre }}<span class="menu__count">{{ s.count }}</span></NuxtLink>
           </div>
         </div>
+
+        <!-- acceso comercial destacado, aparte de las categorías -->
+        <NuxtLink to="/mayoristas" class="menu__mayo" :class="{ on: route.path === '/mayoristas' }">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0l-6.2-6.2a2 2 0 0 1-.6-1.4V5a2 2 0 0 1 2-2h5a2 2 0 0 1 1.4.6l6.4 6.4a2 2 0 0 1 0 2.8z" />
+            <circle cx="7.5" cy="7.5" r="1.3" fill="currentColor" stroke="none" />
+          </svg>
+          Ventas al por mayor
+        </NuxtLink>
       </div>
     </nav>
   </div>
@@ -349,6 +368,35 @@ watch(() => route.fullPath, () => {
   align-items: center;
   gap: 6px;
   flex-shrink: 0;
+}
+
+/* ---------- acceso "Mayoristas" (desktop): pill aparte de las categorías ---------- */
+.d .mayolink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--purple);
+  text-decoration: none;
+  padding: 7px 14px;
+  border: 1.5px solid var(--purple);
+  border-radius: 999px;
+  white-space: nowrap;
+  margin-right: 2px;
+  transition: background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+.d .mayolink:hover,
+.d .mayolink.on {
+  background: var(--purple);
+  color: #fff;
+}
+.d .mayolink:focus-visible {
+  outline: 2px solid var(--turq);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .d .mayolink { transition: none; }
 }
 
 /* ===================== MOBILE (.m .nav) — port exacto ===================== */
@@ -484,6 +532,27 @@ watch(() => route.fullPath, () => {
   color: var(--mut);
 }
 
+/* ---------- acceso "Mayoristas" (mobile): ítem destacado, aparte ---------- */
+.m .menu__mayo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+  padding: 14px 12px;
+  border-top: 1px solid var(--line);
+  border-radius: 0 0 9px 9px;
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--purple);
+  text-decoration: none;
+}
+.m .menu__mayo:hover,
+.m .menu__mayo.on { background: var(--purple-soft); }
+.m .menu__mayo:focus-visible {
+  outline: 2px solid var(--turq);
+  outline-offset: -2px;
+}
+
 /* ===================== compartido: logo + iconbtn + cartdot ===================== */
 .logo {
   display: flex;
@@ -514,6 +583,10 @@ watch(() => route.fullPath, () => {
   flex-shrink: 0;
 }
 .iconbtn:hover { background: var(--hueso); }
+/* SVG como bloque: sin el gap de línea base que puede recortar el trazo */
+.iconbtn svg { display: block; }
+/* Ícono de WhatsApp dentro del KButton: bloque y sin encogerse (no se corta) */
+.wa-ico { display: block; flex-shrink: 0; }
 .cartdot {
   position: absolute;
   top: 3px;
