@@ -28,6 +28,9 @@ const activeSlug = computed(() => {
 // del navbar mobile se oculta ahí para no duplicar (en Home y demás sigue).
 const onCategoryPage = computed(() => activeSlug.value !== null)
 
+// En el home (mobile) el logo va más pequeño y sin el wordmark "Kustom".
+const isHome = computed(() => route.path === '/')
+
 // ---------- desplegable desktop (hover/focus, Escape cierra) ----------
 const openDrop = ref<string | null>(null)
 // focusout: cerrar solo si el foco salió del item completo (permite tabular
@@ -197,9 +200,9 @@ watch(() => route.fullPath, () => {
             </svg>
           </button>
 
-          <NuxtLink to="/" class="logo">
+          <NuxtLink to="/" class="logo" :class="{ 'logo--min': isHome }">
             <img src="/images/logo-mark-black.webp" alt="" aria-hidden="true" class="logoimg" width="240" height="240">
-        <span class="logotext">Kustom</span>
+            <span class="logotext">Kustom</span>
           </NuxtLink>
         </div>
 
@@ -493,6 +496,9 @@ watch(() => route.fullPath, () => {
 }
 /* Isotipo más grande con compensación (60 - 22 = 38 efectivos: la fila .top no crece) */
 .m .logoimg { height: 60px; margin-block: -11px; }
+/* Home (mobile): logo más pequeño y sin el wordmark "Kustom" */
+.m .logo--min .logotext { display: none; }
+.m .logo--min .logoimg { height: 44px; margin-block: -3px; }
 .m .search {
   display: flex;
   align-items: center;
