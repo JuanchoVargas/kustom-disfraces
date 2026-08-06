@@ -48,11 +48,36 @@ function onNavEscape(e: KeyboardEvent) {
 const menuOpen = ref(false)
 const expanded = ref<string | null>(null) // una categoría expandida a la vez
 
-// Al navegar se cierra todo (desplegable, menú y acordeón)
+// ---------- búsqueda ----------
+const searchTerm = ref('')
+const searchOpen = ref(false) // desktop: input expandible junto a la lupa
+const deskInput = ref<HTMLInputElement | null>(null)
+
+async function openSearch() {
+  searchOpen.value = true
+  await nextTick()
+  deskInput.value?.focus()
+}
+function submitSearch() {
+  const q = searchTerm.value.trim()
+  if (!q) return
+  navigateTo({ path: '/buscar', query: { q } })
+}
+// La lupa (desktop): 1er clic abre y enfoca; con texto, busca.
+function onSearchIcon() {
+  if (searchOpen.value) {
+    if (searchTerm.value.trim()) submitSearch()
+    else searchOpen.value = false
+  }
+  else { openSearch() }
+}
+
+// Al navegar se cierra todo (desplegable, menú, acordeón y búsqueda)
 watch(() => route.fullPath, () => {
   openDrop.value = null
   menuOpen.value = false
   expanded.value = null
+  searchOpen.value = false
 })
 </script>
 
@@ -112,12 +137,24 @@ watch(() => route.fullPath, () => {
           <span v-if="cartCount" class="cartdot" :class="{ pop: popping }">{{ cartCount }}</span>
         </button>
 
-        <button class="iconbtn" type="button" aria-label="Buscar">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <circle cx="11" cy="11" r="7" />
-            <line x1="21" y1="21" x2="16.65" y2="16.65" />
-          </svg>
-        </button>
+        <form class="searchbox" role="search" @submit.prevent="submitSearch">
+          <input
+            v-show="searchOpen"
+            ref="deskInput"
+            v-model="searchTerm"
+            type="search"
+            class="searchbox__input"
+            placeholder="Buscar disfraces, personajes…"
+            aria-label="Buscar disfraces"
+            @keydown.escape="searchOpen = false"
+          >
+          <button class="iconbtn" type="button" :aria-label="searchOpen ? 'Buscar' : 'Abrir búsqueda'" @click="onSearchIcon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="11" cy="11" r="7" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+          </button>
+        </form>
 
         <NuxtLink to="/mayoristas" class="mayolink" :class="{ on: route.path === '/mayoristas' }">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -187,13 +224,13 @@ watch(() => route.fullPath, () => {
         </div>
       </div>
 
-      <label class="search">
+      <form class="search" role="search" @submit.prevent="submitSearch">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--mut); flex-shrink: 0">
           <circle cx="11" cy="11" r="7" />
           <line x1="21" y1="21" x2="16.65" y2="16.65" />
         </svg>
-        <input type="search" placeholder="Buscar disfraces, tallas, personajes…" >
-      </label>
+        <input v-model="searchTerm" type="search" placeholder="Buscar disfraces, tallas, personajes…" aria-label="Buscar disfraces" >
+      </form>
 
       <!-- chips rápidos: se ocultan en la PLP (las tabs ya están) y con el
            menú abierto (el acordeón es el canónico — no duplicar controles) -->
@@ -399,6 +436,30 @@ watch(() => route.fullPath, () => {
 }
 @media (prefers-reduced-motion: reduce) {
   .d .mayolink { transition: none; }
+}
+
+/* ---------- buscador desktop (input expandible + lupa) ---------- */
+.d .searchbox {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.d .searchbox__input {
+  width: 210px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  padding: 8px 15px;
+  font-family: var(--ff-body);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
+  background: var(--hueso);
+  outline: none;
+}
+.d .searchbox__input::placeholder { color: var(--mut-2); }
+.d .searchbox__input:focus {
+  border-color: var(--purple);
+  box-shadow: 0 0 0 3px var(--purple-soft);
 }
 
 /* ===================== MOBILE (.m .nav) — port exacto ===================== */
