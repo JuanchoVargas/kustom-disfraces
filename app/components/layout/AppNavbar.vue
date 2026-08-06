@@ -102,14 +102,6 @@ watch(() => route.fullPath, () => {
       </div>
 
       <div class="icons">
-        <NuxtLink to="/mayoristas" class="mayolink" :class="{ on: route.path === '/mayoristas' }">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0l-6.2-6.2a2 2 0 0 1-.6-1.4V5a2 2 0 0 1 2-2h5a2 2 0 0 1 1.4.6l6.4 6.4a2 2 0 0 1 0 2.8z" />
-            <circle cx="7.5" cy="7.5" r="1.3" fill="currentColor" stroke="none" />
-          </svg>
-          Mayoristas
-        </NuxtLink>
-
         <button type="button" class="iconbtn" aria-label="Abrir carrito" @click="cart.openDrawer()">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <circle cx="9" cy="21" r="1.6" />
@@ -125,6 +117,14 @@ watch(() => route.fullPath, () => {
             <line x1="21" y1="21" x2="16.65" y2="16.65" />
           </svg>
         </button>
+
+        <NuxtLink to="/mayoristas" class="mayolink" :class="{ on: route.path === '/mayoristas' }">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0l-6.2-6.2a2 2 0 0 1-.6-1.4V5a2 2 0 0 1 2-2h5a2 2 0 0 1 1.4.6l6.4 6.4a2 2 0 0 1 0 2.8z" />
+            <circle cx="7.5" cy="7.5" r="1.3" fill="currentColor" stroke="none" />
+          </svg>
+          Mayoristas
+        </NuxtLink>
 
         <KButton variant="whatsapp" size="sm" :to="contact.whatsapp">
           <template #icon-left>
