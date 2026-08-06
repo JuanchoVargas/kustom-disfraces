@@ -1,6 +1,11 @@
 <script setup lang="ts">
-const { categories } = useProducts()
+const { categories, byPublico } = useProducts()
 const { reveal } = useSiteMotion()
+
+// Solo categorías con productos visibles: las vacías ("muy pronto", p. ej.
+// Caballeros hoy) no se muestran en el home hasta tener catálogo/fotos.
+// Se reactivan solas cuando byPublico deja de estar vacío.
+const shownCategories = computed(() => categories.filter(c => byPublico(c.slug).length > 0))
 
 useHead({
   title: 'Kustom Disfraces — Disfraces para cada historia en Bogotá',
@@ -33,9 +38,9 @@ useHead({
     <div v-motion v-bind="reveal()" class="section__head">
       <h2 class="section__title">Explora por categoría</h2>
     </div>
-    <div class="cat-grid">
+    <div class="cat-grid" :style="{ '--cols': shownCategories.length }">
       <CategoryCard
-        v-for="(c, i) in categories"
+        v-for="(c, i) in shownCategories"
         :key="c.slug"
         v-motion
         v-bind="reveal(i * 60)"
@@ -89,8 +94,9 @@ useHead({
 
 .cat-grid {
   display: grid;
-  /* 5 públicos en una fila (desktop) */
-  grid-template-columns: repeat(5, 1fr);
+  /* una columna por categoría mostrada (desktop); --cols lo fija el template.
+     Los breakpoints de abajo lo sobreescriben en mobile. */
+  grid-template-columns: repeat(var(--cols, 5), 1fr);
   gap: var(--space-5);
 }
 

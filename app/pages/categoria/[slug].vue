@@ -81,10 +81,12 @@ const fRange = ref<number | null>(null) // índice de priceRanges
 const sort = ref<'rel' | 'price-asc' | 'price-desc'>('rel')
 const showFilters = ref(false) // toggle mobile
 
-function toggle<T>(arr: Ref<T[]>, val: T) {
-  const i = arr.value.indexOf(val)
-  if (i === -1) arr.value.push(val)
-  else arr.value.splice(i, 1)
+// OJO: en el template los refs se auto-desenvuelven, así que aquí llega el
+// array reactivo (no el Ref). Mutarlo (push/splice) dispara la reactividad.
+function toggle<T>(arr: T[], val: T) {
+  const i = arr.indexOf(val)
+  if (i === -1) arr.push(val)
+  else arr.splice(i, 1)
 }
 function clearFilters() {
   fSizes.value = []
