@@ -2,8 +2,8 @@
 // Iconos como path SVG (24x24, stroke). Estáticos y de confianza -> v-html seguro.
 const items = [
   {
-    title: 'Envío a toda Colombia',
-    sub: 'Despachos en 24–48h',
+    title: 'Envío gratis en Bogotá',
+    sub: 'Y despachos a todo el país',
     icon: '<path d="M3 7h11v8H3z"/><path d="M14 10h4l3 3v2h-7z"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/>',
   },
   {

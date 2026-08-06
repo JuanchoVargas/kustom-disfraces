@@ -107,7 +107,7 @@ const related = computed(() =>
 )
 
 const perks = [
-  { t: 'Envío a toda Colombia', icon: '<path d="M3 7h11v8H3z"/><path d="M14 10h4l3 3v2h-7z"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/>' },
+  { t: 'Envío gratis en Bogotá', icon: '<path d="M3 7h11v8H3z"/><path d="M14 10h4l3 3v2h-7z"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/>' },
   { t: 'Pago contra entrega', icon: '<rect x="2.5" y="6" width="19" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/>' },
   { t: 'Cambios fáciles', icon: '<path d="M4 12a8 8 0 0 1 13-6l3 2M20 12a8 8 0 0 1-13 6l-3-2"/>' },
 ]

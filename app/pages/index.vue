@@ -4,7 +4,7 @@ const { reveal } = useSiteMotion()
 
 useHead({
   title: 'Kustom Disfraces — Disfraces para cada historia en Bogotá',
-  meta: [{ name: 'description', content: 'Disfraces de calidad para niños, niñas, damas, caballeros y bebés en Bogotá. Superhéroes, anime, animales y más. Envío a toda Colombia.' }],
+  meta: [{ name: 'description', content: 'Disfraces de calidad para niños, niñas, damas, caballeros y bebés en Bogotá. Superhéroes, anime, animales y más. Envío gratis en Bogotá y despacho a todo el país.' }],
 })
 </script>
 

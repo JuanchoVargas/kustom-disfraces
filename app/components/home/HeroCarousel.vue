@@ -18,7 +18,7 @@ const slides: Slide[] = [
     eyebrow: '🦸 Catálogo 2026',
     title: 'Disfraces para ',
     accent: 'cada historia',
-    subtitle: 'Superhéroes acolchados con calidad premium. Encuentra tu personaje, elige tu talla y recíbelo en casa — envío a toda Colombia.',
+    subtitle: 'Superhéroes acolchados con calidad premium. Encuentra tu personaje, elige tu talla y recíbelo en casa — envío gratis en Bogotá.',
     ctaPrimary: { label: 'Ver niños', to: '/categoria/ninos' },
     ctaSecondary: { label: 'Cómo comprar', to: '/como-comprar' },
     blobA: 'var(--purple)',

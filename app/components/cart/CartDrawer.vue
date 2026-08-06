@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import { FREE_SHIPPING_THRESHOLD } from '~/stores/cart'
-
 /**
  * Drawer lateral del carrito. Se abre desde el ícono del navbar y al
  * agregar un producto. Cierra con X, Escape u overlay. La animación de
@@ -28,11 +26,6 @@ watch(() => cart.drawerOpen, (open) => {
   if (open) nextTick(() => closeBtn.value?.focus())
 })
 
-// ---- envío gratis (umbral PROVISIONAL, ver stores/cart.ts) ----
-const shippingProgress = computed(() => Math.min(1, cart.subtotal / FREE_SHIPPING_THRESHOLD))
-const shippingRemaining = computed(() => Math.max(0, FREE_SHIPPING_THRESHOLD - cart.subtotal))
-const hasFreeShipping = computed(() => shippingRemaining.value === 0)
-
 const waCheckout = computed(() => {
   const lines = cart.items.map(i => `• ${i.name} (talla ${i.size}${i.gama ? `, ${i.gama}` : ''}) x${i.quantity}`).join('\n')
   const text = `Hola, quiero finalizar mi pedido:\n${lines}\n\nSubtotal: ${formatCOP(cart.subtotal)}`
@@ -57,15 +50,10 @@ const waCheckout = computed(() => {
             </button>
           </header>
 
-          <!-- ---------- envío gratis ---------- -->
-          <div v-if="cart.items.length" class="cd__ship" :class="{ ok: hasFreeShipping }">
-            <p class="cd__shiptext">
-              <template v-if="hasFreeShipping">🎉 ¡Tienes <strong>envío gratis</strong>!</template>
-              <template v-else>Te faltan <strong>{{ formatCOP(shippingRemaining) }}</strong> para el envío gratis</template>
-            </p>
-            <div class="cd__bar" role="progressbar" :aria-valuenow="Math.round(shippingProgress * 100)" aria-valuemin="0" aria-valuemax="100">
-              <div class="cd__fill" :style="{ width: `${shippingProgress * 100}%` }" />
-            </div>
+          <!-- ---------- envío gratis en Bogotá (mensaje fijo) ---------- -->
+          <div v-if="cart.items.length" class="cd__ship">
+            <p class="cd__shiptext">🎉 <strong>Envío gratis en Bogotá</strong></p>
+            <p class="cd__shipsub">Fuera de Bogotá el envío se cotiza al finalizar.</p>
           </div>
 
           <!-- ---------- items ---------- -->
@@ -200,32 +188,23 @@ const waCheckout = computed(() => {
 .cd__close:hover { background: var(--hueso); }
 .cd__close:focus-visible { outline: 2px solid var(--turq); outline-offset: 2px; }
 
-/* ---------- envío gratis ---------- */
+/* ---------- envío gratis en Bogotá (mensaje fijo) ---------- */
 .cd__ship {
-  padding: 14px 20px;
+  padding: 12px 20px;
   border-bottom: 1px solid var(--line);
   background: var(--hueso);
 }
 .cd__shiptext {
-  font-size: 12.5px;
-  color: var(--mut);
-  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
 }
 .cd__shiptext strong { color: var(--ink); }
-.cd__ship.ok .cd__shiptext { color: var(--ink); }
-.cd__bar {
-  height: 7px;
-  border-radius: 999px;
-  background: var(--line);
-  overflow: hidden;
+.cd__shipsub {
+  font-size: 11.5px;
+  color: var(--mut);
+  margin-top: 3px;
 }
-.cd__fill {
-  height: 100%;
-  border-radius: 999px;
-  background: var(--turq);
-  transition: width 0.35s var(--ease-out);
-}
-.cd__ship.ok .cd__fill { background: var(--lima); }
 
 /* ---------- items ---------- */
 .cd__body {
