@@ -802,8 +802,8 @@
     ],
     "precio": 120000,
     "imagenes": [
-      "/images/products/venom-negro.webp",
       "/images/products/venom-negro-2.webp",
+      "/images/products/venom-negro.webp",
       "/images/products/venom-negro-3.webp"
     ],
     "disponibleWeb": true,
