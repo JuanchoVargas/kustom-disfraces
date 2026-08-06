@@ -46,12 +46,17 @@ useHead(() => ({
   title: known.value
     ? `Disfraces de ${known.value.nombre} en Bogotá | Kustom`
     : 'Kustom Disfraces',
-  meta: [{
-    name: 'description',
-    content: known.value
-      ? `Disfraces de ${known.value.nombre} en Bogotá: calidad premium, gran variedad de personajes y tallas. Envío gratis en Bogotá y despacho a todo el país.`
-      : 'Disfraces de calidad en Bogotá — Kustom Disfraces.',
-  }],
+  meta: [
+    {
+      name: 'description',
+      content: known.value
+        ? `Disfraces de ${known.value.nombre} en Bogotá: calidad premium, gran variedad de personajes y tallas. Envío gratis en Bogotá y despacho a todo el país.`
+        : 'Disfraces de calidad en Bogotá — Kustom Disfraces.',
+    },
+    // Categoría sin productos ("muy pronto", p. ej. Combos): no indexar hasta
+    // que tenga catálogo. Se reactiva sola cuando byPublico deja de estar vacío.
+    ...(categoryEmpty.value ? [{ name: 'robots', content: 'noindex, nofollow' }] : []),
+  ],
 }))
 
 // ---------- opciones de filtro (derivadas de los productos de la categoría) ----------

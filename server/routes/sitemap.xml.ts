@@ -12,15 +12,17 @@ const INFO = ['sobre-nosotros', 'como-comprar', 'envios', 'devoluciones', 'faq',
 export default defineEventHandler((event) => {
   const site = useRuntimeConfig().public.siteUrl.replace(/\/+$/, '')
 
-  const productPaths = CATALOGO_LOCAL
-    .filter(p => p.disponibleWeb && p.slug)
-    .map(p => `/producto/${p.slug}`)
+  const visibles = CATALOGO_LOCAL.filter(p => p.disponibleWeb && p.slug)
+
+  // Solo categorías con al menos un producto visible: Combos (vacío, "muy
+  // pronto") queda fuera y se reactiva solo cuando tenga catálogo.
+  const categoriesWithProducts = CATEGORIES.filter(c => visibles.some(p => p.publicos?.includes(c)))
 
   const paths = [
     '/',
-    ...CATEGORIES.map(c => `/categoria/${c}`),
+    ...categoriesWithProducts.map(c => `/categoria/${c}`),
     ...INFO.map(i => `/${i}`),
-    ...productPaths,
+    ...visibles.map(p => `/producto/${p.slug}`),
   ]
 
   const urls = paths
