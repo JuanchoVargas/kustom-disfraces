@@ -3,7 +3,10 @@ const cart = useCartStore()
 const { contact, categories } = useSiteNav()
 const route = useRoute()
 
-useHead({ title: 'Tu carrito — Kustom Disfraces' })
+useHead({
+  title: 'Tu carrito — Kustom Disfraces',
+  meta: [{ name: 'robots', content: 'noindex, nofollow' }], // no debe salir en Google
+})
 
 // Sembrado de demo para revisar la vista llena (solo con ?demo=1 y carrito vacío).
 onMounted(() => {

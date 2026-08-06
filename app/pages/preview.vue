@@ -1,6 +1,9 @@
 <script setup lang="ts">
 definePageMeta({ layout: false })
-useHead({ title: 'Preview · Componentes de dominio' })
+useHead({
+  title: 'Preview · Componentes de dominio',
+  meta: [{ name: 'robots', content: 'noindex, nofollow' }], // página interna, no indexar
+})
 
 const { products, categories } = useProducts()
 

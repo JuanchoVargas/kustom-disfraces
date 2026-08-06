@@ -1,6 +1,9 @@
 <script setup lang="ts">
 // Storybook simple para validación visual del design system.
-useHead({ title: 'Design System · Kustom' })
+useHead({
+  title: 'Design System · Kustom',
+  meta: [{ name: 'robots', content: 'noindex, nofollow' }], // página interna, no indexar
+})
 
 const buttonVariants = ['primary', 'turq', 'ink', 'line', 'ghost'] as const
 const sizes = ['sm', 'md', 'lg'] as const

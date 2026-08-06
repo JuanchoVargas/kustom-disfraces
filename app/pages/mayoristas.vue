@@ -6,7 +6,10 @@
  */
 useHead({
   title: 'Ventas al por mayor — Kustom Disfraces',
-  meta: [{ name: 'description', content: 'Compra al por mayor con Kustom Disfraces. Déjanos tus datos y nuestro equipo comercial te contactará.' }],
+  meta: [
+    { name: 'description', content: 'Compra al por mayor con Kustom Disfraces. Déjanos tus datos y nuestro equipo comercial te contactará.' },
+    { name: 'robots', content: 'noindex, nofollow' }, // formulario: no debe salir en Google
+  ],
 })
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/

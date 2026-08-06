@@ -34,11 +34,9 @@ export default defineNuxtConfig({
   app: {
     pageTransition: { name: 'page', mode: 'out-in' },
     head: {
-      meta: [
-        // Pre-lanzamiento: el dominio ya es público pero no debe indexarse aún.
-        // Quitar en el lanzamiento oficial (decisión del cliente).
-        { name: 'robots', content: 'noindex, nofollow' },
-      ],
+      // Sitio indexable (precios y contenido ya definitivos). El noindex global
+      // se retiró; solo /carrito y /mayoristas (y páginas internas) llevan
+      // noindex por página. robots.txt + /sitemap.xml guían a Google.
       // Favicon = isotipo K/alien (blanco sobre morado de marca), legible a 16-32px.
       link: [
         { rel: 'icon', type: 'image/x-icon', href: '/favicon.ico' },
@@ -85,6 +83,8 @@ export default defineNuxtConfig({
       // Origen del catálogo: 'local' (catalogo.json) | 'woo' (proxy /api/products).
       // Default LOCAL — el switch a woo se hace tras verificar paridad (README).
       dataSource: process.env.DATA_SOURCE || 'local',       // -> NUXT_PUBLIC_DATA_SOURCE
+      // URL canónica del sitio (sitemap, robots, JSON-LD, canonicals).
+      siteUrl: process.env.NUXT_PUBLIC_SITE_URL || 'https://www.disfraceskustom.com',
     },
   },
 })

@@ -42,7 +42,17 @@ const banner = computed(() => CATEGORY_BANNERS[slug.value])
 const catCount = computed(() => byPublico(slug.value).length)
 
 const subNombre = computed(() => publico.value?.subcategorias.find(s => s.slug === activeSub.value)?.nombre)
-useHead(() => ({ title: `${known.value?.nombre}${subNombre.value ? ` · ${subNombre.value}` : ''} — Kustom Disfraces` }))
+useHead(() => ({
+  title: known.value
+    ? `Disfraces de ${known.value.nombre} en Bogotá | Kustom`
+    : 'Kustom Disfraces',
+  meta: [{
+    name: 'description',
+    content: known.value
+      ? `Disfraces de ${known.value.nombre} en Bogotá: calidad premium, gran variedad de personajes y tallas. Envío gratis en Bogotá y despacho a todo el país.`
+      : 'Disfraces de calidad en Bogotá — Kustom Disfraces.',
+  }],
+}))
 
 // ---------- opciones de filtro (derivadas de los productos de la categoría) ----------
 // Orden canónico de tallas del catálogo (mezcla "Bebé", números y S-XL)

@@ -15,7 +15,41 @@ if (!product.value) {
   throw createError({ statusCode: 404, statusMessage: 'Producto no encontrado', fatal: true })
 }
 
-useHead(() => ({ title: `${product.value?.name} — Kustom Disfraces` }))
+const siteUrl = useRuntimeConfig().public.siteUrl
+
+useHead(() => {
+  const p = product.value
+  if (!p) return {}
+  const desc = (p.description || '').replace(/\s+/g, ' ').trim().slice(0, 160)
+    || `${p.name}: disfraz de calidad premium. Envío gratis en Bogotá.`
+  const images = (p.images || []).map(img => (img.startsWith('http') ? img : `${siteUrl}${img}`))
+  // Datos estructurados de Producto (schema.org) para el precio en Google.
+  const jsonld = {
+    '@context': 'https://schema.org/',
+    '@type': 'Product',
+    name: p.name,
+    image: images,
+    description: desc,
+    sku: p.slug,
+    brand: { '@type': 'Brand', name: 'Kustom Disfraces' },
+    offers: {
+      '@type': 'Offer',
+      url: `${siteUrl}/producto/${p.slug}`,
+      price: p.price,
+      priceCurrency: 'COP',
+      availability: 'https://schema.org/InStock',
+    },
+  }
+  return {
+    title: `${p.name} | Kustom Disfraces`,
+    meta: [{ name: 'description', content: desc }],
+    script: [{
+      type: 'application/ld+json',
+      // escapamos "<" para evitar cierres de script inesperados
+      innerHTML: JSON.stringify(jsonld).replace(/</g, '\\u003c'),
+    }],
+  }
+})
 
 const category = computed(() => categoryBySlug(product.value!.categorySlug))
 
