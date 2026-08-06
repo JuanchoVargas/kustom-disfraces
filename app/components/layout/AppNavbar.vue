@@ -61,7 +61,8 @@ watch(() => route.fullPath, () => {
   <div class="d">
     <nav class="nav">
       <NuxtLink to="/" class="logo">
-        <img src="/images/logo-mark-black.webp" alt="Kustom — Disfraces y Trajes típicos" class="logoimg" width="240" height="240">
+        <img src="/images/logo-mark-black.webp" alt="" aria-hidden="true" class="logoimg" width="240" height="240">
+        <span class="logotext">Kustom</span>
       </NuxtLink>
 
       <div class="links">
@@ -160,7 +161,8 @@ watch(() => route.fullPath, () => {
           </button>
 
           <NuxtLink to="/" class="logo">
-            <img src="/images/logo-mark-black.webp" alt="Kustom — Disfraces y Trajes típicos" class="logoimg" width="240" height="240">
+            <img src="/images/logo-mark-black.webp" alt="" aria-hidden="true" class="logoimg" width="240" height="240">
+        <span class="logotext">Kustom</span>
           </NuxtLink>
         </div>
 
@@ -557,9 +559,23 @@ watch(() => route.fullPath, () => {
 .logo {
   display: flex;
   align-items: center;
+  gap: 9px;
   text-decoration: none;
   flex-shrink: 0;
 }
+/* wordmark junto al isotipo (tipografía display de marca) */
+.logotext {
+  font-family: var(--ff-display);
+  font-weight: 400;
+  font-size: 30px;
+  line-height: 1;
+  color: var(--ink);
+  letter-spacing: 0.01em;
+  /* Luckiest Guy carga un pelín baja: centrado óptico con el isotipo */
+  margin-top: 3px;
+}
+.m .logo { gap: 7px; }
+.m .logotext { font-size: 24px; }
 /* Isotipo K/alien (logo-mark-black.webp, cuadrado, fondo transparente).
    Agrandado a pedido del cliente SIN crecer el navbar: el margen vertical
    negativo compensa el alto extra y mantiene el alto efectivo (72 - 26 = 46). */

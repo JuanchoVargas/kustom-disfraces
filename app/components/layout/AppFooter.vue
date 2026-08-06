@@ -17,7 +17,8 @@ const year = 2026
       <!-- Marca -->
       <div class="foot__brand">
         <div class="flogo">
-          <img src="/images/logo-mark-white.webp" alt="Kustom — Disfraces y Trajes típicos" class="flogoimg" width="240" height="240">
+          <img src="/images/logo-mark-white.webp" alt="" aria-hidden="true" class="flogoimg" width="240" height="240">
+          <span class="flogotext">Kustom</span>
         </div>
         <p class="ftag">Disfraces para cada historia</p>
         <div class="social">
@@ -106,7 +107,18 @@ const year = 2026
 /* ---- marca ---- */
 .flogo {
   display: flex;
+  align-items: center;
+  gap: 10px;
   line-height: 1;
+}
+.flogotext {
+  font-family: var(--ff-display);
+  font-weight: 400;
+  font-size: 27px;
+  line-height: 1;
+  color: #fff;
+  letter-spacing: 0.01em;
+  margin-top: 3px;
 }
 /* isotipo K/alien en blanco sobre fondo carbón (sin invertir) */
 .foot .flogoimg {
