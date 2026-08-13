@@ -65,20 +65,24 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 422, message: 'Carrito vacío o inválido' })
   }
 
-  // Origen real de la petición (local, preview o prod) para las back_urls.
+  // Origen real de la petición (local, preview o prod) para back_urls / notification_url.
   const origin = getRequestURL(event, { xForwardedHost: true }).origin
   const isLocal = /localhost|127\.0\.0\.1/.test(origin)
 
   const preference = {
     items,
     back_urls: {
-      success: `${origin}/carrito?pago=exito`,
-      failure: `${origin}/carrito?pago=error`,
-      pending: `${origin}/carrito?pago=pendiente`,
+      success: `${origin}/pago-exitoso`,
+      failure: `${origin}/pago-fallido`,
+      pending: `${origin}/pago-pendiente`,
     },
     // auto_return exige una back_url pública válida; MP la rechaza en localhost.
     // En local el comprador vuelve manualmente ("Volver al sitio"); en prod es automático.
     ...(isLocal ? {} : { auto_return: 'approved' }),
+    // Webhook de MP: notificación server-to-server del estado real del pago.
+    // MP no puede alcanzar localhost, así que solo se registra en entornos públicos
+    // (Preview/prod). El handler vive en /api/webhooks/mercadopago.
+    ...(isLocal ? {} : { notification_url: `${origin}/api/webhooks/mercadopago` }),
     statement_descriptor: 'KUSTOM',
   }
 

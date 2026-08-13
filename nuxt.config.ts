@@ -83,6 +83,10 @@ export default defineNuxtConfig({
     // SOLO en servidor (crea la preferencia de pago). Sin él, /api/checkout/mercadopago
     // responde 503 "not_configured" y el sitio sigue funcionando (queda WhatsApp).
     mpAccessToken: process.env.MP_ACCESS_TOKEN || '',       // -> NUXT_MP_ACCESS_TOKEN (TEST-... en Fase 1)
+    // Secreto de firma del webhook de MP (opcional). Si está, /api/webhooks/mercadopago
+    // valida la cabecera x-signature (HMAC) y rechaza notificaciones no auténticas.
+    // Sin él, el webhook igual verifica el pago consultando la API de MP.
+    mpWebhookSecret: process.env.MP_WEBHOOK_SECRET || '',    // -> NUXT_MP_WEBHOOK_SECRET
     public: {
       // Origen del catálogo: 'local' (catalogo.json) | 'woo' (proxy /api/products).
       // Default LOCAL — el switch a woo se hace tras verificar paridad (README).

@@ -245,8 +245,9 @@ sitio" queda como posible Fase 2.
 
 | Variable | Dónde | Qué es |
 |---|---|---|
-| `MP_ACCESS_TOKEN` | **Servidor (secreto)** | Access Token de PRUEBA. Crea la preferencia. En runtime se sobrescribe con `NUXT_MP_ACCESS_TOKEN`. Empieza por `TEST-`. |
+| `MP_ACCESS_TOKEN` | **Servidor (secreto)** | Access Token de PRUEBA. Crea la preferencia y verifica pagos en el webhook. En runtime: `NUXT_MP_ACCESS_TOKEN`. Empieza por `TEST-`. |
 | `MP_PUBLIC_KEY` | **Frontend (público)** | Public Key de PRUEBA. Registrada y lista para un futuro brick del SDK; el flujo redirect actual **no la usa**. En runtime: `NUXT_PUBLIC_MP_PUBLIC_KEY`. Empieza por `TEST-`. |
+| `MP_WEBHOOK_SECRET` | **Servidor (secreto)** | *(Fase 2, opcional)* Clave de firma del webhook. Si está, se valida `x-signature`. En runtime: `NUXT_MP_WEBHOOK_SECRET`. |
 
 Se sacan de: **Mercado Pago → Tus integraciones → (tu app) → Credenciales de
 prueba**. Sin `MP_ACCESS_TOKEN`, el endpoint responde `503 not_configured` y el
@@ -273,3 +274,47 @@ Documento (identificación): tipo **CC**, número **12345678**.
 
 (Los números de prueba pueden variar por país/cuenta; confirmar en el panel de
 MP → Cuentas de prueba / Tarjetas de prueba si alguno no aplica.)
+
+## 💳 Mercado Pago (Fase 2 — Webhook + páginas de resultado, sandbox)
+
+Todo sigue en **modo PRUEBA**. La Fase 2 añade la confirmación server-to-server
+del pago y las pantallas de retorno.
+
+### Páginas de resultado (back_urls)
+
+MP redirige al comprador tras el pago. Rutas (todas `noindex`), componente
+compartido `app/components/checkout/PaymentResult.vue`:
+
+| back_url | Ruta | Estado |
+|---|---|---|
+| success | `/pago-exitoso` | Aprobado — KO celebrando; **vacía el carrito** |
+| failure | `/pago-fallido` | Rechazado/cancelado — ofrece reintentar o WhatsApp |
+| pending | `/pago-pendiente` | En proceso — mensaje de espera |
+
+> El estado que muestran estas páginas es **informativo** (viene de la URL de
+> retorno). La confirmación **real** la da el webhook.
+
+### Webhook — `server/api/webhooks/mercadopago.post.ts`
+
+`POST /api/webhooks/mercadopago`. Al recibir la notificación, **no confía en el
+body**: consulta `GET /v1/payments/{id}` en la API de MP con el Access Token para
+leer el estado real (`approved` / `rejected` / `pending`…). Si `MP_WEBHOOK_SECRET`
+está configurado, valida además la firma `x-signature` (HMAC-SHA256) y rechaza lo
+no auténtico (401). Hoy verifica y **registra** el estado; el enganche para
+persistir/confirmar el pedido queda marcado con un `TODO` (falta sistema de pedidos/BD).
+
+El `notification_url` se arma solo con el origen de la request, así que apunta
+automáticamente al dominio donde corre (Preview o prod). **En localhost no se
+registra** (MP no puede alcanzarlo) → el webhook se prueba en un despliegue público.
+
+### Cómo probar el webhook (Preview en Vercel)
+
+1. Desplegar la rama `feature/pagos-mp` como **Preview** en Vercel.
+2. En el entorno **Preview** de Vercel, definir las variables: `MP_ACCESS_TOKEN`,
+   `MP_PUBLIC_KEY` (y opcional `MP_WEBHOOK_SECRET`) con credenciales de **prueba**.
+   **No tocar producción.**
+3. La preferencia ya manda `notification_url = https://<preview>.vercel.app/api/webhooks/mercadopago`
+   automáticamente. Registrar esa misma URL en **MP → Tus integraciones → Webhooks**
+   (evento *Pagos*) para tener el secreto de firma y las reentregas manuales.
+4. Hacer un pago de prueba desde el Preview y verificar en los logs de Vercel la
+   línea `[mp-webhook] pago <id>: approved …`.
