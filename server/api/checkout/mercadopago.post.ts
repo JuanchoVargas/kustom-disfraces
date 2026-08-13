@@ -12,11 +12,13 @@
  */
 
 interface RawItem {
-  title?: unknown
-  quantity?: unknown
-  unit_price?: unknown
-  slug?: unknown
   sku?: unknown
+  quantity?: unknown
+  /** Precio que ve el cliente — SOLO para detectar manipulación; el server usa el suyo. */
+  unit_price?: unknown
+  /** Talla y gama elegidas — solo para el título (display); no afectan el precio. */
+  size?: unknown
+  gama?: unknown
 }
 
 interface MpPreferenceItem {
@@ -37,8 +39,6 @@ interface MpPreferenceResponse {
   sandbox_init_point?: string
 }
 
-const clean = (v: unknown, max = 250) => String(v ?? '').trim().slice(0, max)
-
 /** Redacta el Bearer del Access Token si apareciera en un mensaje de error. */
 const sanitizeMpError = (err: unknown): string =>
   String((err as Error)?.message ?? err).replace(/Bearer\s+[^\s"']+/gi, 'Bearer ***')
@@ -56,42 +56,71 @@ export default defineEventHandler(async (event) => {
   }
 
   const body = await readBody<{ items?: RawItem[] }>(event)
+  const rawItems = Array.isArray(body?.items) ? body!.items : []
+  if (!rawItems.length) {
+    throw createError({ statusCode: 422, message: 'Carrito vacío' })
+  }
 
   // Las fotos son públicas y estáticas: viven en el sitio canónico (prod), no en
   // el origen de la request (localhost/Preview no las tienen expuestas a MP).
-  // Así el picture_url siempre apunta a una imagen que MP puede descargar.
   const siteBase = (config.public.siteUrl || 'https://www.disfraceskustom.com').replace(/\/$/, '')
-  const pictureFor = (slug: unknown): string | undefined => {
-    const s = String(slug ?? '').trim().toLowerCase()
-    // Solo slugs seguros ([a-z0-9-]) — evita construir URLs raras con datos del cliente.
-    return /^[a-z0-9-]+$/.test(s) ? `${siteBase}/images/products/${s}.webp` : undefined
+  const pictureFor = (slug: string): string | undefined =>
+    /^[a-z0-9-]+$/.test(slug) ? `${siteBase}/images/products/${slug}.webp` : undefined
+
+  // ---------- SEGURIDAD: precios recalculados en el servidor (nunca del cliente) ----------
+  // Se ignora el unit_price enviado; el precio real sale del catálogo por SKU. Si un
+  // SKU no existe (no vendible) o el precio enviado no coincide -> se RECHAZA todo.
+  let priceMap
+  try {
+    priceMap = await getPriceMapBySku()
+  }
+  catch (err) {
+    console.error('[mercadopago] no se pudo cargar el catálogo para validar precios:', String((err as Error)?.message ?? err))
+    throw createError({ statusCode: 502, message: 'No se pudo validar el catálogo' })
   }
 
-  // ---------- validación server-side (no confiar en el cliente) ----------
-  const items: MpPreferenceItem[] = (Array.isArray(body?.items) ? body!.items : [])
-    .map((raw): MpPreferenceItem | null => {
-      const title = clean(raw?.title)
-      const quantity = Math.trunc(Number(raw?.quantity))
-      const unit_price = Number(raw?.unit_price)
-      if (!title || !Number.isFinite(quantity) || quantity < 1) return null
-      if (!Number.isFinite(unit_price) || unit_price <= 0) return null
-      const picture_url = pictureFor(raw?.slug)
-      const sku = String(raw?.sku ?? '').trim().slice(0, 60) || undefined
-      // Cada ítem va COMPLETO: id (SKU), nombre (title), cantidad, precio y foto.
-      return {
-        ...(sku ? { id: sku } : {}),
-        title,
-        quantity,
-        unit_price,
-        currency_id: 'COP',
-        ...(picture_url ? { picture_url } : {}),
-      }
-    })
-    .filter((i): i is MpPreferenceItem => i !== null)
+  const items: MpPreferenceItem[] = rawItems.map((raw, idx): MpPreferenceItem => {
+    const sku = String(raw?.sku ?? '').trim()
+    const quantity = Math.trunc(Number(raw?.quantity))
+    if (!sku) {
+      throw createError({ statusCode: 422, message: `Ítem ${idx + 1} sin SKU`, data: { code: 'missing_sku' } })
+    }
+    if (!Number.isFinite(quantity) || quantity < 1) {
+      throw createError({ statusCode: 422, message: `Ítem ${sku} con cantidad inválida`, data: { code: 'invalid_quantity', sku } })
+    }
 
-  if (!items.length) {
-    throw createError({ statusCode: 422, message: 'Carrito vacío o inválido' })
-  }
+    const real = priceMap.get(sku)
+    if (!real) {
+      // SKU inexistente o no vendible (sin precio/oculto) -> no se crea la preferencia.
+      throw createError({ statusCode: 422, message: `Producto no disponible (${sku})`, data: { code: 'sku_not_found', sku } })
+    }
+
+    // Anti-manipulación: si el cliente mandó un precio y NO coincide con el real, se rechaza.
+    const clientPrice = Number(raw?.unit_price)
+    if (Number.isFinite(clientPrice) && Math.round(clientPrice) !== real.price) {
+      console.warn(`[mercadopago] precio manipulado en ${sku}: enviado=${clientPrice} real=${real.price} — rechazado`)
+      throw createError({
+        statusCode: 422,
+        message: 'Los precios cambiaron; recarga el carrito',
+        data: { code: 'price_mismatch', sku, sent: Math.round(clientPrice), real: real.price },
+      })
+    }
+
+    // Título con nombre oficial + talla/gama (display); precio y foto también del servidor.
+    const size = String(raw?.size ?? '').trim().slice(0, 40)
+    const gama = String(raw?.gama ?? '').trim().slice(0, 60)
+    const detail = size ? ` (Talla ${size}${gama ? `, ${gama}` : ''})` : ''
+    const picture_url = pictureFor(real.slug)
+
+    return {
+      id: sku,
+      title: `${real.name}${detail}`,
+      quantity,
+      unit_price: real.price, // ← precio REAL del servidor, no el del cliente
+      currency_id: 'COP',
+      ...(picture_url ? { picture_url } : {}),
+    }
+  })
 
   // Origen real de la petición (local, preview o prod) para back_urls / notification_url.
   const origin = getRequestURL(event, { xForwardedHost: true }).origin

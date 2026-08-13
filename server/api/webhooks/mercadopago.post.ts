@@ -130,12 +130,32 @@ export default defineEventHandler(async (event) => {
     return { received: true, verified: true, status: payment.status, orderCreated: false, reason: 'woo_not_configured' }
   }
 
-  const orderItems = (payment.additional_info?.items ?? []).map(it => ({
-    sku: it.id ? String(it.id) : undefined,
-    title: String(it.title ?? 'Producto'),
-    quantity: Math.max(1, Math.trunc(Number(it.quantity) || 1)),
-    unitPrice: Number(it.unit_price) || 0,
-  }))
+  // SEGURIDAD: los precios de la orden se recalculan por SKU desde el catálogo del
+  // servidor, no se toman del pago. Si el catálogo no carga, se cae al precio pagado
+  // (ya validado al crear la preferencia) para no perder una orden pagada.
+  let priceMap: Awaited<ReturnType<typeof getPriceMapBySku>> | null = null
+  try {
+    priceMap = await getPriceMapBySku()
+  }
+  catch (err) {
+    console.warn('[mp-webhook] catálogo no disponible para recalcular precios; se usa el monto pagado:', String((err as Error)?.message ?? err))
+  }
+
+  const orderItems = (payment.additional_info?.items ?? []).map((it) => {
+    const sku = it.id ? String(it.id) : undefined
+    const real = sku ? priceMap?.get(sku) : undefined
+    const paidPrice = Number(it.unit_price) || 0
+    if (real && real.price !== paidPrice) {
+      // No debería ocurrir (la preferencia ya usó el precio real); se registra por si acaso.
+      console.warn(`[mp-webhook] precio de ${sku} difiere: pagado=${paidPrice} real=${real.price} — se usa el real`)
+    }
+    return {
+      sku,
+      title: real?.name ?? String(it.title ?? 'Producto'),
+      quantity: Math.max(1, Math.trunc(Number(it.quantity) || 1)),
+      unitPrice: real?.price ?? paidPrice, // ← precio REAL del servidor cuando está disponible
+    }
+  })
 
   try {
     // Idempotencia: si ya existe una orden para este pago, no se crea otra.

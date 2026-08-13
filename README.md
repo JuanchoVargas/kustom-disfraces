@@ -256,9 +256,9 @@ sitio sigue funcionando (queda WhatsApp).
 - Endpoint: `server/api/checkout/mercadopago.post.ts` → `POST /api/checkout/mercadopago`.
 - Frontend: composable `app/composables/useMercadoPago.ts`.
 
-> ⚠️ **Antes de PRODUCCIÓN:** revalidar los precios contra el catálogo en el
-> servidor (hoy llegan del carrito del cliente) y cambiar las credenciales
-> `TEST-` por las de producción.
+> ✅ **Precios validados en el servidor** (ver "Seguridad de precios" abajo): el
+> endpoint ignora el precio del cliente y recalcula por SKU desde el catálogo.
+> ⚠️ **Antes de PRODUCCIÓN** queda solo cambiar las credenciales `TEST-` por las de producción.
 
 ### Tarjetas de prueba (sandbox)
 
@@ -387,3 +387,21 @@ catálogo (mínimo privilegio). Misma tienda, así que **reutiliza `WOO_API_URL`
 Igual que Fase 2, añadiendo al entorno **Preview** las dos vars de arriba. Luego:
 pago de prueba con titular `APRO` → en Woo aparece **una** orden `processing` con
 los ítems y el pagador; reenviar el webhook desde MP **no** crea una segunda.
+
+## 🔒 Seguridad de precios (server-side)
+
+El precio **nunca** se confía al cliente. Fuente de verdad: `server/utils/pricing.ts`
+(`getPriceMapBySku()`), que lee el mismo catálogo que el sitio (`DATA_SOURCE`
+local/woo) y devuelve `SKU → {precio, nombre, slug}` solo de productos vendibles.
+
+- **Al crear la preferencia** (`/api/checkout/mercadopago`): por cada ítem se busca
+  el SKU y se usa el **precio real del servidor** (también nombre y foto). El
+  `unit_price` que envía el cliente solo se usa para **detectar manipulación**:
+  - SKU inexistente / no vendible → `422 { code: 'sku_not_found' }` (no se crea la preferencia).
+  - Precio enviado ≠ precio real → `422 { code: 'price_mismatch' }` (no se crea la preferencia).
+- **Al crear la orden** (webhook): los precios de las líneas se recalculan por SKU
+  desde el catálogo; si el catálogo no cargara, cae al monto ya pagado (que también
+  fue validado al crear la preferencia) para no perder una orden.
+
+El front (`useMercadoPago.ts`) muestra "Los precios cambiaron, recarga" si el
+servidor responde `price_mismatch`/`sku_not_found`.

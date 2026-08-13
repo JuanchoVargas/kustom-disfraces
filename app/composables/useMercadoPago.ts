@@ -16,15 +16,15 @@ export function useMercadoPago() {
     loading.value = true
     error.value = ''
 
-    // Título legible por ítem (nombre + talla + gama); el precio unitario y la
-    // cantidad definen el monto total que muestra Mercado Pago. El `slug` permite
-    // que el servidor arme el picture_url público (foto en "Detalles del pago").
+    // Se envía SKU + cantidad (lo esencial). El precio real, el nombre y la foto los
+    // pone el SERVIDOR por SKU (seguridad): unit_price aquí solo sirve para que el
+    // servidor detecte manipulación. size/gama son para el título (display).
     const items = cart.items.map(i => ({
-      title: `${i.name} (Talla ${i.size}${i.gama ? `, ${i.gama}` : ''})`,
+      sku: i.sku,
       quantity: i.quantity,
       unit_price: i.price,
-      slug: i.slug,
-      sku: i.sku,
+      size: i.size,
+      gama: i.gama,
     }))
 
     try {
@@ -37,8 +37,12 @@ export function useMercadoPago() {
       if (!url) throw new Error('sin_init_point')
       window.location.href = url
     }
-    catch (err) {
-      error.value = 'No se pudo iniciar el pago. Intenta de nuevo o finaliza por WhatsApp.'
+    catch (err: unknown) {
+      // El servidor rechaza si detecta precios manipulados o un producto no disponible.
+      const code = (err as { data?: { code?: string } })?.data?.code
+      error.value = (code === 'price_mismatch' || code === 'sku_not_found')
+        ? 'Los precios cambiaron. Recarga la página y vuelve a intentar.'
+        : 'No se pudo iniciar el pago. Intenta de nuevo o finaliza por WhatsApp.'
       console.error('[mercadopago] no se pudo iniciar el pago:', err)
       loading.value = false // en éxito no se resetea: la página está redirigiendo
     }
