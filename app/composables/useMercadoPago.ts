@@ -17,11 +17,13 @@ export function useMercadoPago() {
     error.value = ''
 
     // Título legible por ítem (nombre + talla + gama); el precio unitario y la
-    // cantidad definen el monto total que muestra Mercado Pago.
+    // cantidad definen el monto total que muestra Mercado Pago. El `slug` permite
+    // que el servidor arme el picture_url público (foto en "Detalles del pago").
     const items = cart.items.map(i => ({
       title: `${i.name} (Talla ${i.size}${i.gama ? `, ${i.gama}` : ''})`,
       quantity: i.quantity,
       unit_price: i.price,
+      slug: i.slug,
     }))
 
     try {

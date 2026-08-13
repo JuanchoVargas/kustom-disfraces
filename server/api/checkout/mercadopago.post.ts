@@ -15,6 +15,7 @@ interface RawItem {
   title?: unknown
   quantity?: unknown
   unit_price?: unknown
+  slug?: unknown
 }
 
 interface MpPreferenceItem {
@@ -22,6 +23,8 @@ interface MpPreferenceItem {
   quantity: number
   unit_price: number
   currency_id: 'COP'
+  /** Foto pública del disfraz — MP la muestra en "Detalles del pago" (Nivel 1). */
+  picture_url?: string
 }
 
 interface MpPreferenceResponse {
@@ -37,7 +40,8 @@ const sanitizeMpError = (err: unknown): string =>
   String((err as Error)?.message ?? err).replace(/Bearer\s+[^\s"']+/gi, 'Bearer ***')
 
 export default defineEventHandler(async (event) => {
-  const { mpAccessToken } = useRuntimeConfig()
+  const config = useRuntimeConfig()
+  const { mpAccessToken } = config
   if (!mpAccessToken) {
     // Sin credenciales configuradas: el front cae al fallback (WhatsApp).
     throw createError({
@@ -49,6 +53,16 @@ export default defineEventHandler(async (event) => {
 
   const body = await readBody<{ items?: RawItem[] }>(event)
 
+  // Las fotos son públicas y estáticas: viven en el sitio canónico (prod), no en
+  // el origen de la request (localhost/Preview no las tienen expuestas a MP).
+  // Así el picture_url siempre apunta a una imagen que MP puede descargar.
+  const siteBase = (config.public.siteUrl || 'https://www.disfraceskustom.com').replace(/\/$/, '')
+  const pictureFor = (slug: unknown): string | undefined => {
+    const s = String(slug ?? '').trim().toLowerCase()
+    // Solo slugs seguros ([a-z0-9-]) — evita construir URLs raras con datos del cliente.
+    return /^[a-z0-9-]+$/.test(s) ? `${siteBase}/images/products/${s}.webp` : undefined
+  }
+
   // ---------- validación server-side (no confiar en el cliente) ----------
   const items: MpPreferenceItem[] = (Array.isArray(body?.items) ? body!.items : [])
     .map((raw): MpPreferenceItem | null => {
@@ -57,7 +71,9 @@ export default defineEventHandler(async (event) => {
       const unit_price = Number(raw?.unit_price)
       if (!title || !Number.isFinite(quantity) || quantity < 1) return null
       if (!Number.isFinite(unit_price) || unit_price <= 0) return null
-      return { title, quantity, unit_price, currency_id: 'COP' }
+      const picture_url = pictureFor(raw?.slug)
+      // Cada ítem va COMPLETO: nombre (title), cantidad, precio unitario y foto.
+      return { title, quantity, unit_price, currency_id: 'COP', ...(picture_url ? { picture_url } : {}) }
     })
     .filter((i): i is MpPreferenceItem => i !== null)
 

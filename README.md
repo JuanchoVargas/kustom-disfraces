@@ -318,3 +318,23 @@ registra** (MP no puede alcanzarlo) → el webhook se prueba en un despliegue p�
    (evento *Pagos*) para tener el secreto de firma y las reentregas manuales.
 4. Hacer un pago de prueba desde el Preview y verificar en los logs de Vercel la
    línea `[mp-webhook] pago <id>: approved …`.
+
+## 💳 Mercado Pago (Nivel 1 — apariencia de la pantalla de pago)
+
+Cada ítem se envía a MP **completo**: `title` (nombre + talla + gama), `quantity`,
+`unit_price` y **`picture_url`**. Con eso MP muestra la **foto de cada disfraz** en
+"Detalles del pago", no solo el total.
+
+- El `picture_url` lo arma el servidor desde el `slug`:
+  `https://www.disfraceskustom.com/images/products/<slug>.webp` (URL pública y
+  canónica — las fotos viven en producción, así MP puede descargarlas aunque el
+  checkout corra en Preview o local). Solo se envía si el slug es válido (`[a-z0-9-]`).
+
+### 🏷️ Logo del negocio en la pantalla de MP — lo sube Juan Diego (no por código)
+
+El logo/imagen de marca que aparece en la pantalla de pago **no se manda por API**:
+se configura una sola vez en el panel de Mercado Pago.
+
+**Pasos (Juan Diego):** Mercado Pago → **Tu negocio / Configuración del negocio** →
+subir **logo** y completar **nombre del negocio**. Eso se refleja en el checkout
+para todas las preferencias. (No requiere tocar el código ni volver a desplegar.)
