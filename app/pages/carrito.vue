@@ -11,8 +11,8 @@ useHead({
 // Sembrado de demo para revisar la vista llena (solo con ?demo=1 y carrito vacío).
 onMounted(() => {
   if (route.query.demo && cart.items.length === 0) {
-    cart.add({ productId: 1, name: 'Spider-Man Clásico', slug: 'spider-man-clasico', price: 129900, image: '/images/products/spider-man-clasico.webp', size: 6, gama: 'Súper Acolchado', quantity: 1 })
-    cart.add({ productId: 49, name: 'Pollito', slug: 'pollito', price: 79900, image: '/images/products/pollito.webp', size: 'Bebé', quantity: 2 })
+    cart.add({ productId: 1, name: 'Spider-Man Clásico', slug: 'spider-man-clasico', sku: '001001001', price: 129900, image: '/images/products/spider-man-clasico.webp', size: 6, gama: 'Súper Acolchado', quantity: 1 })
+    cart.add({ productId: 49, name: 'Pollito', slug: 'pollito', sku: '001011001', price: 79900, image: '/images/products/pollito.webp', size: 'Bebé', quantity: 2 })
   }
 })
 

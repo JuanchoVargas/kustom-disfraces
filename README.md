@@ -338,3 +338,52 @@ se configura una sola vez en el panel de Mercado Pago.
 **Pasos (Juan Diego):** Mercado Pago → **Tu negocio / Configuración del negocio** →
 subir **logo** y completar **nombre del negocio**. Eso se refleja en el checkout
 para todas las preferencias. (No requiere tocar el código ni volver a desplegar.)
+
+## 💳 Mercado Pago (Fase 3 — orden en WooCommerce + cuotas limitadas)
+
+Sigue en **sandbox**.
+
+### Cuotas máximo 3
+
+La preferencia envía `payment_methods.installments: 3`, así la pantalla de pago
+**ya no ofrece hasta 36x** (tope de 3 cuotas).
+
+### Orden en WooCommerce al aprobarse el pago
+
+Cuando el webhook confirma `status: approved`, crea la orden vía REST de Woo
+(`POST /orders`) con una llave de **escritura**:
+
+- **Ítems**: nombre, cantidad y precio de cada disfraz (el **SKU** viaja como
+  `item.id` en la preferencia → `additional_info.items[].id` del pago → línea de la orden).
+- **Estado** `processing` + `set_paid: true` (pagado).
+- **Pagador**: nombre y email que entrega MP (`payment.payer`).
+- **Referencia**: `transaction_id` = payment id de MP.
+- **Nota**: *"Dirección de envío a coordinar por WhatsApp"*.
+- **Idempotencia**: guarda el payment id en la meta `_mp_payment_id`; antes de crear
+  busca una orden con ese id y **no duplica** si el webhook llega dos veces.
+- **Si Woo falla**: el pago **no se pierde** — se registra en el log con todos los
+  datos (payment id, monto, pagador, ítems) y el webhook responde 500 para que MP
+  **reintente**; al recuperarse Woo, la idempotencia evita duplicar.
+
+Código: `server/utils/wooOrders.ts` + `server/api/webhooks/mercadopago.post.ts`.
+
+### Variables de entorno — llave de Woo con ESCRITURA
+
+Se genera en **WooCommerce → Ajustes → Avanzado → REST API → Añadir clave**, con
+permiso **Lectura/Escritura**. Va **separada** de la llave de solo lectura del
+catálogo (mínimo privilegio). Misma tienda, así que **reutiliza `WOO_API_URL`**.
+
+| Variable (nombre literal para Vercel) | Qué es |
+|---|---|
+| `WOO_ORDERS_CONSUMER_KEY` | Consumer key de la llave **Lectura/Escritura** (`ck_…`). |
+| `WOO_ORDERS_CONSUMER_SECRET` | Consumer secret de esa llave (`cs_…`). |
+
+> Sin estas variables, el webhook **verifica y registra** el pago pero **no crea
+> orden** (responde `orderCreated: false, reason: 'woo_not_configured'`).
+> Nombres **planos** (sin `NUXT_`), igual que el resto de vars en Vercel.
+
+### Probar (Preview en Vercel)
+
+Igual que Fase 2, añadiendo al entorno **Preview** las dos vars de arriba. Luego:
+pago de prueba con titular `APRO` → en Woo aparece **una** orden `processing` con
+los ítems y el pagador; reenviar el webhook desde MP **no** crea una segunda.

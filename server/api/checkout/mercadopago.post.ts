@@ -16,9 +16,13 @@ interface RawItem {
   quantity?: unknown
   unit_price?: unknown
   slug?: unknown
+  sku?: unknown
 }
 
 interface MpPreferenceItem {
+  /** SKU del producto — MP lo devuelve en additional_info.items[].id; el webhook
+   *  lo usa para crear la orden en Woo (Fase 3). */
+  id?: string
   title: string
   quantity: number
   unit_price: number
@@ -72,8 +76,16 @@ export default defineEventHandler(async (event) => {
       if (!title || !Number.isFinite(quantity) || quantity < 1) return null
       if (!Number.isFinite(unit_price) || unit_price <= 0) return null
       const picture_url = pictureFor(raw?.slug)
-      // Cada ítem va COMPLETO: nombre (title), cantidad, precio unitario y foto.
-      return { title, quantity, unit_price, currency_id: 'COP', ...(picture_url ? { picture_url } : {}) }
+      const sku = String(raw?.sku ?? '').trim().slice(0, 60) || undefined
+      // Cada ítem va COMPLETO: id (SKU), nombre (title), cantidad, precio y foto.
+      return {
+        ...(sku ? { id: sku } : {}),
+        title,
+        quantity,
+        unit_price,
+        currency_id: 'COP',
+        ...(picture_url ? { picture_url } : {}),
+      }
     })
     .filter((i): i is MpPreferenceItem => i !== null)
 
@@ -99,6 +111,10 @@ export default defineEventHandler(async (event) => {
     // MP no puede alcanzar localhost, así que solo se registra en entornos públicos
     // (Preview/prod). El handler vive en /api/webhooks/mercadopago.
     ...(isLocal ? {} : { notification_url: `${origin}/api/webhooks/mercadopago` }),
+    // Máximo 3 cuotas (Fase 3): la pantalla de pago ya no ofrece hasta 36x.
+    payment_methods: {
+      installments: 3,
+    },
     statement_descriptor: 'KUSTOM',
   }
 

@@ -24,6 +24,7 @@ export function useMercadoPago() {
       quantity: i.quantity,
       unit_price: i.price,
       slug: i.slug,
+      sku: i.sku,
     }))
 
     try {

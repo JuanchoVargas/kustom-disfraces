@@ -68,6 +68,8 @@ export interface CartItem {
   productId: number
   name: string
   slug: string
+  /** SKU / código del producto (Product.code) — se manda a MP y crea la orden en Woo */
+  sku?: string
   /** Precio unitario en COP */
   price: number
   image?: string

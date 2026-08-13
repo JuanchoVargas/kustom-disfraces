@@ -68,8 +68,13 @@ export default defineNuxtConfig({
   // sobreescribir con las variables NUXT_* equivalentes.
   runtimeConfig: {
     wooBaseUrl: process.env.WOO_API_URL || '',              // -> NUXT_WOO_BASE_URL
-    wooConsumerKey: process.env.WOO_CONSUMER_KEY || '',     // -> NUXT_WOO_CONSUMER_KEY
+    wooConsumerKey: process.env.WOO_CONSUMER_KEY || '',     // -> NUXT_WOO_CONSUMER_KEY (solo LECTURA: catálogo)
     wooConsumerSecret: process.env.WOO_CONSUMER_SECRET || '', // -> NUXT_WOO_CONSUMER_SECRET
+    // Llave de WooCommerce con permiso de ESCRITURA — SOLO para crear órdenes al
+    // confirmarse un pago (Fase 3). Separada de la de lectura (mínimo privilegio).
+    // Misma tienda (WOO_API_URL). Sin ella, el webhook registra el pago pero no crea orden.
+    wooOrdersConsumerKey: process.env.WOO_ORDERS_CONSUMER_KEY || '',       // -> NUXT_WOO_ORDERS_CONSUMER_KEY
+    wooOrdersConsumerSecret: process.env.WOO_ORDERS_CONSUMER_SECRET || '', // -> NUXT_WOO_ORDERS_CONSUMER_SECRET
     // SMTP para el formulario de mayoristas (solo servidor; nunca al cliente).
     // Defaults del .env en build; en runtime se sobrescriben con NUXT_SMTP_*.
     // Sin credenciales configuradas, /api/mayoristas responde 503 "not_configured".

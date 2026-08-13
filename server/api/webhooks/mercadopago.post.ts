@@ -19,12 +19,20 @@ import { createHmac, timingSafeEqual } from 'node:crypto'
  * el estado; el punto de enganche para persistir/confirmar el pedido queda marcado.
  */
 
+interface MpPaymentItem {
+  id?: string           // = SKU (lo pusimos como item.id en la preferencia)
+  title?: string
+  quantity?: string | number
+  unit_price?: string | number
+}
 interface MpPayment {
   id: number
   status: string        // approved | rejected | pending | in_process | cancelled | refunded...
   status_detail: string
   transaction_amount: number
   external_reference?: string
+  payer?: { email?: string, first_name?: string, last_name?: string }
+  additional_info?: { items?: MpPaymentItem[] }
 }
 
 /** Valida la firma x-signature de MP (HMAC-SHA256). Ver docs "Validar origen". */
@@ -93,28 +101,71 @@ export default defineEventHandler(async (event) => {
     return { received: true, verified: false }
   }
 
+  let payment: MpPayment
   try {
-    const payment = await $fetch<MpPayment>(`https://api.mercadopago.com/v1/payments/${dataId}`, {
+    payment = await $fetch<MpPayment>(`https://api.mercadopago.com/v1/payments/${dataId}`, {
       headers: { Authorization: `Bearer ${mpAccessToken}` },
     })
-
-    // Estado real y confiable del pago.
-    console.info(
-      `[mp-webhook] pago ${payment.id}: ${payment.status} (${payment.status_detail}) — `
-      + `$${payment.transaction_amount} ref=${payment.external_reference ?? '-'}`,
-    )
-
-    // TODO (con sistema de pedidos): según payment.status
-    //   approved  -> marcar pedido pagado y disparar preparación/envío
-    //   rejected/cancelled -> liberar reserva
-    //   pending/in_process -> dejar en espera
-    // Hoy (sin BD) solo se verifica y registra.
-
-    return { received: true, verified: true, status: payment.status }
   }
   catch (err) {
     // Fallo al consultar la API: devolvemos 500 para que MP reintente más tarde.
     console.error('[mp-webhook] no se pudo consultar el pago en MP:', String((err as Error)?.message ?? err))
     throw createError({ statusCode: 500, message: 'No se pudo verificar el pago' })
+  }
+
+  // Estado real y confiable del pago.
+  console.info(
+    `[mp-webhook] pago ${payment.id}: ${payment.status} (${payment.status_detail}) — `
+    + `$${payment.transaction_amount} ref=${payment.external_reference ?? '-'}`,
+  )
+
+  // Solo un pago APROBADO genera orden. rejected/cancelled/pending -> solo se registra.
+  if (payment.status !== 'approved') {
+    return { received: true, verified: true, status: payment.status }
+  }
+
+  // ---------- 3) crear la orden en WooCommerce (idempotente) ----------
+  if (!wooOrdersConfigured()) {
+    console.warn(`[mp-webhook] Woo (escritura) sin configurar — pago APROBADO ${payment.id} registrado SIN crear orden`)
+    return { received: true, verified: true, status: payment.status, orderCreated: false, reason: 'woo_not_configured' }
+  }
+
+  const orderItems = (payment.additional_info?.items ?? []).map(it => ({
+    sku: it.id ? String(it.id) : undefined,
+    title: String(it.title ?? 'Producto'),
+    quantity: Math.max(1, Math.trunc(Number(it.quantity) || 1)),
+    unitPrice: Number(it.unit_price) || 0,
+  }))
+
+  try {
+    // Idempotencia: si ya existe una orden para este pago, no se crea otra.
+    const existing = await findWooOrderByPaymentId(String(payment.id))
+    if (existing) {
+      console.info(`[mp-webhook] orden ya existía para el pago ${payment.id} (Woo #${existing.id}) — no se duplica`)
+      return { received: true, verified: true, status: payment.status, orderId: existing.id, duplicate: true }
+    }
+
+    const order = await createWooOrder({
+      paymentId: String(payment.id),
+      payerFirstName: payment.payer?.first_name,
+      payerLastName: payment.payer?.last_name,
+      payerEmail: payment.payer?.email,
+      items: orderItems,
+      amount: payment.transaction_amount,
+    })
+    console.info(`[mp-webhook] orden creada en Woo #${order.id} (pago ${payment.id}, ${payment.status})`)
+    return { received: true, verified: true, status: payment.status, orderId: order.id }
+  }
+  catch (err) {
+    // Woo falló: NO perder el pago — se registra con todos los datos para recuperarlo a mano.
+    console.error(
+      `[mp-webhook] Woo no respondió — pago APROBADO SIN orden. Recuperar manualmente. `
+      + `paymentId=${payment.id} monto=$${payment.transaction_amount} `
+      + `pagador=${payment.payer?.email ?? '-'} `
+      + `items=${JSON.stringify(orderItems)} `
+      + `causa=${sanitizeWooOrderError(err)}`,
+    )
+    // 500 -> MP reintenta más tarde; al recuperarse Woo, la idempotencia evita duplicar.
+    throw createError({ statusCode: 500, message: 'Pago verificado pero no se pudo crear la orden' })
   }
 })

@@ -122,6 +122,7 @@ function addToCart() {
     productId: product.value.id,
     name: product.value.name,
     slug: product.value.slug,
+    sku: product.value.code,
     price: currentPrice.value,
     image: currentImage.value,
     size: size.value,
