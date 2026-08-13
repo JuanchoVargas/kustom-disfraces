@@ -21,6 +21,9 @@ const waCheckout = computed(() => {
   const text = `Hola, quiero finalizar mi pedido:\n${lines}\n\nSubtotal: ${formatCOP(cart.subtotal)}`
   return `${contact.whatsapp}?text=${encodeURIComponent(text)}`
 })
+
+// Pago con Mercado Pago (Checkout Pro) — CTA principal; WhatsApp queda como alternativa.
+const { pay: payMP, loading: mpLoading, error: mpError } = useMercadoPago()
 </script>
 
 <template>
@@ -80,7 +83,8 @@ const waCheckout = computed(() => {
           <span>Total</span>
           <strong>{{ formatCOP(cart.subtotal) }}</strong>
         </div>
-        <KButton variant="primary" size="lg" block to="/checkout">Finalizar compra</KButton>
+        <KButton variant="primary" size="lg" block :loading="mpLoading" @click="payMP">Pagar con Mercado Pago</KButton>
+        <p v-if="mpError" class="summary__mperror" role="alert">{{ mpError }}</p>
         <KButton variant="whatsapp" size="lg" block :to="waCheckout">
           <template #icon-left>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -249,6 +253,12 @@ const waCheckout = computed(() => {
   border-top: 1px solid var(--line);
 }
 .summary__total strong { color: var(--purple); }
+.summary__mperror {
+  font-size: 12.5px;
+  color: var(--fucsia);
+  text-align: center;
+  margin-top: -4px;
+}
 .summary__continue {
   text-align: center;
   font-size: 13px;

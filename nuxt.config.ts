@@ -79,12 +79,20 @@ export default defineNuxtConfig({
     smtpPass: process.env.SMTP_PASS || '',                  // -> NUXT_SMTP_PASS (clave del buzón)
     smtpFrom: process.env.SMTP_FROM || '',                  // -> NUXT_SMTP_FROM (remitente; por defecto = smtpUser)
     mayoristasTo: process.env.MAYORISTAS_TO || 'contacto@disfraceskustom.com', // -> NUXT_MAYORISTAS_TO
+    // Mercado Pago (Fase 1: PRUEBA/sandbox). El Access Token es SECRETO y vive
+    // SOLO en servidor (crea la preferencia de pago). Sin él, /api/checkout/mercadopago
+    // responde 503 "not_configured" y el sitio sigue funcionando (queda WhatsApp).
+    mpAccessToken: process.env.MP_ACCESS_TOKEN || '',       // -> NUXT_MP_ACCESS_TOKEN (TEST-... en Fase 1)
     public: {
       // Origen del catálogo: 'local' (catalogo.json) | 'woo' (proxy /api/products).
       // Default LOCAL — el switch a woo se hace tras verificar paridad (README).
       dataSource: process.env.DATA_SOURCE || 'local',       // -> NUXT_PUBLIC_DATA_SOURCE
       // URL canónica del sitio (sitemap, robots, JSON-LD, canonicals).
       siteUrl: process.env.NUXT_PUBLIC_SITE_URL || 'https://www.disfraceskustom.com',
+      // Mercado Pago — Public Key de PRUEBA (frontend). El flujo actual es redirect
+      // a la preferencia (Checkout Pro), que NO la necesita; queda registrada y lista
+      // para un futuro brick embebido del SDK de MP. Es pública por diseño (no secreta).
+      mpPublicKey: process.env.MP_PUBLIC_KEY || '',         // -> NUXT_PUBLIC_MP_PUBLIC_KEY (TEST-... en Fase 1)
     },
   },
 })

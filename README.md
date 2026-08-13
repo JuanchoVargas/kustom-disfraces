@@ -227,3 +227,49 @@ Compara visibles local vs Woo: mismos slugs, precios y tallas. Sale con código
   y página de favoritos.
 
 Nada más: el resto del frontend ya está listo.
+
+---
+
+## 💳 Mercado Pago (Fase 1 — Checkout Pro, modo PRUEBA)
+
+Pago adicional al de WhatsApp (que **sigue intacto** como alternativa). El botón
+**"Pagar con Mercado Pago"** (drawer del carrito y página `/carrito`) pide al
+servidor una **preferencia** con los ítems del carrito y redirige al comprador a
+la pantalla de pago de Mercado Pago con el monto correcto.
+
+**Arquitectura elegida:** redirect a la preferencia (Checkout Pro), no brick
+embebido. Es lo más robusto para la Fase 1; un brick embebido "sin salir del
+sitio" queda como posible Fase 2.
+
+### Variables de entorno (van en `.env` local y en Vercel)
+
+| Variable | Dónde | Qué es |
+|---|---|---|
+| `MP_ACCESS_TOKEN` | **Servidor (secreto)** | Access Token de PRUEBA. Crea la preferencia. En runtime se sobrescribe con `NUXT_MP_ACCESS_TOKEN`. Empieza por `TEST-`. |
+| `MP_PUBLIC_KEY` | **Frontend (público)** | Public Key de PRUEBA. Registrada y lista para un futuro brick del SDK; el flujo redirect actual **no la usa**. En runtime: `NUXT_PUBLIC_MP_PUBLIC_KEY`. Empieza por `TEST-`. |
+
+Se sacan de: **Mercado Pago → Tus integraciones → (tu app) → Credenciales de
+prueba**. Sin `MP_ACCESS_TOKEN`, el endpoint responde `503 not_configured` y el
+sitio sigue funcionando (queda WhatsApp).
+
+- Endpoint: `server/api/checkout/mercadopago.post.ts` → `POST /api/checkout/mercadopago`.
+- Frontend: composable `app/composables/useMercadoPago.ts`.
+
+> ⚠️ **Antes de PRODUCCIÓN:** revalidar los precios contra el catálogo en el
+> servidor (hoy llegan del carrito del cliente) y cambiar las credenciales
+> `TEST-` por las de producción.
+
+### Tarjetas de prueba (sandbox)
+
+Usar cualquiera de estas. El **resultado** se controla con el **nombre del
+titular**: `APRO` (aprobado), `OTHE` (rechazado), `CONT` (pendiente).
+Documento (identificación): tipo **CC**, número **12345678**.
+
+| Tarjeta | Número | CVV | Vencimiento |
+|---|---|---|---|
+| Mastercard | 5031 7557 3453 0604 | 123 | 11/30 |
+| Visa | 4509 9535 6623 3704 | 123 | 11/30 |
+| American Express | 3711 803032 57522 | 1234 | 11/30 |
+
+(Los números de prueba pueden variar por país/cuenta; confirmar en el panel de
+MP → Cuentas de prueba / Tarjetas de prueba si alguno no aplica.)
