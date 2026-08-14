@@ -328,3 +328,106 @@ export async function sendOrderConfirmationEmail(
 
   return { sent: salesSent || customerSent, salesSent, customerSent, salesTo }
 }
+
+// ---------------------------------------------------------------------------
+// ALERTA: pago aprobado que NO se pudo convertir en orden (Woo caído/mal config)
+// ---------------------------------------------------------------------------
+
+/**
+ * Dedupe de alertas: máx. una por paymentId. EN MEMORIA (per-instancia) — MP
+ * reintenta el webhook y podría repetir la alerta; esto la limita dentro de una
+ * instancia caliente. Entre cold starts podrían salir 1-2 (aceptable; mejor eso
+ * que ninguna). Un dedupe perfecto necesitaría un store persistente (ver README).
+ */
+const alertedPayments = new Set<string>()
+
+export interface OrderFailureAlert {
+  paymentId: string
+  amount: number
+  payerName?: string
+  payerEmail?: string
+  items: { name: string, talla?: string, quantity: number, unitPrice: number }[]
+  reason: string
+}
+
+/**
+ * Envía una ALERTA interna a ventas@ cuando un pago APROBADO no pudo crear la
+ * orden en Woo, para que ningún pago pase desapercibido. Máx. una por paymentId.
+ * NO lanza: registra el fallo y devuelve el estado.
+ */
+export async function sendOrderFailureAlert(data: OrderFailureAlert): Promise<{ sent: boolean, deduped?: boolean, reason?: string }> {
+  if (alertedPayments.has(data.paymentId)) return { sent: false, deduped: true }
+  if (!mailerConfigured()) {
+    console.warn(`[order-alert] SMTP sin configurar — no se envía alerta del pago ${data.paymentId}`)
+    return { sent: false, reason: 'smtp_not_configured' }
+  }
+
+  const c = useRuntimeConfig()
+  const to = c.ventasTo || 'ventas@disfraceskustom.com'
+  const from = c.smtpFrom || c.smtpUser
+
+  const itemsHtml = data.items.length
+    ? data.items.map(it =>
+        `<tr>
+          <td style="padding:6px 8px;border-bottom:1px solid ${C.line};font-family:Arial,sans-serif;font-size:13px;color:${C.ink};">${esc(it.name)}${it.talla ? ` <span style="color:#888;">(Talla ${esc(it.talla)})</span>` : ''}</td>
+          <td align="center" style="padding:6px 8px;border-bottom:1px solid ${C.line};font-family:Arial,sans-serif;font-size:13px;color:${C.ink};">x${it.quantity}</td>
+          <td align="right" style="padding:6px 8px;border-bottom:1px solid ${C.line};font-family:Arial,sans-serif;font-size:13px;color:${C.ink};">${formatCOP(it.unitPrice * it.quantity)}</td>
+        </tr>`).join('')
+    : `<tr><td colspan="3" style="padding:6px 8px;font-family:Arial,sans-serif;font-size:13px;color:#888;">(sin ítems detallados)</td></tr>`
+
+  const row = (label: string, value: string) =>
+    `<tr><td style="padding:3px 0;font-family:Arial,sans-serif;font-size:13px;color:#888;width:120px;">${label}</td><td style="padding:3px 0;font-family:Arial,sans-serif;font-size:13px;color:${C.ink};font-weight:bold;">${esc(value)}</td></tr>`
+
+  const html = `<div style="max-width:600px;margin:0 auto;background:${C.white};">
+    <div style="background:#B00020;color:#fff;padding:16px 20px;border-radius:12px 12px 0 0;font-family:Arial,sans-serif;">
+      <div style="font-size:18px;font-weight:800;">⚠️ Pago aprobado SIN orden</div>
+      <div style="font-size:13px;opacity:.92;margin-top:4px;">Un pago se aprobó pero NO se pudo crear la orden en WooCommerce. Revisar y recuperar la venta.</div>
+    </div>
+    <div style="border:1px solid ${C.line};border-top:0;border-radius:0 0 12px 12px;padding:18px 20px;">
+      <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+        ${row('Pago (MP)', `#${data.paymentId}`)}
+        ${row('Monto', formatCOP(data.amount))}
+        ${row('Pagador', `${data.payerName || '—'}${data.payerEmail ? ` · ${data.payerEmail}` : ''}`)}
+        ${row('Causa', data.reason)}
+      </table>
+      <div style="font-family:Arial,sans-serif;font-size:12px;font-weight:bold;letter-spacing:1px;text-transform:uppercase;color:${C.muted};margin:16px 0 6px;">Ítems</div>
+      <table role="presentation" cellpadding="0" cellspacing="0" width="100%">${itemsHtml}</table>
+      <div style="margin-top:16px;padding:12px 14px;background:${C.crema};border-radius:8px;font-family:Arial,sans-serif;font-size:12.5px;color:#555;line-height:1.5;">
+        <strong>Cómo recuperar:</strong> corrige la causa (p. ej. credenciales de Woo) y reenvía la notificación desde el panel de Mercado Pago, o re-dispara el webhook con este payment id. El webhook es idempotente (no duplica).
+      </div>
+    </div>
+  </div>`
+
+  const text = [
+    '⚠️ Pago aprobado SIN orden en WooCommerce.',
+    '',
+    `Pago (MP): #${data.paymentId}`,
+    `Monto: ${formatCOP(data.amount)}`,
+    `Pagador: ${data.payerName || '—'}${data.payerEmail ? ` <${data.payerEmail}>` : ''}`,
+    `Causa: ${data.reason}`,
+    '',
+    'Ítems:',
+    ...(data.items.length
+      ? data.items.map(it => `- ${it.name}${it.talla ? ` (Talla ${it.talla})` : ''} x${it.quantity}  ${formatCOP(it.unitPrice * it.quantity)}`)
+      : ['(sin ítems detallados)']),
+    '',
+    'Recuperar: corrige la causa y reenvía la notificación desde MP (o re-dispara el webhook con este payment id). Es idempotente.',
+  ].join('\n')
+
+  try {
+    await createMailTransport().sendMail({
+      from: `"Alertas Kustom" <${from}>`,
+      to,
+      subject: `⚠️ Pago aprobado SIN orden — MP #${data.paymentId} (${formatCOP(data.amount)})`,
+      text,
+      html,
+    })
+    alertedPayments.add(data.paymentId) // marcar SOLO tras enviar OK (si falla, un reintento lo reintenta)
+    console.info(`[order-alert] alerta enviada a ${to} (pago ${data.paymentId}, causa: ${data.reason})`)
+    return { sent: true }
+  }
+  catch (err) {
+    console.error(`[order-alert] fallo al enviar la alerta del pago ${data.paymentId}:`, String((err as Error)?.message ?? err))
+    return { sent: false, reason: 'send_failed' }
+  }
+}

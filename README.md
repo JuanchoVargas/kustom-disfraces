@@ -405,3 +405,28 @@ local/woo) y devuelve `SKU → {precio, nombre, slug}` solo de productos vendibl
 
 El front (`useMercadoPago.ts`) muestra "Los precios cambiaron, recarga" si el
 servidor responde `price_mismatch`/`sku_not_found`.
+
+---
+
+## 🚨 Webhook MP — alertas ante fallos (no fallos silenciosos)
+
+Antes, si el webhook no podía crear la orden en Woo (caído, credenciales mal,
+timeout) respondía **200** y MP no reintentaba: la venta quedaba pagada sin orden
+y nadie se enteraba (así se perdió en silencio la orden del pago #727).
+
+Ahora, ante **cualquier** fallo al crear la orden de un pago **aprobado**
+(`wooOrdersConfigured()` falso, o error de la API de Woo / idempotency check):
+
+1. **Responde `503`** → MP **reintenta** (recupera solo si el fallo es temporal;
+   la idempotencia evita duplicar cuando Woo vuelve).
+2. **Envía una ALERTA** por correo a `ventas@` (`sendOrderFailureAlert` en
+   `server/utils/orderEmail.ts`) con **paymentId, monto, pagador, ítems y la causa**,
+   para que el equipo recupere la venta manualmente.
+3. El pago verificado **siempre** queda en el log con todos los datos.
+
+**Dedupe:** máx. **una alerta por paymentId**, con un `Set` **en memoria**
+(per-instancia). MP reintenta el webhook y esto evita spam dentro de una instancia
+caliente; entre cold starts podrían salir 1-2 alertas (aceptable — mejor eso que
+ninguna). Un dedupe perfecto necesitaría un store persistente (Redis/KV).
+
+Con Woo OK, el flujo no cambia: crea la orden + envía la confirmación, **sin alerta**.

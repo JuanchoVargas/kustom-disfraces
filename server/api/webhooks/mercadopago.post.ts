@@ -124,15 +124,10 @@ export default defineEventHandler(async (event) => {
     return { received: true, verified: true, status: payment.status }
   }
 
-  // ---------- 3) crear la orden en WooCommerce (idempotente) ----------
-  if (!wooOrdersConfigured()) {
-    console.warn(`[mp-webhook] Woo (escritura) sin configurar — pago APROBADO ${payment.id} registrado SIN crear orden`)
-    return { received: true, verified: true, status: payment.status, orderCreated: false, reason: 'woo_not_configured' }
-  }
-
-  // SEGURIDAD: los precios de la orden se recalculan por SKU desde el catálogo del
-  // servidor, no se toman del pago. Si el catálogo no carga, se cae al precio pagado
-  // (ya validado al crear la preferencia) para no perder una orden pagada.
+  // ---------- 3) preparar ítems (para la orden Y para la alerta) ----------
+  // SEGURIDAD: los precios se recalculan por SKU desde el catálogo del servidor.
+  // Se construyen ANTES de tocar Woo para que la alerta los incluya aunque Woo
+  // esté caído/sin configurar.
   let priceMap: Awaited<ReturnType<typeof getPriceMapBySku>> | null = null
   try {
     priceMap = await getPriceMapBySku()
@@ -161,6 +156,32 @@ export default defineEventHandler(async (event) => {
       unitPrice: real?.price ?? paidPrice, // ← precio REAL del servidor cuando está disponible
     }
   })
+
+  // Fallo al crear la orden (cualquier causa): registra TODO, ALERTA a ventas@ (una
+  // vez por paymentId) y responde 5xx para que MP REINTENTE. Así ningún pago pasa
+  // desapercibido y un fallo temporal se recupera solo en el próximo reintento.
+  const failWithAlert = async (reason: string): Promise<never> => {
+    console.error(
+      `[mp-webhook] ⚠️ pago APROBADO SIN orden (${reason}). Recuperar. `
+      + `paymentId=${payment.id} monto=$${payment.transaction_amount} `
+      + `pagador=${payment.payer?.email ?? '-'} items=${JSON.stringify(orderItems)}`,
+    )
+    const alert = await sendOrderFailureAlert({
+      paymentId: String(payment.id),
+      amount: payment.transaction_amount,
+      payerName: [payment.payer?.first_name, payment.payer?.last_name].filter(Boolean).join(' ') || undefined,
+      payerEmail: payment.payer?.email,
+      items: orderItems.map(i => ({ name: i.name, talla: i.talla, quantity: i.quantity, unitPrice: i.unitPrice })),
+      reason,
+    })
+    console.info(`[mp-webhook] alerta a ventas: ${alert.sent ? 'enviada' : alert.deduped ? 'ya enviada antes (dedupe)' : `no enviada (${alert.reason})`}`)
+    throw createError({ statusCode: 503, message: `Pago verificado pero no se pudo crear la orden (${reason})` })
+  }
+
+  // ---------- 4) crear la orden en WooCommerce (idempotente) ----------
+  if (!wooOrdersConfigured()) {
+    await failWithAlert('woo_not_configured') // credenciales de escritura ausentes/mal
+  }
 
   try {
     // Idempotencia: si ya existe una orden para este pago, no se crea otra.
@@ -194,15 +215,8 @@ export default defineEventHandler(async (event) => {
     return { received: true, verified: true, status: payment.status, orderId: order.id, emailSent: emailResult.sent }
   }
   catch (err) {
-    // Woo falló: NO perder el pago — se registra con todos los datos para recuperarlo a mano.
-    console.error(
-      `[mp-webhook] Woo no respondió — pago APROBADO SIN orden. Recuperar manualmente. `
-      + `paymentId=${payment.id} monto=$${payment.transaction_amount} `
-      + `pagador=${payment.payer?.email ?? '-'} `
-      + `items=${JSON.stringify(orderItems)} `
-      + `causa=${sanitizeWooOrderError(err)}`,
-    )
-    // 500 -> MP reintenta más tarde; al recuperarse Woo, la idempotencia evita duplicar.
-    throw createError({ statusCode: 500, message: 'Pago verificado pero no se pudo crear la orden' })
+    // Woo falló (caído, timeout, credenciales mal, error en el idempotency check):
+    // alerta + 5xx para que MP reintente. La idempotencia evita duplicar al recuperarse.
+    await failWithAlert(`woo_error: ${sanitizeWooOrderError(err)}`)
   }
 })
