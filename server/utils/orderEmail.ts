@@ -24,6 +24,9 @@ const C = {
   wa: '#25D366',
 }
 
+// Content-IDs de las imágenes fijas incrustadas (deben coincidir en HTML y adjuntas).
+const INLINE_CID = { logo: 'logo', ko: 'ko' }
+
 const SOCIAL = [
   { label: 'Instagram', href: 'https://www.instagram.com/disfraceskustom/' },
   { label: 'Facebook', href: 'https://www.facebook.com/profile.php?id=61591282154264' },
@@ -48,6 +51,8 @@ export interface OrderEmailData {
   siteUrl?: string
   /** 'customer' = confirmación al comprador · 'sales' = aviso al negocio. Default customer. */
   audience?: 'customer' | 'sales'
+  /** 'url' = imágenes por URL remota (preview) · 'cid' = incrustadas inline (envío real). Default url. */
+  imageMode?: 'url' | 'cid'
 }
 
 const esc = (s: string) =>
@@ -58,6 +63,17 @@ export function buildOrderEmailHtml(data: OrderEmailData): string {
   const base = (data.siteUrl || 'https://www.disfraceskustom.com').replace(/\/$/, '')
   const saludo = data.buyerName ? `, ${esc(data.buyerName)}` : ''
   const isSales = data.audience === 'sales'
+
+  // Resolución de imágenes: 'url' (remota, para previsualizar) o 'cid' (incrustada
+  // inline en el envío real, así se ven sin "cargar imágenes"). Keys: 'logo', 'ko',
+  // 'p:<slug>'. Los cid deben coincidir con los de las adjuntas (ver INLINE_CID).
+  const cidMode = data.imageMode === 'cid'
+  const imgSrc = (key: string): string => {
+    if (key === 'logo') return cidMode ? `cid:${INLINE_CID.logo}` : `${base}/images/email/logo.png`
+    if (key === 'ko') return cidMode ? `cid:${INLINE_CID.ko}` : `${base}/images/email/ko-paz.png`
+    const slug = key.slice(2) // 'p:<slug>'
+    return cidMode ? `cid:p-${slug}` : `${base}/images/email/products/${slug}.jpg`
+  }
 
   // El encabezado cambia según a quién va: cliente (confirmación) o negocio (aviso de venta).
   const heroTitle = isSales ? '🛍️ ¡Nueva venta!' : '¡Pago recibido! 🎉'
@@ -72,7 +88,7 @@ export function buildOrderEmailHtml(data: OrderEmailData): string {
 
   const rows = data.items.map((it) => {
     // JPG fondo blanco (no WebP transparente): evita el recuadro negro en clientes de correo.
-    const photo = it.slug ? `${base}/images/email/products/${it.slug}.jpg` : ''
+    const photo = it.slug ? imgSrc(`p:${it.slug}`) : ''
     const lineTotal = formatCOP(it.unitPrice * it.quantity)
     const img = photo
       ? `<img src="${photo}" width="56" height="56" alt="" style="display:block;width:56px;height:56px;border-radius:8px;border:1px solid ${C.line};object-fit:cover;background:${C.white};">`
@@ -110,7 +126,7 @@ export function buildOrderEmailHtml(data: OrderEmailData): string {
           <!-- ===== HEADER (morado) ===== -->
           <tr>
             <td align="center" style="background:${C.purple};padding:28px 24px 24px;">
-              <img src="${base}/images/email/logo.png" width="52" height="52" alt="Kustom" style="display:block;margin:0 auto 8px;width:52px;height:52px;border-radius:12px;">
+              <img src="${imgSrc('logo')}" width="52" height="52" alt="Kustom" style="display:block;margin:0 auto 8px;width:52px;height:52px;border-radius:12px;">
               <div style="font-family:Arial,Helvetica,sans-serif;font-size:30px;font-weight:800;letter-spacing:2px;color:${C.white};">KUSTOM</div>
               <div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;color:${C.purpleSoft};margin-top:2px;">Disfraces y Trajes típicos</div>
             </td>
@@ -119,7 +135,7 @@ export function buildOrderEmailHtml(data: OrderEmailData): string {
           <!-- ===== HERO (KO celebrando) ===== -->
           <tr>
             <td align="center" style="padding:28px 28px 4px;">
-              <img src="${base}/images/email/ko-paz.png" width="150" alt="KO celebrando tu compra" style="display:block;margin:0 auto 6px;width:150px;height:auto;">
+              <img src="${imgSrc('ko')}" width="150" alt="KO celebrando tu compra" style="display:block;margin:0 auto 6px;width:150px;height:auto;">
               <h1 style="margin:10px 0 6px;font-family:Arial,Helvetica,sans-serif;font-size:26px;font-weight:800;color:${C.ink};">${heroTitle}</h1>
               <p style="margin:0;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.5;color:#555;">
                 ${heroSub}
@@ -221,11 +237,42 @@ function buildOrderEmailText(data: OrderEmailData): string {
 
 const isEmail = (v?: string): v is string => !!v && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)
 
+interface InlineAttachment { filename: string, content: Buffer, cid: string }
+
+/**
+ * Descarga las imágenes del correo (logo, KO y las fotos de los productos del
+ * pedido) desde su URL pública y las devuelve como adjuntas inline (cid) para
+ * INCRUSTARLAS en el correo — así se ven sin "cargar imágenes" en cualquier
+ * cliente (Roundcube/Outlook incluidos). Si algo falla, devuelve null y el envío
+ * cae a imágenes por URL remota (comportamiento anterior).
+ */
+async function fetchInlineAttachments(data: OrderEmailData): Promise<InlineAttachment[] | null> {
+  const base = (data.siteUrl || 'https://www.disfraceskustom.com').replace(/\/$/, '')
+  const slugs = [...new Set(data.items.map(i => i.slug).filter((s): s is string => !!s))]
+  const specs = [
+    { cid: INLINE_CID.logo, filename: 'logo.png', url: `${base}/images/email/logo.png` },
+    { cid: INLINE_CID.ko, filename: 'ko-paz.png', url: `${base}/images/email/ko-paz.png` },
+    ...slugs.map(s => ({ cid: `p-${s}`, filename: `${s}.jpg`, url: `${base}/images/email/products/${s}.jpg` })),
+  ]
+  try {
+    return await Promise.all(specs.map(async sp => ({
+      filename: sp.filename,
+      cid: sp.cid,
+      content: Buffer.from(await $fetch<ArrayBuffer>(sp.url, { responseType: 'arrayBuffer' })),
+    })))
+  }
+  catch (err) {
+    console.warn(`[order-email] no se pudieron incrustar imágenes (se usan URLs remotas):`, String((err as Error)?.message ?? err))
+    return null
+  }
+}
+
 /**
  * Envía dos correos: (1) AVISO DE VENTA al negocio (siempre, a ventas@ — su propio
  * correo, NO bcc, para que llegue fiable al buzón de ventas), y (2) CONFIRMACIÓN al
- * cliente (si MP dio su email). NO lanza: registra cualquier fallo y sigue — el pago
- * y la orden ya quedaron guardados (Fase 4, req 5).
+ * cliente (si MP dio su email). Las imágenes van INCRUSTADAS (cid) para que se vean
+ * sin "cargar imágenes". NO lanza: registra cualquier fallo y sigue — el pago y la
+ * orden ya quedaron guardados (Fase 4, req 5).
  */
 export async function sendOrderConfirmationEmail(
   data: OrderEmailData,
@@ -242,17 +289,23 @@ export async function sendOrderConfirmationEmail(
   const transporter = createMailTransport()
   const senderFrom = `"Kustom Disfraces" <${from}>`
 
+  // Imágenes incrustadas (una sola descarga, se reutiliza en ambos correos).
+  const attachments = await fetchInlineAttachments(data)
+  const imageMode: 'url' | 'cid' = attachments ? 'cid' : 'url'
+  const withImages = <T extends object>(m: T) => (attachments ? { ...m, attachments } : m)
+  console.info(`[order-email] imágenes=${imageMode}${attachments ? ` (${attachments.length} incrustadas)` : ''} (pago ${data.paymentId})`)
+
   // (1) AVISO DE VENTA -> ventas@ (correo dedicado, destinatario distinto del remitente)
   let salesSent = false
   try {
-    await transporter.sendMail({
+    await transporter.sendMail(withImages({
       from: senderFrom,
       to: salesTo,
       replyTo: buyer, // responder al aviso escribe al cliente
       subject: `🛍️ Nueva venta — Pedido #${data.paymentId}`,
       text: buildOrderEmailText({ ...data, audience: 'sales' }),
-      html: buildOrderEmailHtml({ ...data, audience: 'sales' }),
-    })
+      html: buildOrderEmailHtml({ ...data, audience: 'sales', imageMode }),
+    }))
     salesSent = true
     console.info(`[order-email] aviso de venta enviado a ${salesTo} (pago ${data.paymentId})`)
   }
@@ -264,13 +317,13 @@ export async function sendOrderConfirmationEmail(
   let customerSent = false
   if (buyer) {
     try {
-      await transporter.sendMail({
+      await transporter.sendMail(withImages({
         from: senderFrom,
         to: buyer,
         subject: '¡Pago recibido! Tu pedido en Kustom Disfraces 🎉',
         text: buildOrderEmailText({ ...data, audience: 'customer' }),
-        html: buildOrderEmailHtml({ ...data, audience: 'customer' }),
-      })
+        html: buildOrderEmailHtml({ ...data, audience: 'customer', imageMode }),
+      }))
       customerSent = true
       console.info(`[order-email] confirmación enviada al cliente ${buyer} (pago ${data.paymentId})`)
     }
