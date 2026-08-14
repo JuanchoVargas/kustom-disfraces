@@ -153,8 +153,18 @@ export default defineEventHandler(async (event) => {
       headers: { Authorization: `Bearer ${mpAccessToken}` },
       body: preference,
     })
+    // El servidor elige la URL de pago según el tipo de credencial:
+    //  - TEST-...  (prueba)     -> sandbox_init_point (pantalla con watermark "Sandbox")
+    //  - APP_USR-  (producción) -> init_point (pantalla real, sin "Sandbox")
+    // sandbox_init_point es SIEMPRE sandbox aunque el token sea de producción; por eso
+    // no se puede usar como default. Cualquier prefijo que no sea TEST- se trata como prod.
+    const isTest = mpAccessToken.startsWith('TEST-')
+    const checkout_url = isTest
+      ? (res.sandbox_init_point || res.init_point)
+      : (res.init_point || res.sandbox_init_point)
     return {
       id: res.id,
+      checkout_url,
       init_point: res.init_point,
       sandbox_init_point: res.sandbox_init_point,
     }

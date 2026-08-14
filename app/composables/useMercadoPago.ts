@@ -28,12 +28,12 @@ export function useMercadoPago() {
     }))
 
     try {
-      const res = await $fetch<{ init_point?: string, sandbox_init_point?: string }>(
+      const res = await $fetch<{ checkout_url?: string, init_point?: string, sandbox_init_point?: string }>(
         '/api/checkout/mercadopago',
         { method: 'POST', body: { items } },
       )
-      // Fase 1: preferimos sandbox_init_point (entorno de prueba).
-      const url = res.sandbox_init_point || res.init_point
+      // El servidor ya eligió la URL correcta según el token (prod vs sandbox).
+      const url = res.checkout_url || res.init_point || res.sandbox_init_point
       if (!url) throw new Error('sin_init_point')
       window.location.href = url
     }
