@@ -57,7 +57,8 @@ export function buildOrderEmailHtml(data: OrderEmailData): string {
   const saludo = data.buyerName ? `, ${esc(data.buyerName)}` : ''
 
   const rows = data.items.map((it) => {
-    const photo = it.slug ? `${base}/images/products/${it.slug}.webp` : ''
+    // JPG fondo blanco (no WebP transparente): evita el recuadro negro en clientes de correo.
+    const photo = it.slug ? `${base}/images/email/products/${it.slug}.jpg` : ''
     const lineTotal = formatCOP(it.unitPrice * it.quantity)
     const img = photo
       ? `<img src="${photo}" width="56" height="56" alt="" style="display:block;width:56px;height:56px;border-radius:8px;border:1px solid ${C.line};object-fit:cover;background:${C.white};">`
@@ -95,7 +96,7 @@ export function buildOrderEmailHtml(data: OrderEmailData): string {
           <!-- ===== HEADER (morado) ===== -->
           <tr>
             <td align="center" style="background:${C.purple};padding:28px 24px 24px;">
-              <img src="${base}/images/logo-mark-white.webp" width="52" height="52" alt="Kustom" style="display:block;margin:0 auto 8px;width:52px;height:auto;">
+              <img src="${base}/images/email/logo.png" width="52" height="52" alt="Kustom" style="display:block;margin:0 auto 8px;width:52px;height:52px;border-radius:12px;">
               <div style="font-family:Arial,Helvetica,sans-serif;font-size:30px;font-weight:800;letter-spacing:2px;color:${C.white};">KUSTOM</div>
               <div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;color:${C.purpleSoft};margin-top:2px;">Disfraces y Trajes típicos</div>
             </td>
@@ -104,7 +105,7 @@ export function buildOrderEmailHtml(data: OrderEmailData): string {
           <!-- ===== HERO (KO celebrando) ===== -->
           <tr>
             <td align="center" style="padding:28px 28px 4px;">
-              <img src="${base}/images/ko/ko-paz.webp" width="150" alt="KO celebrando tu compra" style="display:block;margin:0 auto 6px;width:150px;height:auto;">
+              <img src="${base}/images/email/ko-paz.png" width="150" alt="KO celebrando tu compra" style="display:block;margin:0 auto 6px;width:150px;height:auto;">
               <h1 style="margin:10px 0 6px;font-family:Arial,Helvetica,sans-serif;font-size:26px;font-weight:800;color:${C.ink};">¡Pago recibido! 🎉</h1>
               <p style="margin:0;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.5;color:#555;">
                 Gracias por tu compra${saludo}. Ya estamos preparando tu pedido.
