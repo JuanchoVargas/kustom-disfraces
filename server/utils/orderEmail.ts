@@ -8,6 +8,8 @@ import { createMailTransport, mailerConfigured } from './mailer'
  */
 
 const BUSINESS_EMAIL = 'contacto@disfraceskustom.com'
+// Header List-Unsubscribe (mejora entregabilidad; mail-tester). Va en todos los envíos.
+const LIST_UNSUB = '<mailto:contacto@disfraceskustom.com>'
 const WHATSAPP_URL = 'https://wa.me/573118844547'
 const WHATSAPP_NUM = '311 884 4547'
 const HOURS = 'Lunes a sábado, 8:00 a.m. a 7:00 p.m.'
@@ -100,7 +102,7 @@ export function buildOrderEmailHtml(data: OrderEmailData): string {
     `<a href="${s.href}" style="color:${C.muted};text-decoration:none;font-family:Arial,Helvetica,sans-serif;font-size:13px;">${s.label}</a>`,
   ).join(`<span style="color:#4A4843;">&nbsp;&nbsp;·&nbsp;&nbsp;</span>`)
 
-  return `<!doctype html>
+  return `<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="utf-8">
@@ -299,6 +301,7 @@ export async function sendOrderConfirmationEmail(
       subject,
       text,
       html,
+      headers: { 'List-Unsubscribe': LIST_UNSUB },
     }))
     salesSent = true
     console.info(`[order-email] copia de venta enviada a ${salesTo} (pago ${data.paymentId})`)
@@ -317,6 +320,7 @@ export async function sendOrderConfirmationEmail(
         subject,
         text,
         html,
+        headers: { 'List-Unsubscribe': LIST_UNSUB },
       }))
       customerSent = true
       console.info(`[order-email] confirmación enviada al cliente ${buyer} (pago ${data.paymentId})`)
@@ -378,7 +382,16 @@ export async function sendOrderFailureAlert(data: OrderFailureAlert): Promise<{ 
   const row = (label: string, value: string) =>
     `<tr><td style="padding:3px 0;font-family:Arial,sans-serif;font-size:13px;color:#888;width:120px;">${label}</td><td style="padding:3px 0;font-family:Arial,sans-serif;font-size:13px;color:${C.ink};font-weight:bold;">${esc(value)}</td></tr>`
 
-  const html = `<div style="max-width:600px;margin:0 auto;background:${C.white};">
+  const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="x-apple-disable-message-reformatting">
+<title>Pago aprobado sin orden — Kustom Disfraces</title>
+</head>
+<body style="margin:0;padding:0;background:${C.crema};-webkit-text-size-adjust:100%;">
+  <div style="max-width:600px;margin:0 auto;background:${C.white};">
     <div style="background:#B00020;color:#fff;padding:16px 20px;border-radius:12px 12px 0 0;font-family:Arial,sans-serif;">
       <div style="font-size:18px;font-weight:800;">⚠️ Pago aprobado SIN orden</div>
       <div style="font-size:13px;opacity:.92;margin-top:4px;">Un pago se aprobó pero NO se pudo crear la orden en WooCommerce. Revisar y recuperar la venta.</div>
@@ -396,7 +409,9 @@ export async function sendOrderFailureAlert(data: OrderFailureAlert): Promise<{ 
         <strong>Cómo recuperar:</strong> corrige la causa (p. ej. credenciales de Woo) y reenvía la notificación desde el panel de Mercado Pago, o re-dispara el webhook con este payment id. El webhook es idempotente (no duplica).
       </div>
     </div>
-  </div>`
+  </div>
+</body>
+</html>`
 
   const text = [
     '⚠️ Pago aprobado SIN orden en WooCommerce.',
@@ -421,6 +436,7 @@ export async function sendOrderFailureAlert(data: OrderFailureAlert): Promise<{ 
       subject: `⚠️ Pago aprobado SIN orden — MP #${data.paymentId} (${formatCOP(data.amount)})`,
       text,
       html,
+      headers: { 'List-Unsubscribe': LIST_UNSUB },
     })
     alertedPayments.add(data.paymentId) // marcar SOLO tras enviar OK (si falla, un reintento lo reintenta)
     console.info(`[order-alert] alerta enviada a ${to} (pago ${data.paymentId}, causa: ${data.reason})`)
