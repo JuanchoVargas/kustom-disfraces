@@ -33,6 +33,52 @@ interface MpPayment {
   external_reference?: string
   payer?: { email?: string, first_name?: string, last_name?: string }
   additional_info?: { items?: MpPaymentItem[] }
+  metadata?: Record<string, unknown>
+  order?: { id?: number }
+}
+
+/** Mapea la metadata (keys snake_case que puso el endpoint) a los datos del comprador. */
+function buyerFromMetadata(md: unknown): CreateOrderBuyer | null {
+  const m = md as Record<string, unknown> | null | undefined
+  if (!m || typeof m !== 'object') return null
+  if (!m.documento && !m.direccion && !m.nombre) return null
+  const str = (v: unknown) => (v == null ? undefined : String(v))
+  return {
+    nombre: str(m.nombre),
+    tipoDocumento: str(m.tipo_documento),
+    documento: str(m.documento),
+    email: str(m.email),
+    telefono: str(m.telefono),
+    pais: str(m.pais),
+    departamento: str(m.departamento),
+    ciudad: str(m.ciudad),
+    localidad: str(m.localidad),
+    barrio: str(m.barrio),
+    direccion: str(m.direccion),
+    notas: str(m.notas),
+  }
+}
+
+/**
+ * Recupera los datos del comprador (Fase 5). Primero de la metadata del pago;
+ * si no viniera ahí, sigue la cadena merchant_order -> preference -> metadata.
+ */
+async function recoverBuyer(payment: MpPayment, token: string): Promise<CreateOrderBuyer | null> {
+  const direct = buyerFromMetadata(payment.metadata)
+  if (direct) return direct
+  try {
+    const moId = payment.order?.id
+    if (!moId) return null
+    const headers = { Authorization: `Bearer ${token}` }
+    const mo = await $fetch<{ preference_id?: string }>(`https://api.mercadopago.com/merchant_orders/${moId}`, { headers })
+    if (!mo?.preference_id) return null
+    const pref = await $fetch<{ metadata?: unknown }>(`https://api.mercadopago.com/checkout/preferences/${mo.preference_id}`, { headers })
+    return buyerFromMetadata(pref?.metadata)
+  }
+  catch (err) {
+    console.warn('[mp-webhook] no se pudo recuperar el comprador vía merchant_order:', String((err as Error)?.message ?? err))
+    return null
+  }
 }
 
 /** Valida la firma x-signature de MP (HMAC-SHA256). Ver docs "Validar origen". */
@@ -157,6 +203,13 @@ export default defineEventHandler(async (event) => {
     }
   })
 
+  // Datos del comprador (envío + factura opcional) recuperados de la metadata de
+  // la preferencia. Se resuelve ANTES de failWithAlert para que la alerta también
+  // incluya los datos de envío si Woo llegara a fallar.
+  const buyer = await recoverBuyer(payment, mpAccessToken)
+  if (buyer) console.info(`[mp-webhook] comprador recuperado: ${buyer.nombre} · ${buyer.ciudad}/${buyer.departamento} · ${buyer.direccion}`)
+  else console.warn(`[mp-webhook] sin datos de comprador en la preferencia del pago ${payment.id} (se crea orden con datos del pagador de MP)`)
+
   // Fallo al crear la orden (cualquier causa): registra TODO, ALERTA a ventas@ (una
   // vez por paymentId) y responde 5xx para que MP REINTENTE. Así ningún pago pasa
   // desapercibido y un fallo temporal se recupera solo en el próximo reintento.
@@ -164,13 +217,14 @@ export default defineEventHandler(async (event) => {
     console.error(
       `[mp-webhook] ⚠️ pago APROBADO SIN orden (${reason}). Recuperar. `
       + `paymentId=${payment.id} monto=$${payment.transaction_amount} `
-      + `pagador=${payment.payer?.email ?? '-'} items=${JSON.stringify(orderItems)}`,
+      + `pagador=${payment.payer?.email ?? '-'} items=${JSON.stringify(orderItems)} `
+      + `envío=${buyer ? JSON.stringify(buyer) : '-'}`,
     )
     const alert = await sendOrderFailureAlert({
       paymentId: String(payment.id),
       amount: payment.transaction_amount,
-      payerName: [payment.payer?.first_name, payment.payer?.last_name].filter(Boolean).join(' ') || undefined,
-      payerEmail: payment.payer?.email,
+      payerName: buyer?.nombre || [payment.payer?.first_name, payment.payer?.last_name].filter(Boolean).join(' ') || undefined,
+      payerEmail: buyer?.email || payment.payer?.email,
       items: orderItems.map(i => ({ name: i.name, talla: i.talla, quantity: i.quantity, unitPrice: i.unitPrice })),
       reason,
     })
@@ -198,6 +252,7 @@ export default defineEventHandler(async (event) => {
       payerEmail: payment.payer?.email,
       items: orderItems,
       amount: payment.transaction_amount,
+      buyer: buyer ?? undefined,
     })
     console.info(`[mp-webhook] orden creada en Woo #${order.id} (pago ${payment.id}, ${payment.status})`)
 
@@ -206,10 +261,24 @@ export default defineEventHandler(async (event) => {
     // No rompe el flujo: sendOrderConfirmationEmail nunca lanza (registra y sigue).
     const emailResult = await sendOrderConfirmationEmail({
       paymentId: String(payment.id),
-      buyerName: [payment.payer?.first_name, payment.payer?.last_name].filter(Boolean).join(' ') || undefined,
-      buyerEmail: payment.payer?.email,
+      buyerName: buyer?.nombre || [payment.payer?.first_name, payment.payer?.last_name].filter(Boolean).join(' ') || undefined,
+      buyerEmail: buyer?.email || payment.payer?.email,
       items: orderItems.map(i => ({ name: i.name, talla: i.talla, quantity: i.quantity, unitPrice: i.unitPrice, slug: i.slug })),
       total: payment.transaction_amount,
+      shipping: buyer
+        ? {
+            documento: buyer.documento ? `${buyer.tipoDocumento || 'CC'} ${buyer.documento}` : undefined,
+            telefono: buyer.telefono,
+            correo: buyer.email,
+            pais: buyer.pais,
+            departamento: buyer.departamento,
+            ciudad: buyer.ciudad,
+            localidad: buyer.localidad,
+            barrio: buyer.barrio,
+            direccion: buyer.direccion,
+            notas: buyer.notas,
+          }
+        : undefined,
     })
 
     return { received: true, verified: true, status: payment.status, orderId: order.id, emailSent: emailResult.sent }

@@ -31,6 +31,20 @@ export interface CreateOrderInput {
   items: OrderItemInput[]
   /** Total pagado según MP (respaldo si no hay ítems detallados). */
   amount: number
+  /** Datos del comprador capturados en /checkout (Fase 5): billing + shipping + documento. */
+  buyer?: CreateOrderBuyer
+}
+
+export interface CreateOrderBuyer {
+  nombre?: string
+  tipoDocumento?: string
+  documento?: string
+  email?: string
+  telefono?: string
+  direccion?: string
+  ciudad?: string
+  departamento?: string
+  notas?: string
 }
 
 /** ¿Hay llave de escritura configurada? Sin ella no se crea orden (solo se registra). */
@@ -93,6 +107,41 @@ export async function createWooOrder(input: CreateOrderInput): Promise<WooOrder>
     // Respaldo: sin ítems detallados, una sola línea con el total pagado.
     : [{ name: 'Pedido Kustom (Mercado Pago)', quantity: 1, subtotal: String(Math.round(input.amount)), total: String(Math.round(input.amount)) }]
 
+  // Datos del comprador (Fase 5): billing + shipping + documento. Si no vienen
+  // (compat), se cae al nombre/email del pagador de MP y la nota de "coordinar por WhatsApp".
+  const b = input.buyer
+  const nombre = (b?.nombre || [input.payerFirstName, input.payerLastName].filter(Boolean).join(' ')).trim()
+  const [firstName, ...restName] = (nombre || 'Cliente').split(/\s+/)
+  const lastName = restName.join(' ')
+  const email = b?.email || input.payerEmail || ''
+
+  const billing = {
+    first_name: firstName,
+    last_name: lastName,
+    email,
+    ...(b?.telefono ? { phone: b.telefono } : {}),
+    ...(b?.direccion ? { address_1: b.direccion } : {}),
+    ...(b?.ciudad ? { city: b.ciudad } : {}),
+    ...(b?.departamento ? { state: b.departamento } : {}),
+    ...(b ? { country: 'CO' } : {}),
+  }
+  const shipping = b?.direccion
+    ? { first_name: firstName, last_name: lastName, address_1: b.direccion, city: b.ciudad || '', state: b.departamento || '', country: 'CO' }
+    : undefined
+
+  // Documento VISIBLE en la orden (para la factura): en la nota del cliente y en meta.
+  const docLine = b?.documento ? `Documento: ${b.tipoDocumento || 'CC'} ${b.documento}` : ''
+  const notesLine = b?.notas ? `Notas del cliente: ${b.notas}` : ''
+  const customerNote = b
+    ? [docLine, notesLine].filter(Boolean).join('\n') || '—'
+    : 'Dirección de envío a coordinar por WhatsApp'
+
+  const meta_data = [
+    { key: MP_PAYMENT_META, value: String(input.paymentId) },
+    ...(b?.documento ? [{ key: '_billing_document_type', value: b.tipoDocumento || 'CC' }, { key: '_billing_document', value: b.documento }] : []),
+    ...(b?.departamento ? [{ key: '_departamento', value: b.departamento }] : []),
+  ]
+
   const body = {
     status: 'processing', // pagado, pendiente de preparar/enviar
     set_paid: true,
@@ -100,14 +149,11 @@ export async function createWooOrder(input: CreateOrderInput): Promise<WooOrder>
     payment_method: 'mercadopago',
     payment_method_title: 'Mercado Pago',
     transaction_id: String(input.paymentId),
-    billing: {
-      first_name: input.payerFirstName || '',
-      last_name: input.payerLastName || '',
-      email: input.payerEmail || '',
-    },
+    billing,
+    ...(shipping ? { shipping } : {}),
     line_items: lineItems,
-    customer_note: 'Dirección de envío a coordinar por WhatsApp',
-    meta_data: [{ key: MP_PAYMENT_META, value: String(input.paymentId) }],
+    customer_note: customerNote,
+    meta_data,
   }
 
   return await wooOrdersFetch<WooOrder>('/orders', { method: 'POST', body })

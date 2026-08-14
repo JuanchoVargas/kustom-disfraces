@@ -43,12 +43,26 @@ export interface OrderEmailItem {
   unitPrice: number
   slug?: string
 }
+export interface OrderEmailShipping {
+  documento?: string
+  telefono?: string
+  correo?: string
+  pais?: string
+  departamento?: string
+  ciudad?: string
+  localidad?: string
+  barrio?: string
+  direccion?: string
+  notas?: string
+}
 export interface OrderEmailData {
   paymentId: string
   buyerName?: string
   buyerEmail?: string
   items: OrderEmailItem[]
   total: number
+  /** Datos de envío/factura capturados en /checkout (Fase 5). */
+  shipping?: OrderEmailShipping
   /** Base pública para las imágenes (default: sitio canónico). */
   siteUrl?: string
   /** 'url' = imágenes por URL remota (preview) · 'cid' = incrustadas inline (envío real). Default url. */
@@ -101,6 +115,33 @@ export function buildOrderEmailHtml(data: OrderEmailData): string {
   const socialLinks = SOCIAL.map(s =>
     `<a href="${s.href}" style="color:${C.muted};text-decoration:none;font-family:Arial,Helvetica,sans-serif;font-size:13px;">${s.label}</a>`,
   ).join(`<span style="color:#4A4843;">&nbsp;&nbsp;·&nbsp;&nbsp;</span>`)
+
+  // Bloque de datos de envío / factura, si vienen.
+  const sh = data.shipping
+  const shRow = (label: string, value?: string) => value
+    ? `<tr><td style="padding:2px 0;font-family:Arial,Helvetica,sans-serif;font-size:12.5px;color:#888;width:110px;vertical-align:top;">${label}</td><td style="padding:2px 0;font-family:Arial,Helvetica,sans-serif;font-size:12.5px;color:${C.ink};">${esc(value)}</td></tr>`
+    : ''
+  const shippingBlock = (sh && (sh.direccion || sh.documento))
+    ? `
+          <tr>
+            <td style="padding:8px 28px 4px;">
+              <div style="font-family:Arial,Helvetica,sans-serif;font-size:12px;font-weight:bold;letter-spacing:1.5px;text-transform:uppercase;color:${C.muted};padding-bottom:4px;">Datos de envío</div>
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                ${shRow('Nombre', data.buyerName)}
+                ${shRow('Documento', sh.documento)}
+                ${shRow('Celular', sh.telefono)}
+                ${shRow('Correo', sh.correo || data.buyerEmail)}
+                ${shRow('Dirección', sh.direccion)}
+                ${shRow('Barrio', sh.barrio)}
+                ${shRow('Localidad/Zona', sh.localidad)}
+                ${shRow('Ciudad', sh.ciudad)}
+                ${shRow('Departamento', sh.departamento)}
+                ${shRow('País', sh.pais)}
+                ${shRow('Notas', sh.notas)}
+              </table>
+            </td>
+          </tr>`
+    : ''
 
   return `<!DOCTYPE html>
 <html lang="es">
@@ -161,6 +202,8 @@ export function buildOrderEmailHtml(data: OrderEmailData): string {
             </td>
           </tr>
 
+          <!-- ===== DATOS DE ENVÍO (Fase 5) ===== -->${shippingBlock}
+
           <!-- ===== ENVÍO / CONTACTO ===== -->
           <tr>
             <td style="padding:12px 28px 24px;">
@@ -209,6 +252,24 @@ export function buildOrderEmailHtml(data: OrderEmailData): string {
 /** Versión de texto plano (fallback para clientes sin HTML). */
 function buildOrderEmailText(data: OrderEmailData): string {
   const lines = data.items.map(it => `- ${it.name} (Talla ${it.talla}) x${it.quantity}  ${formatCOP(it.unitPrice * it.quantity)}`)
+  const sh = data.shipping
+  const shipping = (sh && (sh.direccion || sh.documento))
+    ? [
+        '',
+        'Datos de envío:',
+        ...(data.buyerName ? [`Nombre: ${data.buyerName}`] : []),
+        ...(sh.documento ? [`Documento: ${sh.documento}`] : []),
+        ...(sh.telefono ? [`Celular: ${sh.telefono}`] : []),
+        ...(sh.correo || data.buyerEmail ? [`Correo: ${sh.correo || data.buyerEmail}`] : []),
+        ...(sh.direccion ? [`Dirección: ${sh.direccion}`] : []),
+        ...(sh.barrio ? [`Barrio: ${sh.barrio}`] : []),
+        ...(sh.localidad ? [`Localidad/Zona: ${sh.localidad}`] : []),
+        ...(sh.ciudad ? [`Ciudad: ${sh.ciudad}`] : []),
+        ...(sh.departamento ? [`Departamento: ${sh.departamento}`] : []),
+        ...(sh.pais ? [`País: ${sh.pais}`] : []),
+        ...(sh.notas ? [`Notas: ${sh.notas}`] : []),
+      ]
+    : []
   return [
     '¡Pago recibido! Gracias por tu compra en Kustom Disfraces.',
     '',
@@ -217,6 +278,7 @@ function buildOrderEmailText(data: OrderEmailData): string {
     '',
     `Total pagado: ${formatCOP(data.total)}`,
     `Referencia de pago Mercado Pago: #${data.paymentId}`,
+    ...shipping,
     '',
     'Coordinar el envío por WhatsApp.',
     `WhatsApp: ${WHATSAPP_NUM} (${WHATSAPP_URL})`,

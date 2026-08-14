@@ -486,3 +486,43 @@ handoff a un agente, historial) hay que mover el estado a un store persistente
 Sin `NUXT_WHATSAPP_TOKEN`/`PHONE_ID`, el bot **calcula** la respuesta pero **no la
 envía** (la registra en el log) — útil para probar en local. La URL del webhook a
 registrar en Meta es `https://<dominio>/api/whatsapp`.
+
+---
+
+## 🧾 Checkout — datos de envío obligatorios antes del pago
+
+Antes de ir a Mercado Pago, `/checkout` (`app/pages/checkout.vue`) captura los
+datos de **envío** (obligatorios) y, opcionalmente, los de **factura electrónica**.
+Se llega desde el botón "Pagar con Mercado Pago" del carrito/drawer (ese botón
+lleva al formulario, no directo a MP). "Finalizar por WhatsApp" **no cambia**.
+
+Campos **obligatorios** (bloquean el pago si faltan): nombre completo, país
+(default Colombia), departamento (select de Colombia), ciudad, localidad/zona,
+barrio, dirección, celular y correo (validado). Campos **opcionales** (solo para
+factura electrónica): tipo de documento (CC/CE/NIT), número de documento y notas
+del pedido. Se validan en cliente **y** en el servidor (`/api/checkout/mercadopago`
+responde `422 { code: 'buyer_invalid' }` si falta alguno de los obligatorios — no
+se crea la preferencia sin ellos).
+
+### Vía de los datos a la orden: **metadata de la preferencia**
+
+Al enviar el formulario, `useMercadoPago.pay(buyer)` manda los datos al endpoint,
+que los guarda en la **`metadata` de la preferencia** de MP (además de prefilar
+`payer` y fijar un `external_reference`). El **webhook** los recupera al crear la
+orden, con dos caminos (el segundo es respaldo):
+
+1. `payment.metadata` (si MP la propaga al pago), o
+2. `payment.order.id → GET /merchant_orders → preference_id → GET /checkout/preferences → metadata`.
+
+Con esos datos, `createWooOrder` llena **billing** (nombre, email, celular,
+dirección + barrio/localidad en `address_2`, ciudad, departamento=`state`, país
+CO) y **shipping** (misma dirección). El **documento** (si vino) queda visible en
+la orden en la **nota del cliente** (`Documento: CC 123…`) y también en meta
+(`_billing_document_type`, `_billing_document`, `_departamento`, `_localidad`,
+`_barrio`, `_pais`) para la factura. El **correo de confirmación** (cliente y
+`ventas@`, mismo contenido) incluye un bloque "Datos de envío" con país,
+departamento, ciudad, localidad/zona, barrio, dirección, celular y correo.
+
+> Se eligió metadata (no un store externo) porque no hay BD/KV persistente y así
+> el webhook **crea** la orden ya con todos los datos, sin órdenes "pending"
+> abandonadas. La validación de precios server-side sigue intacta.

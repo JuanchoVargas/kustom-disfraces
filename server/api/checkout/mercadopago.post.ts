@@ -11,6 +11,8 @@
  * hay que revalidarlos contra el catálogo en el servidor (no confiar en el cliente).
  */
 
+import { randomUUID } from 'node:crypto'
+
 interface RawItem {
   sku?: unknown
   quantity?: unknown
@@ -55,10 +57,39 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const body = await readBody<{ items?: RawItem[] }>(event)
+  const body = await readBody<{ items?: RawItem[], buyer?: Record<string, unknown> }>(event)
   const rawItems = Array.isArray(body?.items) ? body!.items : []
   if (!rawItems.length) {
     throw createError({ statusCode: 422, message: 'Carrito vacío' })
+  }
+
+  // ---------- datos del comprador (Fase 5): factura electrónica + envío ----------
+  // Se validan en el servidor (no solo en el form). Viajan a la orden vía la
+  // metadata de la preferencia, que el webhook recupera al crear la orden en Woo.
+  const rawBuyer = body?.buyer ?? {}
+  const s = (v: unknown, max: number) => String(v ?? '').trim().slice(0, max)
+  const buyer = {
+    nombre: s(rawBuyer.nombre, 120),
+    tipo_documento: (['CC', 'CE', 'NIT'].includes(String(rawBuyer.tipoDocumento)) ? String(rawBuyer.tipoDocumento) : ''),
+    documento: s(rawBuyer.documento, 40),
+    email: s(rawBuyer.email, 160),
+    telefono: s(rawBuyer.telefono, 40),
+    direccion: s(rawBuyer.direccion, 250),
+    ciudad: s(rawBuyer.ciudad, 120),
+    departamento: s(rawBuyer.departamento, 120),
+    notas: s(rawBuyer.notas, 500),
+  }
+  const missing: string[] = []
+  if (!buyer.nombre) missing.push('nombre')
+  if (!buyer.tipo_documento) missing.push('tipoDocumento')
+  if (!buyer.documento) missing.push('documento')
+  if (!buyer.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(buyer.email)) missing.push('email')
+  if (!buyer.telefono) missing.push('telefono')
+  if (!buyer.direccion) missing.push('direccion')
+  if (!buyer.ciudad) missing.push('ciudad')
+  if (!buyer.departamento) missing.push('departamento')
+  if (missing.length) {
+    throw createError({ statusCode: 422, message: 'Datos del comprador incompletos', data: { code: 'buyer_invalid', fields: missing } })
   }
 
   // Las fotos son públicas y estáticas: viven en el sitio canónico (prod), no en
@@ -126,8 +157,18 @@ export default defineEventHandler(async (event) => {
   const origin = getRequestURL(event, { xForwardedHost: true }).origin
   const isLocal = /localhost|127\.0\.0\.1/.test(origin)
 
+  // Nombre para MP (prefill) y para billing en Woo.
+  const [firstName, ...restName] = buyer.nombre.split(/\s+/)
+  const externalRef = `kustom-${randomUUID()}`
+
   const preference = {
     items,
+    // Prefill de MP con el comprador (email/nombre) — mejora la pantalla de pago.
+    payer: { name: firstName, surname: restName.join(' '), email: buyer.email },
+    // VÍA de los datos a la orden: metadata de la preferencia. El webhook la
+    // recupera (payment.metadata o merchant_order -> preference) al crear la orden.
+    metadata: buyer,
+    external_reference: externalRef,
     back_urls: {
       success: `${origin}/pago-exitoso`,
       failure: `${origin}/pago-fallido`,

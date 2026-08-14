@@ -11,7 +11,9 @@ export function useMercadoPago() {
   const loading = ref(false)
   const error = ref('')
 
-  async function pay() {
+  // Se recibe el comprador (datos de /checkout) para pasarlos a la orden vía la
+  // preferencia. El flujo va: carrito -> /checkout (formulario) -> pay(buyer) -> MP.
+  async function pay(buyer?: CheckoutBuyer) {
     if (!cart.items.length || loading.value) return
     loading.value = true
     error.value = ''
@@ -30,7 +32,7 @@ export function useMercadoPago() {
     try {
       const res = await $fetch<{ checkout_url?: string, init_point?: string, sandbox_init_point?: string }>(
         '/api/checkout/mercadopago',
-        { method: 'POST', body: { items } },
+        { method: 'POST', body: { items, buyer } },
       )
       // El servidor ya eligió la URL correcta según el token (prod vs sandbox).
       const url = res.checkout_url || res.init_point || res.sandbox_init_point
