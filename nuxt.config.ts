@@ -87,6 +87,11 @@ export default defineNuxtConfig({
     // Buzón de VENTAS: adónde llega el aviso de cada pago aprobado (Fase 4). Distinto
     // del remitente (contacto@) para que no se deduplique. Cambiable sin tocar código.
     ventasTo: process.env.VENTAS_TO || 'ventas@disfraceskustom.com', // -> NUXT_VENTAS_TO
+    // Bot de WhatsApp (Cloud API de Meta) — solo servidor. Se leen con prefijo NUXT_
+    // para override en runtime (Vercel), la lección del Access Token de MP.
+    whatsappToken: process.env.NUXT_WHATSAPP_TOKEN || '',              // -> NUXT_WHATSAPP_TOKEN (token de la app de Meta)
+    whatsappPhoneId: process.env.NUXT_WHATSAPP_PHONE_ID || '',         // -> NUXT_WHATSAPP_PHONE_ID (phone number id)
+    whatsappVerifyToken: process.env.NUXT_WHATSAPP_VERIFY_TOKEN || '', // -> NUXT_WHATSAPP_VERIFY_TOKEN (verificación del webhook)
     // Mercado Pago (Fase 1: PRUEBA/sandbox). El Access Token es SECRETO y vive
     // SOLO en servidor (crea la preferencia de pago). Sin él, /api/checkout/mercadopago
     // responde 503 "not_configured" y el sitio sigue funcionando (queda WhatsApp).

@@ -430,3 +430,59 @@ caliente; entre cold starts podrían salir 1-2 alertas (aceptable — mejor eso 
 ninguna). Un dedupe perfecto necesitaría un store persistente (Redis/KV).
 
 Con Woo OK, el flujo no cambia: crea la orden + envía la confirmación, **sin alerta**.
+
+---
+
+## 🤖 Bot de WhatsApp (Fase 1 — webhook + árbol de decisión)
+
+Bot **reactivo** (menús + botones) que guía al cliente y lo lleva a la web a
+comprar. Cloud API de Meta. Código listo para conectar al sandbox de Meta.
+
+### Endpoints (`server/api/whatsapp.*`)
+
+- **GET `/api/whatsapp`** — verificación del webhook de Meta: responde
+  `hub.challenge` solo si `hub.verify_token` coincide con `NUXT_WHATSAPP_VERIFY_TOKEN`.
+- **POST `/api/whatsapp`** — recibe los mensajes entrantes, decide con el árbol y
+  responde por la Cloud API. Siempre devuelve `200` rápido (Meta reintenta si no).
+
+### Árbol de decisión
+
+| Entrada | Respuesta |
+|---|---|
+| Cualquier mensaje inicial / texto libre | Saludo + **menú** (botones): *Ver disfraces*, *Cómo comprar*, *Hablar con alguien* |
+| `Ver disfraces` | **Lista** de públicos: Bebés, Niños, Niñas, Damas, Caballeros |
+| Público elegido | **Lista** de subcategorías de ese público (de `navegacion.json`, solo las que tienen productos, igual que la web) |
+| Subcategoría elegida | Link a la web filtrada `…/categoria/<publico>?sub=<sub>` + botones *🛒 Comprar en la web* y *💬 Pedir por WhatsApp* |
+| `Comprar en la web` | Reenvía el link |
+| `Pedir por WhatsApp` / `Hablar con alguien` | *"Te paso con una persona del equipo 🙌"* y **marca la conversación para atención humana** (log + flag) |
+| `Cómo comprar` | Resumen corto + link a `/como-comprar` |
+
+La navegación se codifica en el **id** de cada botón/fila (`main:ver`, `pub:<slug>`,
+`sub:<pub>:<sub>`, `buy:<pub>:<sub>`, `human`), así el bot es casi **sin estado**.
+Código del árbol: `server/utils/whatsappBot.ts` (`buildBotReplies`, función pura
+testeable); Cloud API: `server/utils/whatsapp.ts`; navegación: `server/utils/catalogNav.ts`.
+
+### Estado de conversación (limitación)
+
+El estado (último paso + flag de atención humana) vive **en memoria**
+(`Map` en `whatsappBot.ts`). Es **efímero**: se pierde en cada reinicio/cold start
+y **no se comparte entre instancias** serverless (Vercel). Suficiente para Fase 1,
+porque la navegación va en los ids de los botones. Para producción robusta (colas,
+handoff a un agente, historial) hay que mover el estado a un store persistente
+(Redis/KV/DB). El flag de atención humana hoy solo se **registra** (`console.info`).
+
+> Mientras una conversación está marcada para atención humana, el bot **no
+> responde** (para no interrumpir al asesor); el cliente puede escribir *menú*
+> para reactivar el bot.
+
+### Variables de entorno (prefijo `NUXT_` para runtime en Vercel)
+
+| Variable | Qué es |
+|---|---|
+| `NUXT_WHATSAPP_TOKEN` | Token de la app de Meta (WhatsApp → API Setup) |
+| `NUXT_WHATSAPP_PHONE_ID` | Phone number ID del número (prueba o producción) |
+| `NUXT_WHATSAPP_VERIFY_TOKEN` | Cadena que **tú inventas**; la misma se pone en Meta → Configuración del webhook |
+
+Sin `NUXT_WHATSAPP_TOKEN`/`PHONE_ID`, el bot **calcula** la respuesta pero **no la
+envía** (la registra en el log) — útil para probar en local. La URL del webhook a
+registrar en Meta es `https://<dominio>/api/whatsapp`.
