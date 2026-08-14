@@ -84,6 +84,9 @@ export default defineNuxtConfig({
     smtpPass: process.env.SMTP_PASS || '',                  // -> NUXT_SMTP_PASS (clave del buzón)
     smtpFrom: process.env.SMTP_FROM || '',                  // -> NUXT_SMTP_FROM (remitente; por defecto = smtpUser)
     mayoristasTo: process.env.MAYORISTAS_TO || 'contacto@disfraceskustom.com', // -> NUXT_MAYORISTAS_TO
+    // Buzón de VENTAS: adónde llega el aviso de cada pago aprobado (Fase 4). Distinto
+    // del remitente (contacto@) para que no se deduplique. Cambiable sin tocar código.
+    ventasTo: process.env.VENTAS_TO || 'ventas@disfraceskustom.com', // -> NUXT_VENTAS_TO
     // Mercado Pago (Fase 1: PRUEBA/sandbox). El Access Token es SECRETO y vive
     // SOLO en servidor (crea la preferencia de pago). Sin él, /api/checkout/mercadopago
     // responde 503 "not_configured" y el sitio sigue funcionando (queda WhatsApp).

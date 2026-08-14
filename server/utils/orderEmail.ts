@@ -46,6 +46,8 @@ export interface OrderEmailData {
   total: number
   /** Base pública para las imágenes (default: sitio canónico). */
   siteUrl?: string
+  /** 'customer' = confirmación al comprador · 'sales' = aviso al negocio. Default customer. */
+  audience?: 'customer' | 'sales'
 }
 
 const esc = (s: string) =>
@@ -55,6 +57,18 @@ const esc = (s: string) =>
 export function buildOrderEmailHtml(data: OrderEmailData): string {
   const base = (data.siteUrl || 'https://www.disfraceskustom.com').replace(/\/$/, '')
   const saludo = data.buyerName ? `, ${esc(data.buyerName)}` : ''
+  const isSales = data.audience === 'sales'
+
+  // El encabezado cambia según a quién va: cliente (confirmación) o negocio (aviso de venta).
+  const heroTitle = isSales ? '🛍️ ¡Nueva venta!' : '¡Pago recibido! 🎉'
+  const heroSub = isSales
+    ? `Pedido pagado${data.buyerName ? ` de ${esc(data.buyerName)}` : ''}. Coordina el envío con el cliente.`
+    : `Gracias por tu compra${saludo}. Ya estamos preparando tu pedido.`
+  const sectionLabel = isSales ? 'Detalle del pedido' : 'Tu pedido'
+  // En el aviso de venta se muestran los datos de contacto del comprador.
+  const buyerBlock = (isSales && (data.buyerName || data.buyerEmail))
+    ? `<div style="font-family:Arial,Helvetica,sans-serif;font-size:12.5px;color:#555;margin-top:6px;">Cliente: <strong>${esc(data.buyerName || '—')}</strong>${data.buyerEmail ? ` · <a href="mailto:${esc(data.buyerEmail)}" style="color:${C.purple};text-decoration:none;">${esc(data.buyerEmail)}</a>` : ''}</div>`
+    : ''
 
   const rows = data.items.map((it) => {
     // JPG fondo blanco (no WebP transparente): evita el recuadro negro en clientes de correo.
@@ -106,9 +120,9 @@ export function buildOrderEmailHtml(data: OrderEmailData): string {
           <tr>
             <td align="center" style="padding:28px 28px 4px;">
               <img src="${base}/images/email/ko-paz.png" width="150" alt="KO celebrando tu compra" style="display:block;margin:0 auto 6px;width:150px;height:auto;">
-              <h1 style="margin:10px 0 6px;font-family:Arial,Helvetica,sans-serif;font-size:26px;font-weight:800;color:${C.ink};">¡Pago recibido! 🎉</h1>
+              <h1 style="margin:10px 0 6px;font-family:Arial,Helvetica,sans-serif;font-size:26px;font-weight:800;color:${C.ink};">${heroTitle}</h1>
               <p style="margin:0;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.5;color:#555;">
-                Gracias por tu compra${saludo}. Ya estamos preparando tu pedido.
+                ${heroSub}
               </p>
             </td>
           </tr>
@@ -116,7 +130,8 @@ export function buildOrderEmailHtml(data: OrderEmailData): string {
           <!-- ===== PRODUCTOS ===== -->
           <tr>
             <td style="padding:20px 28px 4px;">
-              <div style="font-family:Arial,Helvetica,sans-serif;font-size:12px;font-weight:bold;letter-spacing:1.5px;text-transform:uppercase;color:${C.muted};padding-bottom:4px;">Tu pedido</div>
+              <div style="font-family:Arial,Helvetica,sans-serif;font-size:12px;font-weight:bold;letter-spacing:1.5px;text-transform:uppercase;color:${C.muted};padding-bottom:4px;">${sectionLabel}</div>
+              ${buyerBlock}
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                 ${rows}
               </table>
@@ -185,55 +200,84 @@ export function buildOrderEmailHtml(data: OrderEmailData): string {
 
 /** Versión de texto plano (fallback para clientes sin HTML). */
 function buildOrderEmailText(data: OrderEmailData): string {
+  const isSales = data.audience === 'sales'
   const lines = data.items.map(it => `- ${it.name} (Talla ${it.talla}) x${it.quantity}  ${formatCOP(it.unitPrice * it.quantity)}`)
   return [
-    '¡Pago recibido! Gracias por tu compra en Kustom Disfraces.',
+    isSales ? '🛍️ Nueva venta en Kustom Disfraces.' : '¡Pago recibido! Gracias por tu compra en Kustom Disfraces.',
     '',
-    'Tu pedido:',
+    ...(isSales && (data.buyerName || data.buyerEmail) ? [`Cliente: ${data.buyerName ?? '—'}${data.buyerEmail ? ` <${data.buyerEmail}>` : ''}`, ''] : []),
+    isSales ? 'Detalle del pedido:' : 'Tu pedido:',
     ...lines,
     '',
     `Total pagado: ${formatCOP(data.total)}`,
     `Referencia de pago Mercado Pago: #${data.paymentId}`,
     '',
-    'Coordinaremos el envío por WhatsApp para confirmar la dirección.',
+    'Coordinar el envío por WhatsApp.',
     `WhatsApp: ${WHATSAPP_NUM} (${WHATSAPP_URL})`,
     `Correo: ${BUSINESS_EMAIL}`,
     `Horario: ${HOURS}`,
   ].join('\n')
 }
 
+const isEmail = (v?: string): v is string => !!v && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)
+
 /**
- * Envía el correo de confirmación. NO lanza: ante cualquier fallo lo registra y
- * devuelve { sent:false } — el pago y la orden ya quedaron guardados (Fase 4, req 5).
+ * Envía dos correos: (1) AVISO DE VENTA al negocio (siempre, a ventas@ — su propio
+ * correo, NO bcc, para que llegue fiable al buzón de ventas), y (2) CONFIRMACIÓN al
+ * cliente (si MP dio su email). NO lanza: registra cualquier fallo y sigue — el pago
+ * y la orden ya quedaron guardados (Fase 4, req 5).
  */
-export async function sendOrderConfirmationEmail(data: OrderEmailData): Promise<{ sent: boolean, reason?: string }> {
+export async function sendOrderConfirmationEmail(
+  data: OrderEmailData,
+): Promise<{ sent: boolean, salesSent: boolean, customerSent: boolean, salesTo?: string, reason?: string }> {
   if (!mailerConfigured()) {
     console.warn(`[order-email] SMTP sin configurar — no se envía correo del pago ${data.paymentId}`)
-    return { sent: false, reason: 'smtp_not_configured' }
+    return { sent: false, salesSent: false, customerSent: false, reason: 'smtp_not_configured' }
   }
 
   const c = useRuntimeConfig()
   const from = c.smtpFrom || c.smtpUser
-  const buyer = data.buyerEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.buyerEmail) ? data.buyerEmail : undefined
+  const salesTo = c.ventasTo || 'ventas@disfraceskustom.com' // buzón de ventas (configurable)
+  const buyer = isEmail(data.buyerEmail) ? data.buyerEmail : undefined
+  const transporter = createMailTransport()
+  const senderFrom = `"Kustom Disfraces" <${from}>`
 
-  // Destinatarios: el cliente (si hay email) y SIEMPRE el negocio (copia oculta).
-  const to = buyer || BUSINESS_EMAIL
-  const bcc = buyer ? BUSINESS_EMAIL : undefined
-
+  // (1) AVISO DE VENTA -> ventas@ (correo dedicado, destinatario distinto del remitente)
+  let salesSent = false
   try {
-    await createMailTransport().sendMail({
-      from: `"Kustom Disfraces" <${from}>`,
-      to,
-      ...(bcc ? { bcc } : {}),
-      subject: '¡Pago recibido! Tu pedido en Kustom Disfraces 🎉',
-      text: buildOrderEmailText(data),
-      html: buildOrderEmailHtml(data),
+    await transporter.sendMail({
+      from: senderFrom,
+      to: salesTo,
+      replyTo: buyer, // responder al aviso escribe al cliente
+      subject: `🛍️ Nueva venta — Pedido #${data.paymentId}`,
+      text: buildOrderEmailText({ ...data, audience: 'sales' }),
+      html: buildOrderEmailHtml({ ...data, audience: 'sales' }),
     })
-    console.info(`[order-email] correo enviado (pago ${data.paymentId}) a ${to}${bcc ? ` + bcc ${bcc}` : ''}`)
-    return { sent: true }
+    salesSent = true
+    console.info(`[order-email] aviso de venta enviado a ${salesTo} (pago ${data.paymentId})`)
   }
   catch (err) {
-    console.error(`[order-email] fallo al enviar el correo del pago ${data.paymentId}:`, String((err as Error)?.message ?? err))
-    return { sent: false, reason: 'send_failed' }
+    console.error(`[order-email] fallo al enviar el aviso de venta a ${salesTo} (pago ${data.paymentId}):`, String((err as Error)?.message ?? err))
   }
+
+  // (2) CONFIRMACIÓN al cliente (si hay email)
+  let customerSent = false
+  if (buyer) {
+    try {
+      await transporter.sendMail({
+        from: senderFrom,
+        to: buyer,
+        subject: '¡Pago recibido! Tu pedido en Kustom Disfraces 🎉',
+        text: buildOrderEmailText({ ...data, audience: 'customer' }),
+        html: buildOrderEmailHtml({ ...data, audience: 'customer' }),
+      })
+      customerSent = true
+      console.info(`[order-email] confirmación enviada al cliente ${buyer} (pago ${data.paymentId})`)
+    }
+    catch (err) {
+      console.error(`[order-email] fallo al enviar la confirmación al cliente ${buyer} (pago ${data.paymentId}):`, String((err as Error)?.message ?? err))
+    }
+  }
+
+  return { sent: salesSent || customerSent, salesSent, customerSent, salesTo }
 }
