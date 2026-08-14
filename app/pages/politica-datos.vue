@@ -33,7 +33,7 @@ useHead({
       <li><strong>NIT:</strong> 901355566-9</li>
       <li><strong>Ciudad:</strong> Bogotá - Colombia</li>
       <li><strong>Correo electrónico:</strong> <a href="mailto:contacto@disfraceskustom.com">contacto@disfraceskustom.com</a></li>
-      <li><strong>Teléfono:</strong> 3144477210</li>
+      <li><strong>Teléfono:</strong> 3118844547</li>
     </ul>
 
     <h2>3. Definiciones</h2>
@@ -175,7 +175,7 @@ useHead({
       <strong>COMERCIALIZADORA INDUSCOL</strong><br>
       Ciudad: Bogotá - Colombia<br>
       Correo electrónico: <a href="mailto:contacto@disfraceskustom.com">contacto@disfraceskustom.com</a><br>
-      Teléfono: 3144477210
+      Teléfono: 3118844547
     </p>
     <p>
       Al utilizar nuestro sitio web o suministrar voluntariamente sus datos personales, el titular

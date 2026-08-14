@@ -8,8 +8,8 @@ import { createMailTransport, mailerConfigured } from './mailer'
  */
 
 const BUSINESS_EMAIL = 'contacto@disfraceskustom.com'
-const WHATSAPP_URL = 'https://wa.me/573144477210'
-const WHATSAPP_NUM = '314 447 7210'
+const WHATSAPP_URL = 'https://wa.me/573118844547'
+const WHATSAPP_NUM = '311 884 4547'
 const HOURS = 'Lunes a sábado, 8:00 a.m. a 7:00 p.m.'
 
 // Paleta de marca (valores literales — el correo no puede leer los tokens del sitio)
