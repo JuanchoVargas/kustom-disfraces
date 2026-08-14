@@ -149,9 +149,14 @@ export default defineEventHandler(async (event) => {
       // No debería ocurrir (la preferencia ya usó el precio real); se registra por si acaso.
       console.warn(`[mp-webhook] precio de ${sku} difiere: pagado=${paidPrice} real=${real.price} — se usa el real`)
     }
+    const title = String(it.title ?? 'Producto')
+    const m = title.match(/^(.*?)\s*\(Talla\s*(.+?)\)\s*$/) // separa nombre y talla del título compuesto
     return {
       sku,
-      title: real?.name ?? String(it.title ?? 'Producto'),
+      title, // nombre+talla (línea de la orden en Woo)
+      name: real?.name ?? (m ? m[1] : title), // nombre limpio (correo)
+      talla: m ? m[2] : '—', // talla (correo)
+      slug: real?.slug || undefined, // foto pública (correo)
       quantity: Math.max(1, Math.trunc(Number(it.quantity) || 1)),
       unitPrice: real?.price ?? paidPrice, // ← precio REAL del servidor cuando está disponible
     }
@@ -174,7 +179,19 @@ export default defineEventHandler(async (event) => {
       amount: payment.transaction_amount,
     })
     console.info(`[mp-webhook] orden creada en Woo #${order.id} (pago ${payment.id}, ${payment.status})`)
-    return { received: true, verified: true, status: payment.status, orderId: order.id }
+
+    // Correo de confirmación con marca (Fase 4). Idempotente: solo se envía en esta
+    // ruta de orden NUEVA (si el webhook llega otra vez, cae en el `existing` de arriba).
+    // No rompe el flujo: sendOrderConfirmationEmail nunca lanza (registra y sigue).
+    const emailResult = await sendOrderConfirmationEmail({
+      paymentId: String(payment.id),
+      buyerName: [payment.payer?.first_name, payment.payer?.last_name].filter(Boolean).join(' ') || undefined,
+      buyerEmail: payment.payer?.email,
+      items: orderItems.map(i => ({ name: i.name, talla: i.talla, quantity: i.quantity, unitPrice: i.unitPrice, slug: i.slug })),
+      total: payment.transaction_amount,
+    })
+
+    return { received: true, verified: true, status: payment.status, orderId: order.id, emailSent: emailResult.sent }
   }
   catch (err) {
     // Woo falló: NO perder el pago — se registra con todos los datos para recuperarlo a mano.
