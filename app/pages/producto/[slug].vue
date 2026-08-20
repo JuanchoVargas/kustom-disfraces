@@ -238,7 +238,7 @@ const perks = [
 
         <div class="field">
           <div class="field__label">
-            <span>Talla</span>
+            <span>Seleccione su talla</span>
             <span v-if="needsSize" class="field__hint">Elige una talla</span>
           </div>
           <SizeSelector v-model="size" :sizes="product.sizes" :disabled="product.soldOutSizes ?? []" />
@@ -473,8 +473,8 @@ const perks = [
               box-shadow var(--dur-fast, 0.15s) var(--ease-out, ease),
               background var(--dur-fast, 0.15s) var(--ease-out, ease);
 }
-.sizeguide:hover { background: #F2B733; }
-.sizeguide:active { transform: translateY(1px); }
+.sizeguide:hover { background: #F2B733; transform: translateY(-2px); box-shadow: var(--shadow-lift); }
+.sizeguide:active { transform: translateY(1px); box-shadow: var(--shadow); transition-duration: 0.06s; }
 .sizeguide:focus-visible { outline: 3px solid var(--turq); outline-offset: 3px; }
 @media (prefers-reduced-motion: reduce) {
   .sizeguide { transition: none; }
