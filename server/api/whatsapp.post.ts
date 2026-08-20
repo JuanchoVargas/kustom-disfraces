@@ -25,13 +25,17 @@ export default defineEventHandler(async (event) => {
   // FALLBACK: un interactivo que excede límites (validación) o cuyo envío falla se
   // degrada a texto plano con menú numerado; se recuerda el orden de ids para
   // mapear la respuesta numérica (1/2/…) de vuelta al id original.
+  // Kill-switch: con el flag activo NO se intenta el interactivo (Meta lo acepta y
+  // lo descarta); todos los menús salen directo como texto numerado.
+  const forceText = useRuntimeConfig().whatsappForceTextMenu === true
   let lastMenu: string[] | undefined
   for (const msg of replies) {
-    const violations = validateInteractive(msg)
+    const violations = forceText ? [] : validateInteractive(msg)
     if (violations.length) {
       console.error(`[whatsapp] payload interactivo inválido para ${incoming.from} — degradando a texto:`, violations.join('; '))
     }
-    const ok = violations.length ? false : await sendWhatsAppMessage(incoming.from, msg)
+    const skipInteractive = forceText && msg.type === 'interactive'
+    const ok = (skipInteractive || violations.length) ? false : await sendWhatsAppMessage(incoming.from, msg)
     if (!ok && msg.type === 'interactive') {
       const fb = waNumberedFallback(msg)
       if (fb && await sendWhatsAppMessage(incoming.from, fb.message)) {

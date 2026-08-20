@@ -92,6 +92,10 @@ export default defineNuxtConfig({
     whatsappToken: process.env.NUXT_WHATSAPP_TOKEN || '',              // -> NUXT_WHATSAPP_TOKEN (token de la app de Meta)
     whatsappPhoneId: process.env.NUXT_WHATSAPP_PHONE_ID || '',         // -> NUXT_WHATSAPP_PHONE_ID (phone number id)
     whatsappVerifyToken: process.env.NUXT_WHATSAPP_VERIFY_TOKEN || '', // -> NUXT_WHATSAPP_VERIFY_TOKEN (verificación del webhook)
+    // Kill-switch temporal: fuerza TODOS los menús a texto numerado (sin intentar
+    // interactivo). Mientras cazamos por qué Meta acepta y descarta el interactivo.
+    // Override en runtime (Vercel) sin redeploy de código.
+    whatsappForceTextMenu: process.env.NUXT_WHATSAPP_FORCE_TEXT_MENU === 'true', // -> NUXT_WHATSAPP_FORCE_TEXT_MENU ('true' para forzar texto)
     // Mercado Pago (Fase 1: PRUEBA/sandbox). El Access Token es SECRETO y vive
     // SOLO en servidor (crea la preferencia de pago). Sin él, /api/checkout/mercadopago
     // responde 503 "not_configured" y el sitio sigue funcionando (queda WhatsApp).
