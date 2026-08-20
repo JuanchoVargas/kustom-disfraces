@@ -28,8 +28,13 @@ export default defineEventHandler(async (event) => {
   // Kill-switch: con el flag activo NO se intenta el interactivo (Meta lo acepta y
   // lo descarta); todos los menús salen directo como texto numerado.
   const forceText = useRuntimeConfig().whatsappForceTextMenu === true
+  // En modo interactivo, los menús (listas de UNA sección) se parten en mensajes
+  // de REPLY BUTTONS de 1 toque (chunks de ≤3). En force-text se dejan como están
+  // para que el fallback numerado no cambie. Los resultados (lista multi-sección)
+  // nunca se parten. toButtonChunks deja intacto lo que no es un menú-lista.
+  const outgoing = forceText ? replies : replies.flatMap(toButtonChunks)
   let lastMenu: string[] | undefined
-  for (const msg of replies) {
+  for (const msg of outgoing) {
     const violations = forceText ? [] : validateInteractive(msg)
     if (violations.length) {
       console.error(`[whatsapp] payload interactivo inválido para ${incoming.from} — degradando a texto:`, violations.join('; '))

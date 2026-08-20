@@ -193,7 +193,32 @@ async function makeBot() {
     const out = replies.map((m) => { const r = render(m); if (r.ids.length) lastMenu = r.ids; return r.text })
     return { out, newState: { ...state, ...patch, updatedAt: 0, lastMenu } }
   }
-  return { turn }
+  // Primer mensaje del bot para un input (mensaje "fuente", sin partir en chunks).
+  const first = (input, state = { step: 'start', flaggedForHuman: false, updatedAt: 0 }) => {
+    const incoming = typeof input === 'string'
+      ? { from: 'preview', kind: 'text', text: input }
+      : { from: 'preview', kind: 'reply', replyId: input.replyId }
+    return bot.buildBotReplies(incoming, state).replies[0]
+  }
+  return { turn, first, wa }
+}
+
+// Render del canal INTERACTIVO: aplica toButtonChunks y dibuja los botones de
+// 1 toque (o la lista, en el caso de resultados).
+function renderInteractive(label, message, wa) {
+  const chunks = wa.toButtonChunks(message)
+  console.log(`\n──── ${label}  (${chunks.length} mensaje/s) ────`)
+  chunks.forEach((m, i) => {
+    if (m.type === 'interactive' && m.interactive.type === 'button') {
+      const btns = m.interactive.action.buttons.map(b => `[ ${b.reply.title} ]`).join('  ')
+      console.log(`\n[bot · botones ${i + 1}/${chunks.length}]\n${m.interactive.body.text}\n${btns}`)
+    }
+    else if (m.type === 'interactive' && m.interactive.type === 'list') {
+      const n = m.interactive.action.sections.flatMap(s => s.rows).length
+      console.log(`\n[bot · LISTA (excepción)]\n${m.interactive.body.text}\n(lista de ${n} filas — resultados NO se parten en botones)`)
+    }
+    else { console.log(`\n[bot · texto]\n${m.text.body}`) }
+  })
 }
 
 async function previewSearch(query) {
@@ -219,34 +244,17 @@ async function previewMenu(num) {
   turn(String(num), t1.newState).out.forEach(t => console.log(`\n[bot]\n${t}`))
 }
 
-// Demo de navegación ATRÁS: baja hasta subLink (categoría → público → sub) y
-// regresa nivel por nivel con "0", "volver" y el tap de la fila ⬅️ Volver.
+// Demo del render INTERACTIVO: cómo se ven los menús partidos en botones de 1
+// toque (chunks de ≤3), y que los resultados de búsqueda siguen en LISTA.
 async function previewNav() {
-  const { turn } = await makeBot()
-  let st = { step: 'start', flaggedForHuman: false, updatedAt: 0 }
-  const show = (label, input) => {
-    console.log(`\n──── ${label} ────`)
-    const r = turn(input, st)
-    r.out.forEach(t => console.log(`\n[bot]\n${t}`))
-    st = r.newState
-    return r
-  }
-  // Elige un id del último menú que cumpla el predicado (o el primero que empiece por prefijo).
-  const pick = (pred) => (st.lastMenu ?? []).find(pred)
+  const { first, wa } = await makeBot()
+  const r = replyId => first({ replyId })
 
-  console.log('\n════════ navegación ATRÁS (Niñas → Trusas → volver → volver) ════════')
-  show('saludo → menú principal', 'hola')
-  show('tap "Ver disfraces"', { replyId: 'main:ver' })
-  const pubId = pick(id => id === 'pub:ninas') ?? pick(id => id.startsWith('pub:'))
-  show(`tap público (${pubId}) → categorías (LISTA con Volver)`, { replyId: pubId })
-  const subId = pick(id => id.endsWith(':trusas')) ?? pick(id => id.startsWith('sub:'))
-  show(`tap subcategoría (${subId}) → BOTONES de 1 toque con Volver`, { replyId: subId })
-  show('escribe "0"  → vuelve a categorías (Niñas)', '0')
-  show('escribe "volver" → vuelve a públicos', 'volver')
-  show('tap ⬅️ Volver (id back) → vuelve al menú principal', { replyId: 'back' })
-
-  console.log('\n════════ "menú" REINICIA la pila desde el fondo ════════')
-  show('tap "Ver disfraces"', { replyId: 'main:ver' })
-  show(`tap público (${pubId})`, { replyId: pubId })
-  show('escribe "menú" → reinicia (pila vacía, sin Volver)', 'menú')
+  console.log('\n════════ RENDER INTERACTIVO — botones de 1 toque (chunks de 3) ════════')
+  renderInteractive('MENÚ PRINCIPAL (4 → 3 + 1)', first('hola'), wa)
+  renderInteractive('PÚBLICOS (5 + Volver → 3 + 3)', r('main:ver'), wa)
+  renderInteractive('CATEGORÍAS · Niñas (3 + Volver → 3 + 1)', r('pub:ninas'), wa)
+  renderInteractive('CATEGORÍAS · Damas (1 + Volver → ya son botones)', r('pub:damas'), wa)
+  renderInteractive('SUBLINK · Niñas/Trusas (ya son botones)', r('sub:ninas:trusas'), wa)
+  renderInteractive('RESULTADOS "hombre araña" (EXCEPCIÓN: sigue lista)', first('hombre araña'), wa)
 }

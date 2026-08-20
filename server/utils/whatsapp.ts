@@ -87,6 +87,33 @@ export function waList(body: string, buttonLabel: string, rows: WaRow[], section
   return waListSections(body, buttonLabel, [{ title: sectionTitle, rows }])
 }
 
+/**
+ * Convierte un menú (lista de UNA sola sección) en una secuencia de mensajes de
+ * REPLY BUTTONS de 1 toque, partiendo las filas en grupos de ≤3 ("chunking"). El
+ * primer chunk conserva el cuerpo original; los siguientes llevan "Más opciones 👇".
+ * Así "⬅️ Volver" (última fila) queda como último botón del último chunk.
+ *
+ * Se deja intacto todo lo demás: los mensajes de botones ya listos, los de texto y
+ * las listas de VARIAS secciones (resultados de búsqueda agrupados por línea, cuyos
+ * títulos+precios no caben en botones de 20 chars). Devuelve SIEMPRE un arreglo.
+ */
+export function toButtonChunks(message: WaMessage): WaMessage[] {
+  if (message.type !== 'interactive') return [message]
+  const it = message.interactive as any
+  if (it?.type !== 'list') return [message]
+  const sections: any[] = it?.action?.sections ?? []
+  if (sections.length !== 1) return [message] // multi-sección = resultados → se queda como lista
+  const rows: any[] = sections[0]?.rows ?? []
+  if (!rows.length) return [message]
+  const body = String(it?.body?.text ?? '')
+  const chunks: WaMessage[] = []
+  for (let i = 0; i < rows.length; i += 3) {
+    const slice = rows.slice(i, i + 3).map(r => ({ id: r.id, title: r.fullTitle ?? r.title }))
+    chunks.push(waButtons(i === 0 ? body : 'Más opciones 👇', slice))
+  }
+  return chunks
+}
+
 // ---------- validación de límites y fallback a texto ----------
 
 /** Límites duros de la Cloud API para mensajes interactivos (referencia). */
