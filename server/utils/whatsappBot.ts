@@ -97,19 +97,41 @@ const RESET_WORDS = ['menu', 'menú', 'inicio', 'hola', 'buenas', 'empezar', 'st
 const BACK_ROW = { id: 'back', title: '⬅️ Volver' }
 const BACK_WORDS = new Set(['volver', 'atras', 'atrás', 'regresar'])
 
+interface MenuOpt { id: string, title: string, description?: string }
+
+/**
+ * Construye un menú interactivo eligiendo el formato por ergonomía:
+ *  - si (opciones + Volver) ≤ 3 → BOTONES de respuesta (1 toque, sin "Enviar").
+ *  - si no → LISTA (máx 10 filas de la Cloud API; se reserva la última para Volver,
+ *    es decir 9 opciones + Volver).
+ * `back` (por defecto true) agrega "⬅️ Volver"; se pone en false solo en el menú
+ * principal. En BOTONES se pierden las descripciones (la Cloud API no las admite),
+ * por eso los menús con textos "N disfraces" caen a lista cuando hay ≥3 opciones.
+ */
+function interactiveMenu(body: string, options: MenuOpt[], opts: { back?: boolean, listButton?: string, section?: string } = {}): WaMessage {
+  const back = opts.back !== false
+  const total = options.length + (back ? 1 : 0)
+  if (total <= 3) {
+    const buttons = options.map(o => ({ id: o.id, title: o.title }))
+    if (back) buttons.push(BACK_ROW)
+    return waButtons(body, buttons)
+  }
+  const rows = back ? [...options.slice(0, 9), BACK_ROW] : options.slice(0, 10)
+  return waList(body, opts.listButton ?? 'Ver opciones', rows, opts.section ?? 'Opciones')
+}
+
 function mainMenu(name?: string): WaMessage {
   const saludo = name ? `¡Hola, ${name}! 👋` : '¡Hola! 👋'
-  // Lista (no botones): 4 opciones no caben en un mensaje de botones (máx 3).
-  return waList(
+  // Menú principal: sin "Volver" (es la raíz). 4 opciones → lista (no caben en 3 botones).
+  return interactiveMenu(
     `${saludo} Soy el asistente de *Kustom Disfraces* 👽\n¿Qué quieres hacer?`,
-    'Ver opciones',
     [
       { id: 'main:ver', title: 'Ver disfraces' },
       { id: 'main:como', title: 'Cómo comprar' },
       { id: 'main:human', title: 'Hablar con alguien' },
       { id: 'main:catalogo', title: 'Ver catálogo 📖' },
     ],
-    'Menú',
+    { back: false, listButton: 'Ver opciones', section: 'Menú' },
   )
 }
 
@@ -123,12 +145,12 @@ function catalogoLink(): WaMessage {
 }
 
 function publicosList(): WaMessage {
-  const rows = getPublicos().map(p => ({
+  const options = getPublicos().map(p => ({
     id: `pub:${p.slug}`,
     title: p.nombre,
     description: p.count ? `${p.count} disfraces` : 'Muy pronto',
   }))
-  return waList('¿Para quién es el disfraz? 🎭', 'Ver públicos', [...rows, BACK_ROW], 'Públicos')
+  return interactiveMenu('¿Para quién es el disfraz? 🎭', options, { listButton: 'Ver públicos', section: 'Públicos' })
 }
 
 function subcategoriasList(pubSlug: string): WaMessage {
@@ -136,29 +158,28 @@ function subcategoriasList(pubSlug: string): WaMessage {
   if (!pub) return mainMenu()
   if (!pub.subcategorias.length) {
     const link = `${site()}/categoria/${pub.slug}`
-    return waButtons(
+    return interactiveMenu(
       `Estamos cargando más de *${pub.nombre}* 👀\nMíralo en la web 👇\n${link}`,
-      [{ id: 'main:ver', title: 'Ver otros' }, { id: 'main:human', title: 'Hablar con alguien' }, BACK_ROW],
+      [{ id: 'main:ver', title: 'Ver otros' }, { id: 'main:human', title: 'Hablar con alguien' }],
     )
   }
-  const rows = pub.subcategorias.map(s => ({
+  const options = pub.subcategorias.map(s => ({
     id: `sub:${pub.slug}:${s.slug}`,
     title: s.nombre,
     description: `${s.count} disfraces`,
   }))
-  return waList(`Categorías de *${pub.nombre}* 🎃`, 'Ver categorías', [...rows, BACK_ROW], pub.nombre)
+  return interactiveMenu(`Categorías de *${pub.nombre}* 🎃`, options, { listButton: 'Ver categorías', section: pub.nombre })
 }
 
 function subLink(pubSlug: string, subSlug: string): WaMessage {
   const link = `${site()}/categoria/${pubSlug}?sub=${subSlug}`
   const pn = publicoNombre(pubSlug) ?? pubSlug
   const sn = subNombre(pubSlug, subSlug) ?? subSlug
-  return waButtons(
+  return interactiveMenu(
     `¡Genial! Mira los disfraces de *${sn}* para *${pn}* 👇\n${link}`,
     [
       { id: `buy:${pubSlug}:${subSlug}`, title: '🛒 Comprar en la web' },
       { id: 'human', title: '💬 Pedir por WhatsApp' },
-      BACK_ROW,
     ],
   )
 }
@@ -169,7 +190,7 @@ function buyResend(pubSlug: string, subSlug: string): WaMessage {
 }
 
 function comoComprar(): WaMessage {
-  return waButtons(
+  return interactiveMenu(
     '🛍️ *Cómo comprar en Kustom:*\n'
     + '1️⃣ Elige tu disfraz en la web\n'
     + '2️⃣ Págalo con Mercado Pago o pídelo por WhatsApp\n'

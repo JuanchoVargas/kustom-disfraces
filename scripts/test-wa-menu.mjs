@@ -234,14 +234,14 @@ async function previewNav() {
   // Elige un id del último menú que cumpla el predicado (o el primero que empiece por prefijo).
   const pick = (pred) => (st.lastMenu ?? []).find(pred)
 
-  console.log('\n════════ navegación ATRÁS (Trusas → Damas → públicos → menú) ════════')
+  console.log('\n════════ navegación ATRÁS (Niñas → Trusas → volver → volver) ════════')
   show('saludo → menú principal', 'hola')
   show('tap "Ver disfraces"', { replyId: 'main:ver' })
-  const pubId = pick(id => id === 'pub:damas') ?? pick(id => id.startsWith('pub:'))
-  show(`tap público (${pubId})`, { replyId: pubId })
+  const pubId = pick(id => id === 'pub:ninas') ?? pick(id => id.startsWith('pub:'))
+  show(`tap público (${pubId}) → categorías (LISTA con Volver)`, { replyId: pubId })
   const subId = pick(id => id.endsWith(':trusas')) ?? pick(id => id.startsWith('sub:'))
-  show(`tap subcategoría (${subId})`, { replyId: subId })
-  show('escribe "0"  → vuelve a subcategorías (Damas)', '0')
+  show(`tap subcategoría (${subId}) → BOTONES de 1 toque con Volver`, { replyId: subId })
+  show('escribe "0"  → vuelve a categorías (Niñas)', '0')
   show('escribe "volver" → vuelve a públicos', 'volver')
   show('tap ⬅️ Volver (id back) → vuelve al menú principal', { replyId: 'back' })
 
