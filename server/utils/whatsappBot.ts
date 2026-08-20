@@ -13,7 +13,15 @@ import { getPublico, getPublicos, publicoNombre, subNombre } from './catalogNav'
  */
 
 // ---------- estado de conversación (EN MEMORIA — ver limitación en README) ----------
-export interface ConvState { step: string, flaggedForHuman: boolean, updatedAt: number }
+export interface ConvState {
+  step: string
+  flaggedForHuman: boolean
+  updatedAt: number
+  // Orden de ids del último menú enviado como TEXTO numerado (fallback). Permite
+  // mapear una respuesta "1"/"2"… de vuelta al id original. undefined si el último
+  // menú se entregó como interactivo (el usuario responde tocando el botón/fila).
+  lastMenu?: string[]
+}
 const store = new Map<string, ConvState>()
 
 export function getConversation(from: string): ConvState {
@@ -49,6 +57,24 @@ export function parseIncoming(body: any): WaIncoming | null {
   }
   if (msg.type === 'button') return { from, kind: 'reply', replyId: msg.button?.payload ?? msg.button?.text, replyTitle: msg.button?.text, profileName }
   return { from, kind: 'other', profileName }
+}
+
+/**
+ * VISIBILIDAD (Fase de depuración): registra los webhooks de tipo "statuses" cuyo
+ * status es "failed". Ahí aparece el motivo asíncrono por el que un mensaje
+ * aceptado por Graph nunca llega al teléfono (code, title, error_data). Meta manda
+ * estos eventos aparte del mensaje entrante, por eso antes se ignoraban.
+ */
+export function logFailedStatuses(body: any): void {
+  const statuses = body?.entry?.[0]?.changes?.[0]?.value?.statuses
+  if (!Array.isArray(statuses)) return
+  for (const st of statuses) {
+    if (st?.status !== 'failed') continue
+    console.error(
+      `[whatsapp] ❌ status=failed wamid=${st?.id ?? '?'} to=${st?.recipient_id ?? '?'} — errors:`,
+      JSON.stringify(st?.errors ?? [], null, 2),
+    )
+  }
 }
 
 // ---------- helpers de contenido ----------
@@ -136,9 +162,16 @@ function handoff(): WaMessage {
 export interface BotResult { replies: WaMessage[], patch: Partial<ConvState> }
 
 export function buildBotReplies(input: WaIncoming, state: ConvState): BotResult {
-  const id = input.kind === 'reply' ? (input.replyId ?? '') : ''
+  let id = input.kind === 'reply' ? (input.replyId ?? '') : ''
   const text = (input.text ?? '').trim().toLowerCase()
   const isReset = RESET_WORDS.includes(text)
+
+  // Fallback numérico: si el último menú se envió como texto (interactivo falló)
+  // y el usuario responde solo con un número, se mapea a su id original.
+  if (input.kind === 'text' && !isReset && /^\d+$/.test(text) && state.lastMenu?.length) {
+    const mapped = state.lastMenu[Number(text) - 1]
+    if (mapped) id = mapped
+  }
 
   // Conversación marcada para atención humana: el bot NO interrumpe. Solo una
   // palabra de reinicio (p. ej. "menú") lo reactiva.
