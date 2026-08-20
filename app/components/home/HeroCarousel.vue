@@ -84,73 +84,97 @@ function onLeave() {
     @mouseenter="pause"
     @mouseleave="onLeave"
   >
-    <!-- Formas orgánicas: CONTENIDAS dentro del hero, al fondo -->
+    <!-- Fondo (tinte de los blobs): FULL-BLEED, cubre de borde a borde del
+         viewport. Vive en la sección exterior, no en el contenedor de contenido. -->
     <div class="hero__shapes" aria-hidden="true">
       <span class="blob blob--a" :style="{ background: current.blobA }" />
       <span class="blob blob--b" :style="{ background: current.blobB }" />
     </div>
 
-    <Transition :css="!isReduced" name="hslide" mode="out-in" appear>
-      <div :key="active" class="hero__slide">
-        <div class="hero__text">
-          <KTag color="yellow">{{ current.eyebrow }}</KTag>
-          <h1 class="hero__title">
-            {{ current.title }}<span class="accent">{{ current.accent }}</span>
-          </h1>
-          <p class="hero__sub">{{ current.subtitle }}</p>
-          <div class="hero__cta">
-            <KButton variant="primary" size="lg" :to="current.ctaPrimary.to">{{ current.ctaPrimary.label }}</KButton>
-            <KButton v-if="current.ctaSecondary" variant="line" size="lg" :to="current.ctaSecondary.to">
-              {{ current.ctaSecondary.label }}
-            </KButton>
+    <!-- Contenido: mantiene su max-width y centrado -->
+    <div class="hero__inner">
+      <Transition :css="!isReduced" name="hslide" mode="out-in" appear>
+        <div :key="active" class="hero__slide">
+          <div class="hero__text">
+            <KTag color="yellow">{{ current.eyebrow }}</KTag>
+            <h1 class="hero__title">
+              {{ current.title }}<span class="accent">{{ current.accent }}</span>
+            </h1>
+            <p class="hero__sub">{{ current.subtitle }}</p>
+            <div class="hero__cta">
+              <KButton variant="primary" size="lg" :to="current.ctaPrimary.to">{{ current.ctaPrimary.label }}</KButton>
+              <KButton v-if="current.ctaSecondary" variant="line" size="lg" :to="current.ctaSecondary.to">
+                {{ current.ctaSecondary.label }}
+              </KButton>
+            </div>
+          </div>
+          <div class="hero__media">
+            <!-- Motivos espaciales line-art del set de marca (acento morado
+                 suave detrás del producto — NO el patrón tile) -->
+            <svg class="motif motif--planet" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="4.4" /><ellipse cx="12" cy="12" rx="8.6" ry="2.8" transform="rotate(-18 12 12)" />
+            </svg>
+            <svg class="motif motif--star" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 3.5c.75 4.2 2.55 6 6.75 6.75-4.2.75-6 2.55-6.75 6.75-.75-4.2-2.55-6-6.75-6.75 4.2-.75 6-2.55 6.75-6.75z" />
+            </svg>
+            <!-- Recortes WebP transparentes (upgrade fotográfico jul 2026):
+                 object-fit contain muestra la figura completa sobre el crema,
+                 sin mix-blend-mode (ya no hay fondo blanco que fundir). -->
+            <img :src="current.image" :alt="current.imageAlt" class="hero__img">
           </div>
         </div>
-        <div class="hero__media">
-          <!-- Motivos espaciales line-art del set de marca (acento morado
-               suave detrás del producto — NO el patrón tile) -->
-          <svg class="motif motif--planet" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <circle cx="12" cy="12" r="4.4" /><ellipse cx="12" cy="12" rx="8.6" ry="2.8" transform="rotate(-18 12 12)" />
-          </svg>
-          <svg class="motif motif--star" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M12 3.5c.75 4.2 2.55 6 6.75 6.75-4.2.75-6 2.55-6.75 6.75-.75-4.2-2.55-6-6.75-6.75 4.2-.75 6-2.55 6.75-6.75z" />
-          </svg>
-          <!-- Recortes WebP transparentes (upgrade fotográfico jul 2026):
-               object-fit contain muestra la figura completa sobre el crema,
-               sin mix-blend-mode (ya no hay fondo blanco que fundir). -->
-          <img :src="current.image" :alt="current.imageAlt" class="hero__img">
-        </div>
-      </div>
-    </Transition>
+      </Transition>
 
-    <div class="hero__dots" role="tablist" aria-label="Elegir campaña">
-      <button
-        v-for="(s, i) in slides"
-        :key="i"
-        type="button"
-        class="dot"
-        :class="{ on: i === active }"
-        role="tab"
-        :aria-selected="i === active"
-        :aria-label="`Campaña ${i + 1}`"
-        @click="go(i)"
-      />
+      <div class="hero__dots" role="tablist" aria-label="Elegir campaña">
+        <button
+          v-for="(s, i) in slides"
+          :key="i"
+          type="button"
+          class="dot"
+          :class="{ on: i === active }"
+          role="tab"
+          :aria-selected="i === active"
+          :aria-label="`Campaña ${i + 1}`"
+          @click="go(i)"
+        />
+      </div>
     </div>
   </section>
 </template>
 
 <style scoped>
+/* Sección exterior FULL-BLEED: el fondo (blobs) cubre de borde a borde del
+   viewport. El contenido va en .hero__inner con su max-width. */
 .hero {
   position: relative;
+  width: 100%;
+  overflow: hidden; /* contiene las formas orgánicas full-width */
+}
+/* Fundido inferior suave del tinte hacia el crema de la página (sin línea dura) */
+.hero::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 120px;
+  background: linear-gradient(to bottom, rgba(247, 246, 242, 0), var(--hueso));
+  z-index: 0;
+  pointer-events: none;
+}
+/* Contenedor de contenido: max-width centrado (como antes) */
+.hero__inner {
+  position: relative;
+  z-index: 1; /* sobre los blobs y el fundido */
   max-width: 1280px;
   margin: 0 auto;
   /* bottom compacto: los dots quedan pegados al contenido, no huérfanos */
   padding: var(--space-7) var(--space-5) var(--space-6);
   display: grid;
   place-items: center;
-  overflow: hidden; /* contiene las formas orgánicas */
 }
 @media (min-width: 721px) {
-  .hero { min-height: 510px; }
+  .hero__inner { min-height: 510px; }
 }
 
 /* ---------- formas orgánicas (fondo, contenidas) ---------- */
@@ -308,7 +332,7 @@ function onLeave() {
 
 /* ---------- responsive ---------- */
 @media (max-width: 720px) {
-  .hero {
+  .hero__inner {
     padding: var(--space-5) var(--space-5) var(--space-8);
   }
   .hero__slide {
