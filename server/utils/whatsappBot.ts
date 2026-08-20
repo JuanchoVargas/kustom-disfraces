@@ -27,6 +27,11 @@ export interface ConvState {
   // elegir un producto de la lista, la ficha muestre ✅/⚠️ para ESA talla. Se
   // limpia al volver a MENÚ o en una nueva búsqueda sin talla.
   askedSize?: string
+  // Pila de navegación: tokens de los menús ANCESTROS del actual (sin incluirlo).
+  // Ej.: en subLink de Trusas/Damas → ['menu', 'publicos', 'sub:damas']. "0"/
+  // "volver"/"atrás" hace pop de UN nivel; "menú" la vacía (reinicia). Tokens:
+  // 'menu' (principal), 'publicos', 'sub:<pub>'. Ver screenFromToken().
+  stack?: string[]
 }
 const store = new Map<string, ConvState>()
 
@@ -85,7 +90,12 @@ export function logFailedStatuses(body: any): void {
 
 // ---------- helpers de contenido ----------
 const site = () => (useRuntimeConfig().public.siteUrl || 'https://www.disfraceskustom.com').replace(/\/$/, '')
-const RESET_WORDS = ['menu', 'menú', 'inicio', 'hola', 'buenas', 'empezar', 'start', 'volver']
+// "volver" ya NO reinicia: ahora hace pop de un nivel (ver BACK_WORDS). "menú"/
+// "inicio"/"hola"… siguen reiniciando todo.
+const RESET_WORDS = ['menu', 'menú', 'inicio', 'hola', 'buenas', 'empezar', 'start']
+// Navegación atrás: fila/botón id 'back' + estas palabras + el número "0".
+const BACK_ROW = { id: 'back', title: '⬅️ Volver' }
+const BACK_WORDS = new Set(['volver', 'atras', 'atrás', 'regresar'])
 
 function mainMenu(name?: string): WaMessage {
   const saludo = name ? `¡Hola, ${name}! 👋` : '¡Hola! 👋'
@@ -118,7 +128,7 @@ function publicosList(): WaMessage {
     title: p.nombre,
     description: p.count ? `${p.count} disfraces` : 'Muy pronto',
   }))
-  return waList('¿Para quién es el disfraz? 🎭', 'Ver públicos', rows, 'Públicos')
+  return waList('¿Para quién es el disfraz? 🎭', 'Ver públicos', [...rows, BACK_ROW], 'Públicos')
 }
 
 function subcategoriasList(pubSlug: string): WaMessage {
@@ -128,7 +138,7 @@ function subcategoriasList(pubSlug: string): WaMessage {
     const link = `${site()}/categoria/${pub.slug}`
     return waButtons(
       `Estamos cargando más de *${pub.nombre}* 👀\nMíralo en la web 👇\n${link}`,
-      [{ id: 'main:ver', title: 'Ver otros' }, { id: 'main:human', title: 'Hablar con alguien' }],
+      [{ id: 'main:ver', title: 'Ver otros' }, { id: 'main:human', title: 'Hablar con alguien' }, BACK_ROW],
     )
   }
   const rows = pub.subcategorias.map(s => ({
@@ -136,7 +146,7 @@ function subcategoriasList(pubSlug: string): WaMessage {
     title: s.nombre,
     description: `${s.count} disfraces`,
   }))
-  return waList(`Categorías de *${pub.nombre}* 🎃`, 'Ver categorías', rows, pub.nombre)
+  return waList(`Categorías de *${pub.nombre}* 🎃`, 'Ver categorías', [...rows, BACK_ROW], pub.nombre)
 }
 
 function subLink(pubSlug: string, subSlug: string): WaMessage {
@@ -148,6 +158,7 @@ function subLink(pubSlug: string, subSlug: string): WaMessage {
     [
       { id: `buy:${pubSlug}:${subSlug}`, title: '🛒 Comprar en la web' },
       { id: 'human', title: '💬 Pedir por WhatsApp' },
+      BACK_ROW,
     ],
   )
 }
@@ -246,6 +257,9 @@ function resultadosList(matches: FoundProduct[], requestedSize: string | null): 
   const sections = [...groups.values()]
     .sort((a, b) => a.info.order - b.info.order)
     .map(g => ({ title: `${g.info.emoji} ${g.info.label}`, rows: g.rows }))
+  // Sección final solo con "Volver" (id 'back'): en texto se rinde como "0. ⬅️
+  // Volver"; su fila no entra en la numeración de resultados.
+  sections.push({ title: 'Navegación', rows: [BACK_ROW] })
   return waListSections(`Encontré ${matches.length} opciones${enc} 👇`, 'Ver opciones', sections)
 }
 
@@ -259,6 +273,18 @@ function sinResultados(query: string): WaMessage[] {
     ),
     mainMenu(),
   ]
+}
+
+// ---------- navegación atrás ----------
+/**
+ * Re-renderiza un menú a partir de su token de pila, devolviendo también el `step`
+ * y la nueva pila (= ancestros de ESE menú). Tokens: 'menu' (principal, sin pila),
+ * 'publicos', 'sub:<pub>'. subLink no es ancestro de nada, así que no aparece aquí.
+ */
+function screenFromToken(token: string): { message: WaMessage, step: string, stack: string[] } {
+  if (token === 'publicos') return { message: publicosList(), step: 'publicos', stack: ['menu'] }
+  if (token.startsWith('sub:')) return { message: subcategoriasList(token.slice(4)), step: token, stack: ['menu', 'publicos'] }
+  return { message: mainMenu(), step: 'menu', stack: [] }
 }
 
 // ---------- árbol de decisión ----------
@@ -280,29 +306,39 @@ export function buildBotReplies(input: WaIncoming, state: ConvState): BotResult 
   // palabra de reinicio (p. ej. "menú") lo reactiva.
   if (state.flaggedForHuman) {
     if (!isReset) return { replies: [], patch: {} }
-    return { replies: [mainMenu(input.profileName)], patch: { flaggedForHuman: false, step: 'menu', askedSize: undefined } }
+    return { replies: [mainMenu(input.profileName)], patch: { flaggedForHuman: false, step: 'menu', stack: [], askedSize: undefined } }
   }
 
-  if (id === 'main:ver') return { replies: [publicosList()], patch: { step: 'publicos', askedSize: undefined } }
-  if (id.startsWith('pub:')) return { replies: [subcategoriasList(id.slice(4))], patch: { step: `sub:${id.slice(4)}`, askedSize: undefined } }
+  // Navegación ATRÁS: fila/botón 'back' (tap), palabras volver/atrás, o el número
+  // "0". Hace pop de UN nivel usando la pila; sin pila cae al menú principal.
+  const isBack = id === 'back' || (input.kind === 'text' && (text === '0' || BACK_WORDS.has(text)))
+  if (isBack) {
+    const stack = state.stack ?? []
+    const parent = stack.length ? stack[stack.length - 1] : 'menu'
+    const scr = screenFromToken(parent)
+    return { replies: [scr.message], patch: { step: scr.step, stack: scr.stack, askedSize: undefined } }
+  }
+
+  if (id === 'main:ver') return { replies: [publicosList()], patch: { step: 'publicos', stack: ['menu'], askedSize: undefined } }
+  if (id.startsWith('pub:')) return { replies: [subcategoriasList(id.slice(4))], patch: { step: `sub:${id.slice(4)}`, stack: ['menu', 'publicos'], askedSize: undefined } }
   if (id.startsWith('sub:')) {
     const [, pub, sub] = id.split(':')
-    return { replies: [subLink(pub, sub)], patch: { step: `link:${pub}:${sub}` } }
+    return { replies: [subLink(pub, sub)], patch: { step: `link:${pub}:${sub}`, stack: ['menu', 'publicos', `sub:${pub}`] } }
   }
   if (id.startsWith('buy:')) {
     const [, pub, sub] = id.split(':')
-    return { replies: [buyResend(pub, sub)], patch: { step: `buy:${pub}:${sub}` } }
+    return { replies: [buyResend(pub, sub)], patch: { step: `buy:${pub}:${sub}`, stack: [] } }
   }
   if (id === 'main:human' || id === 'human') {
-    return { replies: [handoff()], patch: { flaggedForHuman: true, step: 'human', askedSize: undefined } }
+    return { replies: [handoff()], patch: { flaggedForHuman: true, step: 'human', stack: [], askedSize: undefined } }
   }
-  if (id === 'main:como') return { replies: [comoComprar()], patch: { step: 'como', askedSize: undefined } }
-  if (id === 'main:catalogo') return { replies: [catalogoLink()], patch: { step: 'catalogo', askedSize: undefined } }
+  if (id === 'main:como') return { replies: [comoComprar()], patch: { step: 'como', stack: [], askedSize: undefined } }
+  if (id === 'main:catalogo') return { replies: [catalogoLink()], patch: { step: 'catalogo', stack: [], askedSize: undefined } }
   if (id.startsWith('prod:')) {
     // Ficha desde la lista: usa la talla recordada de la búsqueda para el ✅/⚠️.
     const slug = id.slice(5)
     const p = getProductBySlug(slug)
-    if (p) return { replies: [productoFicha(p, state.askedSize ?? null)], patch: { step: `prod:${slug}` } }
+    if (p) return { replies: [productoFicha(p, state.askedSize ?? null)], patch: { step: `prod:${slug}`, stack: [] } }
   }
 
   // Texto libre (no comando, no número de menú, no reinicio) -> búsqueda de productos.
@@ -313,14 +349,14 @@ export function buildBotReplies(input: WaIncoming, state: ConvState): BotResult 
       // Recuerda la talla pedida (o límpiala si esta búsqueda no trae talla).
       const askedSize = res.requestedSize ?? undefined
       if (res.matches.length === 1) {
-        return { replies: [productoFicha(res.matches[0], res.requestedSize)], patch: { step: 'ficha', askedSize } }
+        return { replies: [productoFicha(res.matches[0], res.requestedSize)], patch: { step: 'ficha', stack: ['menu'], askedSize } }
       }
-      return { replies: [resultadosList(res.matches, res.requestedSize)], patch: { step: 'resultados', askedSize } }
+      return { replies: [resultadosList(res.matches, res.requestedSize)], patch: { step: 'resultados', stack: ['menu'], askedSize } }
     }
-    if (res) return { replies: sinResultados(input.text ?? ''), patch: { step: 'sin-resultados', askedSize: undefined } }
+    if (res) return { replies: sinResultados(input.text ?? ''), patch: { step: 'sin-resultados', stack: [], askedSize: undefined } }
     // res === null: sin tokens útiles -> cae al menú de abajo.
   }
 
   // Cualquier mensaje inicial / texto libre / tipo no soportado -> saludo + menú.
-  return { replies: [mainMenu(input.profileName)], patch: { step: 'menu', askedSize: undefined } }
+  return { replies: [mainMenu(input.profileName)], patch: { step: 'menu', stack: [], askedSize: undefined } }
 }

@@ -181,6 +181,9 @@ export function waNumberedFallback(message: WaMessage): { message: WaMessage, id
   const it = (message as any).interactive
   const body = String(it?.body?.text ?? '').trim()
   const sections: any[] = it?.type === 'list' ? (it?.action?.sections ?? []) : []
+  // La opción "atrás" (id 'back') se rinde aparte como "0. ⬅️ Volver" y NO entra en
+  // la numeración 1..N (así "1" sigue mapeando a la primera opción real en lastMenu).
+  const hasBack = opts.some(o => o.id === 'back')
 
   // Listas con VARIAS secciones (p. ej. resultados agrupados por línea): el título
   // de cada sección se rinde como encabezado en negrita, con la numeración CONTINUA
@@ -191,7 +194,7 @@ export function waNumberedFallback(message: WaMessage): { message: WaMessage, id
     const chunks: string[] = []
     let n = 0
     for (const s of sections) {
-      const rows: any[] = s?.rows ?? []
+      const rows: any[] = (s?.rows ?? []).filter((r: any) => r?.id !== 'back')
       if (!rows.length) continue
       // El primer token del título es el emoji de la línea; se deja FUERA de las
       // negritas para que quede "🦸 *Súper Acolchado*".
@@ -210,10 +213,14 @@ export function waNumberedFallback(message: WaMessage): { message: WaMessage, id
   else {
     // La descripción (p. ej. precio · tallas) desambigua títulos que la lista
     // interactiva recorta a 24 chars — el canal de texto no tiene ese límite.
-    body2 = opts.map((o, i) => `${i + 1}. ${o.title}${o.description ? ` — ${o.description}` : ''}`).join('\n')
-    for (const o of opts) ids.push(o.id)
+    const normal = opts.filter(o => o.id !== 'back')
+    body2 = normal.map((o, i) => {
+      ids.push(o.id)
+      return `${i + 1}. ${o.title}${o.description ? ` — ${o.description}` : ''}`
+    }).join('\n')
   }
-  const text = `${body}\n\n${body2}\n\nResponde con el número de la opción.`
+  const backLine = hasBack ? '\n\n0. ⬅️ Volver' : ''
+  const text = `${body}\n\n${body2}${backLine}\n\nResponde con el número de la opción.`
   return { message: waText(text, false), ids }
 }
 

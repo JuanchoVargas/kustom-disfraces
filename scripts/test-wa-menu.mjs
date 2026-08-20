@@ -31,6 +31,12 @@ if (process.argv[2] === 'menu-preview') {
   process.exit(0)
 }
 
+// ---------- modo LOCAL: demo de navegación atrás ----------
+if (process.argv[2] === 'nav-preview') {
+  await previewNav()
+  process.exit(0)
+}
+
 const to = process.argv[2]
 const which = (process.argv[3] ?? 'menu').toLowerCase()
 if (!to) {
@@ -177,8 +183,12 @@ async function makeBot() {
     }
     return { text: msg.text.body, ids: [] }
   }
-  const turn = (text, state) => {
-    const { replies, patch } = bot.buildBotReplies({ from: 'preview', kind: 'text', text }, state)
+  // input: string (texto libre / número) u objeto { replyId } (tap de botón/fila).
+  const turn = (input, state) => {
+    const incoming = typeof input === 'string'
+      ? { from: 'preview', kind: 'text', text: input }
+      : { from: 'preview', kind: 'reply', replyId: input.replyId }
+    const { replies, patch } = bot.buildBotReplies(incoming, state)
     let lastMenu
     const out = replies.map((m) => { const r = render(m); if (r.ids.length) lastMenu = r.ids; return r.text })
     return { out, newState: { ...state, ...patch, updatedAt: 0, lastMenu } }
@@ -207,4 +217,36 @@ async function previewMenu(num) {
   t1.out.forEach(t => console.log(`\n[bot]\n${t}`))
   console.log(`\n──── (el usuario responde "${num}") ────`)
   turn(String(num), t1.newState).out.forEach(t => console.log(`\n[bot]\n${t}`))
+}
+
+// Demo de navegación ATRÁS: baja hasta subLink (categoría → público → sub) y
+// regresa nivel por nivel con "0", "volver" y el tap de la fila ⬅️ Volver.
+async function previewNav() {
+  const { turn } = await makeBot()
+  let st = { step: 'start', flaggedForHuman: false, updatedAt: 0 }
+  const show = (label, input) => {
+    console.log(`\n──── ${label} ────`)
+    const r = turn(input, st)
+    r.out.forEach(t => console.log(`\n[bot]\n${t}`))
+    st = r.newState
+    return r
+  }
+  // Elige un id del último menú que cumpla el predicado (o el primero que empiece por prefijo).
+  const pick = (pred) => (st.lastMenu ?? []).find(pred)
+
+  console.log('\n════════ navegación ATRÁS (Trusas → Damas → públicos → menú) ════════')
+  show('saludo → menú principal', 'hola')
+  show('tap "Ver disfraces"', { replyId: 'main:ver' })
+  const pubId = pick(id => id === 'pub:damas') ?? pick(id => id.startsWith('pub:'))
+  show(`tap público (${pubId})`, { replyId: pubId })
+  const subId = pick(id => id.endsWith(':trusas')) ?? pick(id => id.startsWith('sub:'))
+  show(`tap subcategoría (${subId})`, { replyId: subId })
+  show('escribe "0"  → vuelve a subcategorías (Damas)', '0')
+  show('escribe "volver" → vuelve a públicos', 'volver')
+  show('tap ⬅️ Volver (id back) → vuelve al menú principal', { replyId: 'back' })
+
+  console.log('\n════════ "menú" REINICIA la pila desde el fondo ════════')
+  show('tap "Ver disfraces"', { replyId: 'main:ver' })
+  show(`tap público (${pubId})`, { replyId: pubId })
+  show('escribe "menú" → reinicia (pila vacía, sin Volver)', 'menú')
 }
