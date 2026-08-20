@@ -23,7 +23,8 @@ export const useSiteNav = () => {
     { label: 'Sobre nosotros', to: '/sobre-nosotros' },
     { label: 'Cómo comprar', to: '/como-comprar' },
     { label: 'Envíos y entregas', to: '/envios' },
-    { label: 'Cambios', to: '/devoluciones' }, // ruta /devoluciones intacta; solo cambia el nombre visible
+    { label: 'Cambios y garantías', to: '/devoluciones' }, // ruta /devoluciones intacta; solo cambia el nombre visible
+    { label: 'Guía de tallas', to: '/tallas' },
     { label: 'Preguntas frecuentes', to: '/faq' },
     { label: 'Ventas al por mayor', to: '/mayoristas' },
     { label: 'Política de tratamiento de datos', to: '/politica-datos' },

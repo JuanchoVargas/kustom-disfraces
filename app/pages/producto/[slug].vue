@@ -112,6 +112,7 @@ const parejaPrompt = computed(() => {
 // ---------- agregar al carrito ----------
 const added = ref(false)
 const needsSize = ref(false)
+const showSizeGuide = ref(false)
 // El aviso se apaga apenas el usuario elige talla
 watch(size, (s) => { if (s !== null) needsSize.value = false })
 function addToCart() {
@@ -241,6 +242,9 @@ const perks = [
             <span v-if="needsSize" class="field__hint">Elige una talla</span>
           </div>
           <SizeSelector v-model="size" :sizes="product.sizes" :disabled="product.soldOutSizes ?? []" />
+          <button type="button" class="sizeguide" @click="showSizeGuide = true">
+            📏 Guía de tallas
+          </button>
         </div>
 
         <div class="actions">
@@ -278,6 +282,8 @@ const perks = [
     </section>
     </template>
   </div>
+
+  <SizeGuideModal v-model="showSizeGuide" />
   </div>
 </template>
 
@@ -447,6 +453,22 @@ const perks = [
 .field {
   margin-bottom: var(--space-5);
 }
+/* enlace-botón discreto bajo el selector de tallas (abre el modal de guía) */
+.sizeguide {
+  margin-top: var(--space-3);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--purple);
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+}
+.sizeguide:hover { color: var(--purple-d); text-decoration: underline; }
+.sizeguide:focus-visible { outline: 3px solid var(--turq); outline-offset: 3px; border-radius: 4px; }
 .field__label {
   display: flex;
   align-items: baseline;
