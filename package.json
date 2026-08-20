@@ -23,6 +23,7 @@
     "vue-router": "^5.1.0"
   },
   "devDependencies": {
-    "@types/nodemailer": "^8.0.1"
+    "@types/nodemailer": "^8.0.1",
+    "pdf-lib": "^1.17.1"
   }
 }
