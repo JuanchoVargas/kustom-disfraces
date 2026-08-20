@@ -59,6 +59,7 @@ const tag = computed(() => (isLink.value ? resolveComponent('NuxtLink') : 'butto
   --kbtn-bg-hover: var(--purple-d);
   --kbtn-border: transparent;
   --kbtn-radius: var(--r-md);
+  --kbtn-shadow: var(--shadow-card); /* variantes transparentes lo ponen en none */
 
   display: inline-flex;
   align-items: center;
@@ -81,11 +82,17 @@ const tag = computed(() => (isLink.value ? resolveComponent('NuxtLink') : 'butto
   user-select: none;
 }
 
+/* hover: sube ligeramente y proyecta sombra (feedback claro) */
 .kbtn:hover {
   background-color: var(--kbtn-bg-hover);
+  transform: translateY(-2px);
+  box-shadow: var(--kbtn-shadow);
 }
+/* click: se "presiona" hacia abajo, respuesta rápida */
 .kbtn:active {
   transform: translateY(1px);
+  box-shadow: var(--shadow);
+  transition-duration: 0.06s;
 }
 .kbtn:focus-visible {
   outline: none;
@@ -134,11 +141,13 @@ const tag = computed(() => (isLink.value ? resolveComponent('NuxtLink') : 'butto
   --kbtn-fg: var(--purple);
   --kbtn-border: var(--purple);
   --kbtn-bg-hover: var(--purple-soft);
+  --kbtn-shadow: none; /* fondo transparente: la sombra flotaría raro */
 }
 .kbtn--ghost {
   --kbtn-bg: transparent;
   --kbtn-fg: var(--ink);
   --kbtn-bg-hover: rgba(17, 17, 17, 0.06);
+  --kbtn-shadow: none;
 }
 /* WhatsApp: pill verde marca (.wa-pill del CSS original) */
 .kbtn--whatsapp {
@@ -185,6 +194,8 @@ const tag = computed(() => (isLink.value ? resolveComponent('NuxtLink') : 'butto
 
 @media (prefers-reduced-motion: reduce) {
   .kbtn { transition: none; }
+  .kbtn:hover,
+  .kbtn:active { transform: none; }
   .kbtn__spinner { animation-duration: 1.5s; }
 }
 </style>
