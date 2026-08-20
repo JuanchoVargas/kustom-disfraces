@@ -1,23 +1,33 @@
-// Reproduce SIN DEPLOY el menú interactivo del bot y lo envía por la Cloud API.
-// Uso:
-//   node scripts/test-wa-menu.mjs <numero_destino> [menu|lista]
-//     menu  (default) → menú de bienvenida (interactive.type=button), lo PRIMERO que envía el bot
-//     lista           → lista de públicos (interactive.type=list)
-// Lee NUXT_WHATSAPP_TOKEN y NUXT_WHATSAPP_PHONE_ID de .env. El <numero> va en
-// formato internacional sin '+'. Usa SIEMPRE el número de prueba registrado
-// 573154168607 — NUNCA 573118844547, que es la línea real del negocio. Imprime el payload exacto,
-// las violaciones de límites y la respuesta de Graph (wamid o error). No hace deploy.
+// Reproduce SIN DEPLOY el menú/búsqueda del bot. Dos modos:
 //
-// Los payloads aquí replican EXACTAMENTE los de server/utils/whatsapp.ts
-// (waButtons / waList) y whatsappBot.ts (mainMenu / publicosList).
+//   node scripts/test-wa-menu.mjs buscar "<consulta>"      (LOCAL, sin red)
+//     → previsualiza la respuesta EXACTA del bot a un texto libre, tal como
+//       saldría con el flag force-text activo (menú/ficha/lista numerados).
+//       Carga la lógica real (server/utils/*.ts) vía jiti, sin duplicarla.
+//
+//   node scripts/test-wa-menu.mjs <numero_destino> [menu|lista]   (ENVÍA por Graph)
+//     menu  (default) → menú de bienvenida (interactive.type=button)
+//     lista           → lista de públicos (interactive.type=list)
+//     Lee NUXT_WHATSAPP_TOKEN y NUXT_WHATSAPP_PHONE_ID de .env. El <numero> va en
+//     formato internacional sin '+'. Usa SIEMPRE el número de prueba registrado
+//     573154168607 — NUNCA 573118844547, que es la línea real del negocio.
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
 const GRAPH_VERSION = 'v21.0'
+
+// ---------- modo LOCAL: previsualizar la respuesta del bot a un texto ----------
+if (process.argv[2] === 'buscar') {
+  const query = process.argv[3]
+  if (!query) { console.error('Uso: node scripts/test-wa-menu.mjs buscar "<consulta>"'); process.exit(1) }
+  await previewSearch(query)
+  process.exit(0)
+}
+
 const to = process.argv[2]
 const which = (process.argv[3] ?? 'menu').toLowerCase()
 if (!to) {
-  console.error('Falta el número destino.\nUso: node scripts/test-wa-menu.mjs <numero> [menu|lista]')
+  console.error('Falta el número destino.\nUso: node scripts/test-wa-menu.mjs <numero> [menu|lista]  |  buscar "<consulta>"')
   process.exit(1)
 }
 
@@ -134,3 +144,41 @@ else {
   console.log('\n❌ Graph rechazó el envío (ver "error" arriba: code/message).')
 }
 process.exit(json?.messages?.[0]?.id ? 0 : 2)
+
+// ---------- preview local del bot (usa la lógica real vía jiti) ----------
+async function previewSearch(query) {
+  const { createJiti } = await import('jiti')
+  const root = fileURLToPath(new URL('..', import.meta.url))
+  // Shim mínimo: whatsappBot usa useRuntimeConfig() solo para siteUrl. force-text
+  // activo para ver la salida tal como llega hoy al cliente (todo texto numerado).
+  globalThis.useRuntimeConfig = () => ({
+    public: { siteUrl: 'https://www.disfraceskustom.com' },
+    whatsappForceTextMenu: true,
+  })
+  const jiti = createJiti(import.meta.url, { alias: { '~~': root, '~': root, '@@': root, '@': root } })
+  const bot = await jiti.import(fileURLToPath(new URL('../server/utils/whatsappBot.ts', import.meta.url)))
+  const wa = await jiti.import(fileURLToPath(new URL('../server/utils/whatsapp.ts', import.meta.url)))
+
+  const render = (msg) => {
+    if (msg.type === 'interactive') {
+      const fb = wa.waNumberedFallback(msg)
+      return fb ? { text: fb.message.text.body, ids: fb.ids } : { text: JSON.stringify(msg), ids: [] }
+    }
+    return { text: msg.text.body, ids: [] }
+  }
+  const turn = (text, state) => {
+    const { replies, patch } = bot.buildBotReplies({ from: 'preview', kind: 'text', text }, state)
+    let lastMenu
+    const out = replies.map((m) => { const r = render(m); if (r.ids.length) lastMenu = r.ids; return r.text })
+    return { out, newState: { ...state, ...patch, updatedAt: 0, lastMenu } }
+  }
+
+  console.log(`\n════════ consulta: "${query}" ════════`)
+  const state = { step: 'start', flaggedForHuman: false, updatedAt: 0 }
+  const t1 = turn(query, state)
+  t1.out.forEach(t => console.log(`\n[bot]\n${t}`))
+  if (t1.newState.lastMenu?.length) {
+    console.log('\n──── (el usuario responde "1") ────')
+    turn('1', t1.newState).out.forEach(t => console.log(`\n[bot]\n${t}`))
+  }
+}

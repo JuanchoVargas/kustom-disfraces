@@ -1,6 +1,8 @@
 import type { WaMessage } from './whatsapp'
+import type { FoundProduct } from './productSearch'
 import { waButtons, waList, waText } from './whatsapp'
 import { getPublico, getPublicos, publicoNombre, subNombre } from './catalogNav'
+import { formatCOP, getProductBySlug, hasSize, searchProducts } from './productSearch'
 
 /**
  * Árbol de decisión del bot de WhatsApp (Fase 1). `buildBotReplies` es una función
@@ -21,6 +23,10 @@ export interface ConvState {
   // mapear una respuesta "1"/"2"… de vuelta al id original. undefined si el último
   // menú se entregó como interactivo (el usuario responde tocando el botón/fila).
   lastMenu?: string[]
+  // Talla pedida en la última búsqueda (p. ej. "4"). Se recuerda para que, al
+  // elegir un producto de la lista, la ficha muestre ✅/⚠️ para ESA talla. Se
+  // limpia al volver a MENÚ o en una nueva búsqueda sin talla.
+  askedSize?: string
 }
 const store = new Map<string, ConvState>()
 
@@ -158,6 +164,51 @@ function handoff(): WaMessage {
   )
 }
 
+// ---------- búsqueda de productos (texto libre) ----------
+
+/** Ficha de un producto: nombre, precio, tallas, enlace y CTA de volver. */
+function productoFicha(p: FoundProduct, requestedSize: string | null): WaMessage {
+  const tallas = p.tallas.join(', ')
+  const link = `${site()}/producto/${p.slug}`
+  let sizeLine = ''
+  if (requestedSize) {
+    sizeLine = hasSize(p, requestedSize)
+      ? `✅ Talla *${requestedSize}* disponible\n`
+      : `⚠️ Talla *${requestedSize}* no disponible en este. Tallas: ${tallas}\n`
+  }
+  return waText(
+    `🎭 *${p.nombre}*\n`
+    + `💲 ${formatCOP(p.precio)}\n`
+    + `📏 Tallas: ${tallas}\n`
+    + sizeLine
+    + `🔗 ${link}\n\n`
+    + 'Escribe *MENÚ* para volver.',
+  )
+}
+
+/** 2-8 coincidencias: lista numerada para elegir (reusa lastMenu). */
+function resultadosList(matches: FoundProduct[], requestedSize: string | null): WaMessage {
+  const enc = requestedSize ? ` (talla ${requestedSize})` : ''
+  const rows = matches.map(p => ({
+    id: `prod:${p.slug}`,
+    title: p.nombre,
+    description: `${formatCOP(p.precio)} · tallas ${p.tallas.join(', ')}`,
+  }))
+  return waList(`Encontré ${matches.length} opciones${enc} 👇\nElige una:`, 'Ver opciones', rows, 'Resultados')
+}
+
+/** 0 coincidencias: mensaje amable + menú. */
+function sinResultados(query: string): WaMessage[] {
+  return [
+    waText(
+      `No encontré nada para *"${query.trim()}"* 😅\n`
+      + 'Puedo mostrarte el catálogo por categorías o pasarte con una persona.',
+      false,
+    ),
+    mainMenu(),
+  ]
+}
+
 // ---------- árbol de decisión ----------
 export interface BotResult { replies: WaMessage[], patch: Partial<ConvState> }
 
@@ -177,11 +228,11 @@ export function buildBotReplies(input: WaIncoming, state: ConvState): BotResult 
   // palabra de reinicio (p. ej. "menú") lo reactiva.
   if (state.flaggedForHuman) {
     if (!isReset) return { replies: [], patch: {} }
-    return { replies: [mainMenu(input.profileName)], patch: { flaggedForHuman: false, step: 'menu' } }
+    return { replies: [mainMenu(input.profileName)], patch: { flaggedForHuman: false, step: 'menu', askedSize: undefined } }
   }
 
-  if (id === 'main:ver') return { replies: [publicosList()], patch: { step: 'publicos' } }
-  if (id.startsWith('pub:')) return { replies: [subcategoriasList(id.slice(4))], patch: { step: `sub:${id.slice(4)}` } }
+  if (id === 'main:ver') return { replies: [publicosList()], patch: { step: 'publicos', askedSize: undefined } }
+  if (id.startsWith('pub:')) return { replies: [subcategoriasList(id.slice(4))], patch: { step: `sub:${id.slice(4)}`, askedSize: undefined } }
   if (id.startsWith('sub:')) {
     const [, pub, sub] = id.split(':')
     return { replies: [subLink(pub, sub)], patch: { step: `link:${pub}:${sub}` } }
@@ -191,10 +242,32 @@ export function buildBotReplies(input: WaIncoming, state: ConvState): BotResult 
     return { replies: [buyResend(pub, sub)], patch: { step: `buy:${pub}:${sub}` } }
   }
   if (id === 'main:human' || id === 'human') {
-    return { replies: [handoff()], patch: { flaggedForHuman: true, step: 'human' } }
+    return { replies: [handoff()], patch: { flaggedForHuman: true, step: 'human', askedSize: undefined } }
   }
-  if (id === 'main:como') return { replies: [comoComprar()], patch: { step: 'como' } }
+  if (id === 'main:como') return { replies: [comoComprar()], patch: { step: 'como', askedSize: undefined } }
+  if (id.startsWith('prod:')) {
+    // Ficha desde la lista: usa la talla recordada de la búsqueda para el ✅/⚠️.
+    const slug = id.slice(5)
+    const p = getProductBySlug(slug)
+    if (p) return { replies: [productoFicha(p, state.askedSize ?? null)], patch: { step: `prod:${slug}` } }
+  }
+
+  // Texto libre (no comando, no número de menú, no reinicio) -> búsqueda de productos.
+  // Los clientes de Marketplace escriben "del hombre araña talla 4", "goku"…
+  if (input.kind === 'text' && !isReset && !id && (input.text ?? '').trim()) {
+    const res = searchProducts(input.text ?? '')
+    if (res && res.matches.length) {
+      // Recuerda la talla pedida (o límpiala si esta búsqueda no trae talla).
+      const askedSize = res.requestedSize ?? undefined
+      if (res.matches.length === 1) {
+        return { replies: [productoFicha(res.matches[0], res.requestedSize)], patch: { step: 'ficha', askedSize } }
+      }
+      return { replies: [resultadosList(res.matches, res.requestedSize)], patch: { step: 'resultados', askedSize } }
+    }
+    if (res) return { replies: sinResultados(input.text ?? ''), patch: { step: 'sin-resultados', askedSize: undefined } }
+    // res === null: sin tokens útiles -> cae al menú de abajo.
+  }
 
   // Cualquier mensaje inicial / texto libre / tipo no soportado -> saludo + menú.
-  return { replies: [mainMenu(input.profileName)], patch: { step: 'menu' } }
+  return { replies: [mainMenu(input.profileName)], patch: { step: 'menu', askedSize: undefined } }
 }

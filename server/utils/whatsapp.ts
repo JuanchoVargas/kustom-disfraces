@@ -133,8 +133,8 @@ export function validateInteractive(message: WaMessage): string[] {
   return v
 }
 
-/** Opciones ordenadas [{id,title}] de un interactivo (button o list), o null. */
-export function interactiveOptions(message: WaMessage): Array<{ id: string, title: string }> | null {
+/** Opciones ordenadas [{id,title,description?}] de un interactivo, o null. */
+export function interactiveOptions(message: WaMessage): Array<{ id: string, title: string, description?: string }> | null {
   if (message.type !== 'interactive') return null
   const it = message.interactive as any
   if (it?.type === 'button') {
@@ -142,7 +142,7 @@ export function interactiveOptions(message: WaMessage): Array<{ id: string, titl
   }
   if (it?.type === 'list') {
     return (it?.action?.sections ?? []).flatMap((s: any) => s?.rows ?? [])
-      .map((r: any) => ({ id: r?.id, title: r?.title }))
+      .map((r: any) => ({ id: r?.id, title: r?.title, description: r?.description }))
   }
   return null
 }
@@ -157,7 +157,9 @@ export function waNumberedFallback(message: WaMessage): { message: WaMessage, id
   if (!opts || !opts.length) return null
   const it = (message as any).interactive
   const body = String(it?.body?.text ?? '').trim()
-  const lines = opts.map((o, i) => `${i + 1}. ${o.title}`)
+  // La descripción (p. ej. precio · tallas) desambigua títulos que la lista
+  // interactiva recorta a 24 chars — el canal de texto no tiene ese límite.
+  const lines = opts.map((o, i) => `${i + 1}. ${o.title}${o.description ? ` — ${o.description}` : ''}`)
   const text = `${body}\n\n${lines.join('\n')}\n\nResponde con el número de la opción.`
   return { message: waText(text, false), ids: opts.map(o => o.id) }
 }
