@@ -453,22 +453,33 @@ const perks = [
 .field {
   margin-bottom: var(--space-5);
 }
-/* enlace-botón discreto bajo el selector de tallas (abre el modal de guía) */
+/* botón amarillo enmarcado bajo el selector de tallas (abre el modal de guía) */
 .sizeguide {
-  margin-top: var(--space-3);
+  margin-top: var(--space-4);
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 0;
+  gap: 8px;
+  padding: 11px 20px;
   border: none;
-  background: none;
-  color: var(--purple);
-  font-weight: 700;
-  font-size: 13px;
+  border-radius: var(--r-pill);
+  background: var(--yellow);
+  color: var(--ink);
+  font-weight: 800;
+  font-size: 15px;
+  letter-spacing: 0.01em;
   cursor: pointer;
+  box-shadow: var(--shadow-card);
+  transition: transform var(--dur-fast, 0.15s) var(--ease-out, ease),
+              box-shadow var(--dur-fast, 0.15s) var(--ease-out, ease),
+              background var(--dur-fast, 0.15s) var(--ease-out, ease);
 }
-.sizeguide:hover { color: var(--purple-d); text-decoration: underline; }
-.sizeguide:focus-visible { outline: 3px solid var(--turq); outline-offset: 3px; border-radius: 4px; }
+.sizeguide:hover { background: #F2B733; }
+.sizeguide:active { transform: translateY(1px); }
+.sizeguide:focus-visible { outline: 3px solid var(--turq); outline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) {
+  .sizeguide { transition: none; }
+  .sizeguide:active { transform: none; }
+}
 .field__label {
   display: flex;
   align-items: baseline;
