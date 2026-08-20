@@ -14,6 +14,7 @@ interface RawProduct {
   slug: string
   precio: number
   tallas: Array<number | string>
+  grupo: string
   disponibleWeb?: boolean
 }
 
@@ -22,6 +23,8 @@ export interface FoundProduct {
   slug: string
   precio: number
   tallas: Array<number | string>
+  /** Línea del catálogo (super, economico, anime…); agrupa los resultados. */
+  grupo: string
 }
 
 export interface SearchResult {
@@ -142,7 +145,7 @@ function buildIndex(): IndexEntry[] {
     }
     const phrases = [nameNorm, ...aliasTerms.map(normalize)].filter(x => x.includes(' '))
     return {
-      p: { nombre: p.nombre, slug: p.slug, precio: p.precio, tallas: p.tallas },
+      p: { nombre: p.nombre, slug: p.slug, precio: p.precio, tallas: p.tallas, grupo: p.grupo },
       nameNorm,
       tokens: tokenSet,
       phrases,

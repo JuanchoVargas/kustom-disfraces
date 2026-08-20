@@ -11,7 +11,16 @@
 const GRAPH_VERSION = 'v21.0'
 
 export interface WaButton { id: string, title: string }
-export interface WaRow { id: string, title: string, description?: string }
+export interface WaRow {
+  id: string
+  title: string
+  description?: string
+  // Título completo para el canal de TEXTO (menú numerado): la lista interactiva
+  // recorta el título a 24 chars, pero el texto no tiene ese límite. Se conserva
+  // en el mensaje para el fallback y se ELIMINA antes de enviar a Graph.
+  fullTitle?: string
+}
+export interface WaSection { title: string, rows: WaRow[] }
 
 /** Mensaje listo para la Cloud API (sin messaging_product/to, que se añaden al enviar). */
 export type WaMessage =
@@ -43,25 +52,39 @@ export function waButtons(body: string, buttons: WaButton[]): WaMessage {
   }
 }
 
-export function waList(body: string, buttonLabel: string, rows: WaRow[], sectionTitle = 'Opciones'): WaMessage {
+/**
+ * Lista interactiva con VARIAS secciones (p. ej. resultados de búsqueda agrupados
+ * por línea). Respeta el tope de la Cloud API de 10 filas EN TOTAL (repartido entre
+ * secciones) y descarta secciones vacías. Las secciones sin fila se omiten.
+ */
+export function waListSections(body: string, buttonLabel: string, sections: WaSection[]): WaMessage {
+  let budget = 10 // filas totales permitidas por la Cloud API
+  const outSections: Array<{ title: string, rows: WaRow[] }> = []
+  for (const s of sections) {
+    if (budget <= 0) break
+    const rows = s.rows.slice(0, budget).map(r => ({
+      id: cut(r.id, 200),
+      title: cut(r.title, 24),
+      ...(r.description ? { description: cut(r.description, 72) } : {}),
+      // Solo si el título se recorta: guarda el completo para el texto numerado.
+      ...([...r.title].length > 24 ? { fullTitle: r.title } : {}),
+    }))
+    if (!rows.length) continue
+    budget -= rows.length
+    outSections.push({ title: cut(s.title, 24), rows })
+  }
   return {
     type: 'interactive',
     interactive: {
       type: 'list',
       body: { text: cut(body, 1024) },
-      action: {
-        button: cut(buttonLabel, 20),
-        sections: [{
-          title: cut(sectionTitle, 24),
-          rows: rows.slice(0, 10).map(r => ({
-            id: cut(r.id, 200),
-            title: cut(r.title, 24),
-            ...(r.description ? { description: cut(r.description, 72) } : {}),
-          })),
-        }],
-      },
+      action: { button: cut(buttonLabel, 20), sections: outSections },
     },
   }
+}
+
+export function waList(body: string, buttonLabel: string, rows: WaRow[], sectionTitle = 'Opciones'): WaMessage {
+  return waListSections(body, buttonLabel, [{ title: sectionTitle, rows }])
 }
 
 // ---------- validación de límites y fallback a texto ----------
@@ -142,7 +165,7 @@ export function interactiveOptions(message: WaMessage): Array<{ id: string, titl
   }
   if (it?.type === 'list') {
     return (it?.action?.sections ?? []).flatMap((s: any) => s?.rows ?? [])
-      .map((r: any) => ({ id: r?.id, title: r?.title, description: r?.description }))
+      .map((r: any) => ({ id: r?.id, title: r?.fullTitle ?? r?.title, description: r?.description }))
   }
   return null
 }
@@ -157,11 +180,56 @@ export function waNumberedFallback(message: WaMessage): { message: WaMessage, id
   if (!opts || !opts.length) return null
   const it = (message as any).interactive
   const body = String(it?.body?.text ?? '').trim()
-  // La descripción (p. ej. precio · tallas) desambigua títulos que la lista
-  // interactiva recorta a 24 chars — el canal de texto no tiene ese límite.
-  const lines = opts.map((o, i) => `${i + 1}. ${o.title}${o.description ? ` — ${o.description}` : ''}`)
-  const text = `${body}\n\n${lines.join('\n')}\n\nResponde con el número de la opción.`
-  return { message: waText(text, false), ids: opts.map(o => o.id) }
+  const sections: any[] = it?.type === 'list' ? (it?.action?.sections ?? []) : []
+
+  // Listas con VARIAS secciones (p. ej. resultados agrupados por línea): el título
+  // de cada sección se rinde como encabezado en negrita, con la numeración CONTINUA
+  // entre grupos. Los menús de una sola sección se rinden como antes (sin encabezado).
+  let body2: string
+  const ids: string[] = []
+  if (sections.length > 1) {
+    const chunks: string[] = []
+    let n = 0
+    for (const s of sections) {
+      const rows: any[] = s?.rows ?? []
+      if (!rows.length) continue
+      // El primer token del título es el emoji de la línea; se deja FUERA de las
+      // negritas para que quede "🦸 *Súper Acolchado*".
+      const t = String(s?.title ?? '').trim()
+      const sp = t.indexOf(' ')
+      const header = sp > 0 ? `${t.slice(0, sp)} *${t.slice(sp + 1)}*` : (t ? `*${t}*` : '')
+      const lines = rows.map((r) => {
+        n += 1
+        ids.push(r.id)
+        return `${n}. ${r.fullTitle ?? r.title}${r.description ? ` — ${r.description}` : ''}`
+      })
+      chunks.push([header, ...lines].filter(Boolean).join('\n'))
+    }
+    body2 = chunks.join('\n\n')
+  }
+  else {
+    // La descripción (p. ej. precio · tallas) desambigua títulos que la lista
+    // interactiva recorta a 24 chars — el canal de texto no tiene ese límite.
+    body2 = opts.map((o, i) => `${i + 1}. ${o.title}${o.description ? ` — ${o.description}` : ''}`).join('\n')
+    for (const o of opts) ids.push(o.id)
+  }
+  const text = `${body}\n\n${body2}\n\nResponde con el número de la opción.`
+  return { message: waText(text, false), ids }
+}
+
+/**
+ * Quita campos internos de display (fullTitle) de las filas antes de enviar a la
+ * Cloud API, que rechaza parámetros desconocidos. Solo aplica a listas.
+ */
+function sanitizeForSend(message: WaMessage): WaMessage {
+  if (message.type !== 'interactive') return message
+  const it = message.interactive as any
+  if (it?.type !== 'list' || !Array.isArray(it?.action?.sections)) return message
+  const sections = it.action.sections.map((s: any) => ({
+    ...s,
+    rows: (s?.rows ?? []).map(({ fullTitle, ...r }: any) => r),
+  }))
+  return { type: 'interactive', interactive: { ...it, action: { ...it.action, sections } } }
 }
 
 export function whatsappConfigured(): boolean {
@@ -180,7 +248,7 @@ export async function sendWhatsAppMessage(to: string, message: WaMessage): Promi
     await $fetch(`https://graph.facebook.com/${GRAPH_VERSION}/${whatsappPhoneId}/messages`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${whatsappToken}` },
-      body: { messaging_product: 'whatsapp', recipient_type: 'individual', to, ...message },
+      body: { messaging_product: 'whatsapp', recipient_type: 'individual', to, ...sanitizeForSend(message) },
     })
     return true
   }

@@ -24,6 +24,13 @@ if (process.argv[2] === 'buscar') {
   process.exit(0)
 }
 
+// ---------- modo LOCAL: menú de bienvenida + elegir una opción ----------
+// node scripts/test-wa-menu.mjs menu-preview [nº]   (default 4 = Ver catálogo)
+if (process.argv[2] === 'menu-preview') {
+  await previewMenu(process.argv[3] ?? '4')
+  process.exit(0)
+}
+
 const to = process.argv[2]
 const which = (process.argv[3] ?? 'menu').toLowerCase()
 if (!to) {
@@ -76,13 +83,17 @@ function waList(body, buttonLabel, rows, sectionTitle = 'Opciones') {
 
 // --- payloads espejo del bot ---
 function mainMenu() {
-  return waButtons(
+  // Espejo del bot: lista de 4 opciones (no botones, que topan en 3).
+  return waList(
     '¡Hola! 👋 Soy el asistente de *Kustom Disfraces* 👽\n¿Qué quieres hacer?',
+    'Ver opciones',
     [
       { id: 'main:ver', title: 'Ver disfraces' },
       { id: 'main:como', title: 'Cómo comprar' },
       { id: 'main:human', title: 'Hablar con alguien' },
+      { id: 'main:catalogo', title: 'Ver catálogo 📖' },
     ],
+    'Menú',
   )
 }
 function publicosList() {
@@ -146,11 +157,11 @@ else {
 process.exit(json?.messages?.[0]?.id ? 0 : 2)
 
 // ---------- preview local del bot (usa la lógica real vía jiti) ----------
-async function previewSearch(query) {
+// Carga el bot real y devuelve un `turn(text, state)` que rinde cada respuesta
+// TAL COMO llega hoy al cliente (force-text: interactivo → texto numerado).
+async function makeBot() {
   const { createJiti } = await import('jiti')
   const root = fileURLToPath(new URL('..', import.meta.url))
-  // Shim mínimo: whatsappBot usa useRuntimeConfig() solo para siteUrl. force-text
-  // activo para ver la salida tal como llega hoy al cliente (todo texto numerado).
   globalThis.useRuntimeConfig = () => ({
     public: { siteUrl: 'https://www.disfraceskustom.com' },
     whatsappForceTextMenu: true,
@@ -172,7 +183,11 @@ async function previewSearch(query) {
     const out = replies.map((m) => { const r = render(m); if (r.ids.length) lastMenu = r.ids; return r.text })
     return { out, newState: { ...state, ...patch, updatedAt: 0, lastMenu } }
   }
+  return { turn }
+}
 
+async function previewSearch(query) {
+  const { turn } = await makeBot()
   console.log(`\n════════ consulta: "${query}" ════════`)
   const state = { step: 'start', flaggedForHuman: false, updatedAt: 0 }
   const t1 = turn(query, state)
@@ -181,4 +196,15 @@ async function previewSearch(query) {
     console.log('\n──── (el usuario responde "1") ────')
     turn('1', t1.newState).out.forEach(t => console.log(`\n[bot]\n${t}`))
   }
+}
+
+// Menú de bienvenida (un saludo lo dispara) + el usuario elige la opción `num`.
+async function previewMenu(num) {
+  const { turn } = await makeBot()
+  console.log(`\n════════ menú de bienvenida → opción ${num} ════════`)
+  const state = { step: 'start', flaggedForHuman: false, updatedAt: 0 }
+  const t1 = turn('hola', state)
+  t1.out.forEach(t => console.log(`\n[bot]\n${t}`))
+  console.log(`\n──── (el usuario responde "${num}") ────`)
+  turn(String(num), t1.newState).out.forEach(t => console.log(`\n[bot]\n${t}`))
 }

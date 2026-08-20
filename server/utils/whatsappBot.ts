@@ -1,6 +1,6 @@
 import type { WaMessage } from './whatsapp'
 import type { FoundProduct } from './productSearch'
-import { waButtons, waList, waText } from './whatsapp'
+import { waButtons, waList, waListSections, waText } from './whatsapp'
 import { getPublico, getPublicos, publicoNombre, subNombre } from './catalogNav'
 import { formatCOP, getProductBySlug, hasSize, searchProducts } from './productSearch'
 
@@ -89,13 +89,26 @@ const RESET_WORDS = ['menu', 'menú', 'inicio', 'hola', 'buenas', 'empezar', 'st
 
 function mainMenu(name?: string): WaMessage {
   const saludo = name ? `¡Hola, ${name}! 👋` : '¡Hola! 👋'
-  return waButtons(
+  // Lista (no botones): 4 opciones no caben en un mensaje de botones (máx 3).
+  return waList(
     `${saludo} Soy el asistente de *Kustom Disfraces* 👽\n¿Qué quieres hacer?`,
+    'Ver opciones',
     [
       { id: 'main:ver', title: 'Ver disfraces' },
       { id: 'main:como', title: 'Cómo comprar' },
       { id: 'main:human', title: 'Hablar con alguien' },
+      { id: 'main:catalogo', title: 'Ver catálogo 📖' },
     ],
+    'Menú',
+  )
+}
+
+/** Enlace al catálogo PDF completo (opción "Ver catálogo" del menú). */
+function catalogoLink(): WaMessage {
+  return waText(
+    'Aquí tienes nuestro catálogo completo 👇\n'
+    + `${site()}/catalogo-kustom.pdf\n`
+    + 'Cuando veas uno que te guste, escríbeme el nombre y te paso precio y tallas 😉',
   )
 }
 
@@ -181,20 +194,59 @@ function productoFicha(p: FoundProduct, requestedSize: string | null): WaMessage
     + `💲 ${formatCOP(p.precio)}\n`
     + `📏 Tallas: ${tallas}\n`
     + sizeLine
+    + `📏 Guía de tallas: ${site()}/tallas\n`
     + `🔗 ${link}\n\n`
     + 'Escribe *MENÚ* para volver.',
   )
 }
 
-/** 2-8 coincidencias: lista numerada para elegir (reusa lastMenu). */
+/**
+ * Presentación por LÍNEA (grupo del catálogo) para agrupar los resultados. `order`
+ * fija el orden de los grupos en la lista; varios grupos del catálogo se muestran
+ * bajo una misma etiqueta (trusa-adulto/infantil → Trusas; peluche-* → Peluches).
+ */
+const LINEA_INFO: Record<string, { label: string, emoji: string, order: number }> = {
+  'super': { label: 'Súper Acolchado', emoji: '🦸', order: 1 },
+  'super-adulto': { label: 'Súper Acolchado', emoji: '🦸', order: 1 },
+  'semi': { label: 'Semi Acolchado', emoji: '🦸', order: 2 },
+  'economico': { label: 'Línea Eco', emoji: '🌱', order: 3 },
+  'anime': { label: 'Anime', emoji: '🎌', order: 4 },
+  'ninja': { label: 'Ninjas', emoji: '🥷', order: 5 },
+  'trusa-adulto': { label: 'Trusas', emoji: '🩱', order: 6 },
+  'trusa-infantil': { label: 'Trusas', emoji: '🩱', order: 6 },
+  'vestidos': { label: 'Vestidos', emoji: '👗', order: 7 },
+  'peluche-plus': { label: 'Peluches', emoji: '🧸', order: 8 },
+  'peluche-linea': { label: 'Peluches', emoji: '🧸', order: 8 },
+  'personajes': { label: 'Personajes', emoji: '🎭', order: 9 },
+  'chaqueta': { label: 'Chaquetas', emoji: '🧥', order: 10 },
+}
+const LINEA_FALLBACK = { label: 'Otros', emoji: '🎭', order: 99 }
+
+/**
+ * 2-8 coincidencias: lista AGRUPADA por línea (con encabezado + emoji por grupo).
+ * La numeración es CONTINUA entre grupos: la lista se entrega como interactivo de
+ * varias secciones y, al degradar a texto (waNumberedFallback), cada sección se
+ * rinde como encabezado y las filas se numeran de corrido → lastMenu sigue igual.
+ */
 function resultadosList(matches: FoundProduct[], requestedSize: string | null): WaMessage {
   const enc = requestedSize ? ` (talla ${requestedSize})` : ''
-  const rows = matches.map(p => ({
-    id: `prod:${p.slug}`,
-    title: p.nombre,
-    description: `${formatCOP(p.precio)} · tallas ${p.tallas.join(', ')}`,
-  }))
-  return waList(`Encontré ${matches.length} opciones${enc} 👇\nElige una:`, 'Ver opciones', rows, 'Resultados')
+  // Agrupa por línea respetando el orden de relevancia dentro de cada grupo y el
+  // orden de LINEA_INFO entre grupos. Map conserva el orden de primera aparición.
+  const groups = new Map<string, { info: { label: string, emoji: string, order: number }, rows: Array<{ id: string, title: string, description: string }> }>()
+  for (const p of matches) {
+    const info = LINEA_INFO[p.grupo] ?? LINEA_FALLBACK
+    let g = groups.get(info.label)
+    if (!g) { g = { info, rows: [] }; groups.set(info.label, g) }
+    g.rows.push({
+      id: `prod:${p.slug}`,
+      title: p.nombre,
+      description: `${formatCOP(p.precio)} · tallas ${p.tallas.join(', ')}`,
+    })
+  }
+  const sections = [...groups.values()]
+    .sort((a, b) => a.info.order - b.info.order)
+    .map(g => ({ title: `${g.info.emoji} ${g.info.label}`, rows: g.rows }))
+  return waListSections(`Encontré ${matches.length} opciones${enc} 👇`, 'Ver opciones', sections)
 }
 
 /** 0 coincidencias: mensaje amable + menú. */
@@ -245,6 +297,7 @@ export function buildBotReplies(input: WaIncoming, state: ConvState): BotResult 
     return { replies: [handoff()], patch: { flaggedForHuman: true, step: 'human', askedSize: undefined } }
   }
   if (id === 'main:como') return { replies: [comoComprar()], patch: { step: 'como', askedSize: undefined } }
+  if (id === 'main:catalogo') return { replies: [catalogoLink()], patch: { step: 'catalogo', askedSize: undefined } }
   if (id.startsWith('prod:')) {
     // Ficha desde la lista: usa la talla recordada de la búsqueda para el ✅/⚠️.
     const slug = id.slice(5)
