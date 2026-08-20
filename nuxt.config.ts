@@ -96,6 +96,10 @@ export default defineNuxtConfig({
     // interactivo). Mientras cazamos por qué Meta acepta y descarta el interactivo.
     // Override en runtime (Vercel) sin redeploy de código.
     whatsappForceTextMenu: process.env.NUXT_WHATSAPP_FORCE_TEXT_MENU === 'true', // -> NUXT_WHATSAPP_FORCE_TEXT_MENU ('true' para forzar texto)
+    // Messenger + Instagram (misma app de Meta "kustombot"). Reutilizan el cerebro
+    // del bot de WhatsApp vía adaptadores de canal (server/utils/messenger.ts).
+    messengerVerifyToken: process.env.NUXT_MESSENGER_VERIFY_TOKEN || '', // -> NUXT_MESSENGER_VERIFY_TOKEN (verificación del webhook GET)
+    messengerPageToken: process.env.NUXT_MESSENGER_PAGE_TOKEN || '',     // -> NUXT_MESSENGER_PAGE_TOKEN (Page Access Token para enviar)
     // Mercado Pago (Fase 1: PRUEBA/sandbox). El Access Token es SECRETO y vive
     // SOLO en servidor (crea la preferencia de pago). Sin él, /api/checkout/mercadopago
     // responde 503 "not_configured" y el sitio sigue funcionando (queda WhatsApp).
