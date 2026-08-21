@@ -32,10 +32,10 @@ export interface ConvState {
   // "volver"/"atrás" hace pop de UN nivel; "menú" la vacía (reinicia). Tokens:
   // 'menu' (principal), 'publicos', 'sub:<pub>'. Ver screenFromToken().
   stack?: string[]
-  // Slots de intención (SOLO canal Messenger/IG — el flujo WhatsApp no los usa ni
-  // los llena). El bot de Messenger (server/utils/messengerBot.ts) recuerda aquí lo
-  // último que dijo el cliente para combinar mensajes cortos ("Super man" → "talla
-  // 10"). Expiran a los 30 min (updatedAt). El cerebro compartido los ignora.
+  // Slots de intención (OMNICANAL). La capa de intención (server/utils/botReplies.ts,
+  // usada por ambos webhooks) recuerda aquí lo último que dijo el cliente para
+  // combinar mensajes cortos ("Super man" → "talla 10"). Expiran a los 30 min
+  // (updatedAt). Este cerebro base (buildBotReplies) los ignora por completo.
   slots?: { producto?: string, talla?: string, publico?: string, updatedAt?: number }
 }
 const store = new Map<string, ConvState>()
@@ -98,30 +98,30 @@ const site = () => (useRuntimeConfig().public.siteUrl || 'https://www.disfracesk
 // "volver" ya NO reinicia: ahora hace pop de un nivel (ver BACK_WORDS). "menú"/
 // "inicio"/"hola"… siguen reiniciando todo.
 const RESET_WORDS = ['menu', 'menú', 'inicio', 'hola', 'buenas', 'empezar', 'start']
-// Navegación atrás: fila/botón id 'back' + estas palabras + el número "0".
+// Navegación: filas/botones id 'back' (atrás) y 'main:menu' (inicio). Van en todo
+// menú salvo el principal. "0"/"volver"/"atrás" también disparan el back por texto.
 const BACK_ROW = { id: 'back', title: '⬅️ Volver' }
+const HOME_ROW = { id: 'main:menu', title: '🏠 Menú' }
 const BACK_WORDS = new Set(['volver', 'atras', 'atrás', 'regresar'])
 
 interface MenuOpt { id: string, title: string, description?: string }
 
 /**
  * Construye un menú interactivo eligiendo el formato por ergonomía:
- *  - si (opciones + Volver) ≤ 3 → BOTONES de respuesta (1 toque, sin "Enviar").
- *  - si no → LISTA (máx 10 filas de la Cloud API; se reserva la última para Volver,
- *    es decir 9 opciones + Volver).
- * `back` (por defecto true) agrega "⬅️ Volver"; se pone en false solo en el menú
- * principal. En BOTONES se pierden las descripciones (la Cloud API no las admite),
- * por eso los menús con textos "N disfraces" caen a lista cuando hay ≥3 opciones.
+ *  - si (opciones + Volver + Menú) ≤ 3 → BOTONES de respuesta (1 toque, sin "Enviar").
+ *  - si no → LISTA (máx 10 filas de la Cloud API; se reservan 2 para Volver + Menú).
+ * `back` (por defecto true) agrega "⬅️ Volver" y "🏠 Menú"; se pone en false solo en
+ * el menú principal. En BOTONES se pierden las descripciones (la Cloud API no las
+ * admite), por eso los menús con textos "N disfraces" caen a lista con ≥2 opciones.
  */
 function interactiveMenu(body: string, options: MenuOpt[], opts: { back?: boolean, listButton?: string, section?: string } = {}): WaMessage {
-  const back = opts.back !== false
-  const total = options.length + (back ? 1 : 0)
+  const nav = opts.back !== false
+  const extras = nav ? [BACK_ROW, HOME_ROW] : []
+  const total = options.length + extras.length
   if (total <= 3) {
-    const buttons = options.map(o => ({ id: o.id, title: o.title }))
-    if (back) buttons.push(BACK_ROW)
-    return waButtons(body, buttons)
+    return waButtons(body, [...options.map(o => ({ id: o.id, title: o.title })), ...extras])
   }
-  const rows = back ? [...options.slice(0, 9), BACK_ROW] : options.slice(0, 10)
+  const rows = nav ? [...options.slice(0, 8), ...extras] : options.slice(0, 10)
   return waList(body, opts.listButton ?? 'Ver opciones', rows, opts.section ?? 'Opciones')
 }
 
@@ -231,7 +231,6 @@ function productoFicha(p: FoundProduct, requestedSize: string | null): WaMessage
     + `💲 ${formatCOP(p.precio)}\n`
     + `📏 Tallas: ${tallas}\n`
     + sizeLine
-    + `📏 Guía de tallas: ${site()}/tallas\n`
     + `🔗 ${link}\n\n`
     + 'Escribe *MENÚ* para volver.',
   )
@@ -283,9 +282,9 @@ function resultadosList(matches: FoundProduct[], requestedSize: string | null): 
   const sections = [...groups.values()]
     .sort((a, b) => a.info.order - b.info.order)
     .map(g => ({ title: `${g.info.emoji} ${g.info.label}`, rows: g.rows }))
-  // Sección final solo con "Volver" (id 'back'): en texto se rinde como "0. ⬅️
-  // Volver"; su fila no entra en la numeración de resultados.
-  sections.push({ title: 'Navegación', rows: [BACK_ROW] })
+  // Sección final de navegación: "⬅️ Volver" (id 'back', se rinde como "0. ⬅️
+  // Volver") y "🏠 Menú".
+  sections.push({ title: 'Navegación', rows: [BACK_ROW, HOME_ROW] })
   return waListSections(`Encontré ${matches.length} opciones${enc} 👇`, 'Ver opciones', sections)
 }
 
@@ -358,6 +357,7 @@ export function buildBotReplies(input: WaIncoming, state: ConvState): BotResult 
   if (id === 'main:human' || id === 'human') {
     return { replies: [handoff()], patch: { flaggedForHuman: true, step: 'human', stack: [], askedSize: undefined } }
   }
+  if (id === 'main:menu') return { replies: [mainMenu(input.profileName)], patch: { step: 'menu', stack: [], askedSize: undefined } }
   if (id === 'main:como') return { replies: [comoComprar()], patch: { step: 'como', stack: [], askedSize: undefined } }
   if (id === 'main:catalogo') return { replies: [catalogoLink()], patch: { step: 'catalogo', stack: [], askedSize: undefined } }
   if (id.startsWith('prod:')) {

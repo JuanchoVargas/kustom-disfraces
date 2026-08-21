@@ -6,10 +6,11 @@ import { publicoNombre } from './catalogNav'
 import { normalize, searchProducts, searchVocabulary } from './productSearch'
 
 /**
- * Cerebro de canal para Messenger/Instagram. NO reemplaza al de WhatsApp: lo
- * REUSA (buildBotReplies para menús, navegación, fichas y resultados) y le añade,
- * SOLO para este canal, memoria de intención por "slots" + tolerancia a lenguaje
- * natural (saludos, typos, palabras de precio). El flujo WhatsApp queda intacto.
+ * Capa de intención OMNICANAL (WhatsApp + Messenger/Instagram). Envuelve al cerebro
+ * base (buildBotReplies: menús, navegación, fichas, resultados) y le añade memoria
+ * por "slots" + tolerancia a lenguaje natural (saludos, typos, palabras de precio)
+ * + tips de búsqueda directa. Ambos webhooks entran por buildReplies(); lo específico
+ * de cada canal (quick replies vs chunking/texto) vive en su adaptador de salida.
  */
 
 export interface BotResult { replies: WaMessage[], patch: Partial<ConvState> }
@@ -156,7 +157,10 @@ function promptPersonaje(publico: string, input: WaIncoming, state: ConvState, s
 /** Solo talla (sin producto vivo): la guarda y pide el personaje. */
 function askPersonaje(state: ConvState, slots: NonNullable<ConvState['slots']>, patch: { talla?: string }): BotResult {
   return {
-    replies: [waButtons(`¡Anoté tu talla *${patch.talla}*! 👌 ¿Qué personaje o disfraz buscas? 😊`, [{ id: 'main:ver', title: 'Ver categorías' }])],
+    replies: [waButtons(`¡Anoté tu talla *${patch.talla}*! 👌 ¿Qué personaje o disfraz buscas? 😊`, [
+      { id: 'main:ver', title: 'Ver categorías' },
+      { id: 'main:menu', title: '🏠 Menú' },
+    ])],
     patch: { step: 'ask-personaje', stack: [], slots: mergeSlots(slots, patch) },
   }
 }
@@ -166,7 +170,7 @@ function sinResultados(state: ConvState, slots: NonNullable<ConvState['slots']>)
   return {
     replies: [waButtons(
       `No tenemos ese disfraz por ahora 😔. Mira el catálogo completo aquí 👇\n${site()}/catalogo-kustom.pdf`,
-      [{ id: 'main:catalogo', title: 'Ver catálogo' }, { id: 'main:human', title: 'Hablar con alguien' }],
+      [{ id: 'main:catalogo', title: 'Ver catálogo' }, { id: 'main:human', title: 'Hablar con alguien' }, { id: 'main:menu', title: '🏠 Menú' }],
     )],
     patch: { step: 'sin-resultados', stack: [], slots: mergeSlots(slots, {}) },
   }
@@ -228,9 +232,9 @@ function handleText(input: WaIncoming, state: ConvState): BotResult {
   return welcome(input, state)
 }
 
-// Invitaciones a la búsqueda directa (SOLO Messenger/IG). Se anexan al cuerpo del
-// primer mensaje según el `step`, sin tocar los builders compartidos (WhatsApp no
-// los ve). Un 💡 corto, sin recargar.
+// Invitaciones a la búsqueda directa (OMNICANAL). Se anexan al cuerpo del primer
+// mensaje según el `step`, sin tocar los builders compartidos (se agregan aquí,
+// después). Un 💡 corto, sin recargar.
 const TIP_MENU = '💡 O escríbeme lo que buscas y te lo encuentro. Ej: *spiderman talla 6*'
 const TIP_PUBLICOS = '💡 Si ya sabes cuál quieres, solo escríbelo.'
 const TIP_SUBLINK = '💡 ¿Buscas algo específico? Escríbeme el nombre y te lo busco.'
@@ -249,12 +253,12 @@ function withTip(res: BotResult): BotResult {
 }
 
 /**
- * Punto de entrada del canal Messenger/IG. Taps (quick_reply/postback) van al
- * cerebro tal cual (ids idénticos); "🏠 Menú" (main:menu) limpia slots; el texto
- * pasa por la capa de slots/lenguaje natural. Al final se anexan las invitaciones
- * a búsqueda directa (menú de bienvenida, públicos, subLink).
+ * Punto de entrada OMNICANAL. Taps (quick_reply/postback/botón) van al cerebro tal
+ * cual (ids idénticos); "🏠 Menú" (main:menu) limpia slots; el texto pasa por la capa
+ * de slots/lenguaje natural. Al final se anexan las invitaciones a búsqueda directa
+ * (menú de bienvenida, públicos, subLink).
  */
-export function buildMessengerReplies(input: WaIncoming, state: ConvState): BotResult {
+export function buildReplies(input: WaIncoming, state: ConvState): BotResult {
   return withTip(_route(input, state))
 }
 

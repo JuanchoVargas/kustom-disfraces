@@ -18,7 +18,10 @@ export default defineEventHandler(async (event) => {
   if (!incoming) return { received: true, ignored: true } // statuses u otros eventos
 
   const state = getConversation(incoming.from)
-  const { replies, patch } = buildBotReplies(incoming, state)
+  // Capa de intención omnicanal (slots, saludos, typos, sin-resultados, tips) sobre
+  // el cerebro base. El formato de salida (chunking de botones / fallback numerado)
+  // no cambia: se aplica igual sobre los mensajes resultantes, más abajo.
+  const { replies, patch } = buildReplies(incoming, state)
 
   // Enviar cada respuesta del árbol (en orden). Si WhatsApp no está configurado,
   // sendWhatsAppMessage lo registra y no rompe (útil en local sin credenciales).

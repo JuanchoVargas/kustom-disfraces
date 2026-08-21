@@ -1,27 +1,31 @@
-// Previsualiza SIN RED el bot de Messenger/IG (cerebro de canal + adaptador de
-// salida), con memoria de slots hilada entre turnos, como lo haría el webhook.
-//   node scripts/test-msg-menu.mjs            (conversación real de los pantallazos + casos sueltos)
+// Previsualiza SIN RED el bot de Messenger/IG (capa de intención omnicanal +
+// adaptador de salida), con memoria de slots hilada entre turnos, como lo haría
+// el webhook.
+//   node scripts/test-msg-menu.mjs            (secuencia Grisel + saludos + typos + casos sueltos)
 //   node scripts/test-msg-menu.mjs "<texto>"  (un texto libre puntual, estado nuevo)
 //
-// Carga la lógica real (whatsappBot + messengerBot + messenger) vía jiti, sin red.
+// Carga la lógica real (botReplies + messenger) vía jiti, sin red.
 import { fileURLToPath } from 'node:url'
 
 const { createJiti } = await import('jiti')
 const root = fileURLToPath(new URL('..', import.meta.url))
 globalThis.useRuntimeConfig = () => ({ public: { siteUrl: 'https://www.disfraceskustom.com' }, messengerPageToken: '' })
 const jiti = createJiti(import.meta.url, { alias: { '~~': root, '~': root, '@@': root, '@': root } })
-const mbot = await jiti.import(fileURLToPath(new URL('../server/utils/messengerBot.ts', import.meta.url)))
+// botReplies = capa de intención omnicanal (slots, saludos, typos, sin-resultados,
+// tips) envolviendo al cerebro base (whatsappBot.buildBotReplies). Mismo módulo que
+// usa el webhook de WhatsApp.
+const bot = await jiti.import(fileURLToPath(new URL('../server/utils/botReplies.ts', import.meta.url)))
 const msgr = await jiti.import(fileURLToPath(new URL('../server/utils/messenger.ts', import.meta.url)))
 
 const fresh = () => ({ step: 'start', flaggedForHuman: false, updatedAt: 0 })
 
-// Un turno: réplica exacta de lo que hace messenger.post (cerebro de canal →
+// Un turno: réplica exacta de lo que hace messenger.post (capa de intención →
 // adaptador de salida → guarda patch + lastMenu). Devuelve los mensajes de Messenger.
 function turn(state, userInput) {
   const input = typeof userInput === 'string'
     ? { from: 'u', kind: 'text', text: userInput }
     : { from: 'u', kind: 'reply', replyId: userInput.replyId }
-  const { replies, patch } = mbot.buildMessengerReplies(input, state)
+  const { replies, patch } = bot.buildReplies(input, state)
   const { messages, lastMenu } = msgr.toMessengerReplies(replies)
   return { messages, newState: { ...state, ...patch, updatedAt: 0, lastMenu } }
 }
@@ -58,8 +62,8 @@ if (process.argv[2]) {
   process.exit(0)
 }
 
-// Secuencia REAL de los pantallazos (memoria de slots entre turnos).
-convo('SECUENCIA REAL (slots vivos entre turnos)', [
+// Secuencia REAL de los pantallazos (Grisel), con memoria de slots entre turnos.
+convo('SECUENCIA GRISEL (slots vivos entre turnos)', [
   'Hola buenas tardes',
   'Q precio tiene los trajes de niños',
   'Super man',
@@ -68,6 +72,9 @@ convo('SECUENCIA REAL (slots vivos entre turnos)', [
 ])
 
 // Casos sueltos (cada uno con estado nuevo).
-convo('SALUDO SUELTO', ['buenas noches'])
+convo('SALUDOS', ['buenas noches'])
+convo('SALUDOS', ['buen dia'])
+convo('TYPO — hombre arana', ['hombre arana'])
+convo('MULTI-MATCH — batman', ['batman'])
 convo('BÚSQUEDA CON TALLA', ['tienes el de astronauta talla 10'])
 convo('SIN RESULTADOS', ['diosa griega'])

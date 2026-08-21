@@ -210,6 +210,8 @@ export function waNumberedFallback(message: WaMessage): { message: WaMessage, id
   const sections: any[] = it?.type === 'list' ? (it?.action?.sections ?? []) : []
   // La opción "atrás" (id 'back') se rinde aparte como "0. ⬅️ Volver" y NO entra en
   // la numeración 1..N (así "1" sigue mapeando a la primera opción real en lastMenu).
+  // "🏠 Menú" (main:menu) NO se trata distinto: fluye como una opción numerada más
+  // (formato del fallback sin tocar), y también se acepta "menú" escrito.
   const hasBack = opts.some(o => o.id === 'back')
 
   // Listas con VARIAS secciones (p. ej. resultados agrupados por línea): el título

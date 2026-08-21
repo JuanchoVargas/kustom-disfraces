@@ -37,6 +37,12 @@ if (process.argv[2] === 'nav-preview') {
   process.exit(0)
 }
 
+// ---------- modo LOCAL: conversación con memoria de slots (canal WhatsApp) ----------
+if (process.argv[2] === 'convo') {
+  await previewConvo()
+  process.exit(0)
+}
+
 const to = process.argv[2]
 const which = (process.argv[3] ?? 'menu').toLowerCase()
 if (!to) {
@@ -163,8 +169,9 @@ else {
 process.exit(json?.messages?.[0]?.id ? 0 : 2)
 
 // ---------- preview local del bot (usa la lógica real vía jiti) ----------
-// Carga el bot real y devuelve un `turn(text, state)` que rinde cada respuesta
-// TAL COMO llega hoy al cliente (force-text: interactivo → texto numerado).
+// Carga el bot real (capa de intención omnicanal sobre el cerebro base) y devuelve
+// un `turn(text, state)` que rinde cada respuesta TAL COMO llega hoy al cliente
+// (force-text: interactivo → texto numerado).
 async function makeBot() {
   const { createJiti } = await import('jiti')
   const root = fileURLToPath(new URL('..', import.meta.url))
@@ -173,7 +180,9 @@ async function makeBot() {
     whatsappForceTextMenu: true,
   })
   const jiti = createJiti(import.meta.url, { alias: { '~~': root, '~': root, '@@': root, '@': root } })
-  const bot = await jiti.import(fileURLToPath(new URL('../server/utils/whatsappBot.ts', import.meta.url)))
+  // botReplies = capa de intención omnicanal (slots, saludos, typos, sin-resultados,
+  // tips) envolviendo al cerebro base (whatsappBot.buildBotReplies).
+  const bot = await jiti.import(fileURLToPath(new URL('../server/utils/botReplies.ts', import.meta.url)))
   const wa = await jiti.import(fileURLToPath(new URL('../server/utils/whatsapp.ts', import.meta.url)))
 
   const render = (msg) => {
@@ -188,7 +197,7 @@ async function makeBot() {
     const incoming = typeof input === 'string'
       ? { from: 'preview', kind: 'text', text: input }
       : { from: 'preview', kind: 'reply', replyId: input.replyId }
-    const { replies, patch } = bot.buildBotReplies(incoming, state)
+    const { replies, patch } = bot.buildReplies(incoming, state)
     let lastMenu
     const out = replies.map((m) => { const r = render(m); if (r.ids.length) lastMenu = r.ids; return r.text })
     return { out, newState: { ...state, ...patch, updatedAt: 0, lastMenu } }
@@ -198,7 +207,7 @@ async function makeBot() {
     const incoming = typeof input === 'string'
       ? { from: 'preview', kind: 'text', text: input }
       : { from: 'preview', kind: 'reply', replyId: input.replyId }
-    return bot.buildBotReplies(incoming, state).replies[0]
+    return bot.buildReplies(incoming, state).replies[0]
   }
   return { turn, first, wa }
 }
@@ -252,9 +261,40 @@ async function previewNav() {
 
   console.log('\n════════ RENDER INTERACTIVO — botones de 1 toque (chunks de 3) ════════')
   renderInteractive('MENÚ PRINCIPAL (4 → 3 + 1)', first('hola'), wa)
-  renderInteractive('PÚBLICOS (5 + Volver → 3 + 3)', r('main:ver'), wa)
-  renderInteractive('CATEGORÍAS · Niñas (3 + Volver → 3 + 1)', r('pub:ninas'), wa)
-  renderInteractive('CATEGORÍAS · Damas (1 + Volver → ya son botones)', r('pub:damas'), wa)
-  renderInteractive('SUBLINK · Niñas/Trusas (ya son botones)', r('sub:ninas:trusas'), wa)
+  renderInteractive('PÚBLICOS (5 + Volver + Menú → 3 + 3 + 2)', r('main:ver'), wa)
+  renderInteractive('CATEGORÍAS · Niñas (3 + Volver + Menú → 3 + 2)', r('pub:ninas'), wa)
+  renderInteractive('CATEGORÍAS · Damas (1 + Volver + Menú)', r('pub:damas'), wa)
+  renderInteractive('SUBLINK · Niñas/Trusas (2 + Volver + Menú)', r('sub:ninas:trusas'), wa)
   renderInteractive('RESULTADOS "hombre araña" (EXCEPCIÓN: sigue lista)', first('hombre araña'), wa)
+}
+
+// Conversación con memoria de slots — canal WHATSAPP (texto numerado, force-text).
+// Misma secuencia real de los pantallazos ("Grisel") + saludos + typos + multi-match.
+async function previewConvo() {
+  const { turn } = await makeBot()
+  const fresh = () => ({ step: 'start', flaggedForHuman: false, updatedAt: 0 })
+  const convo = (title, inputs) => {
+    console.log(`\n\n════════════════ [WhatsApp] ${title} ════════════════`)
+    let state = fresh()
+    for (const inp of inputs) {
+      console.log(`\n🧑 «${inp}»`)
+      const r = turn(inp, state)
+      r.out.forEach(t => console.log(`\n[bot]\n${t}`))
+      state = r.newState
+      const s = state.slots
+      if (s) console.log(`   · slots → producto:${s.producto ?? '—'} talla:${s.talla ?? '—'} publico:${s.publico ?? '—'}`)
+    }
+  }
+
+  convo('SECUENCIA GRISEL (slots vivos entre turnos)', [
+    'Hola buenas tardes',
+    'Q precio tiene los trajes de niños',
+    'Super man',
+    'Q piecio tiene',
+    'Y hombra arañas',
+  ])
+  convo('SALUDOS', ['buenas noches'])
+  convo('SALUDOS', ['buen dia'])
+  convo('TYPO — hombre arana', ['hombre arana'])
+  convo('MULTI-MATCH — batman', ['batman'])
 }

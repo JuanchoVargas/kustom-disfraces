@@ -197,8 +197,8 @@ export function getProductBySlug(slug: string): FoundProduct | undefined {
 
 /**
  * Vocabulario de búsqueda: todos los tokens conocidos del índice (nombre + slug +
- * alias). Aditivo — NO afecta a searchProducts. Lo usa la capa de typos del bot de
- * Messenger (server/utils/messengerBot.ts) como objetivo de corrección Levenshtein.
+ * alias). Aditivo — NO afecta a searchProducts. Lo usa la capa de intención omnicanal
+ * (server/utils/botReplies.ts) como objetivo de corrección Levenshtein.
  */
 export function searchVocabulary(): Set<string> {
   const vocab = new Set<string>()

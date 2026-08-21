@@ -1,6 +1,7 @@
 /**
- * Receptor de eventos de Messenger e Instagram (Graph webhooks). Reutiliza el MISMO
- * cerebro del bot de WhatsApp (buildBotReplies) con un adaptador de canal:
+ * Receptor de eventos de Messenger e Instagram (Graph webhooks). Usa la MISMA capa
+ * de intención omnicanal (buildReplies, en server/utils/botReplies.ts) que el
+ * webhook de WhatsApp, con un adaptador de canal:
  *  - body.object === "page" (Messenger/Marketplace) o "instagram" (DMs de IG)
  *  - por cada entry.messaging[]: sender.id (PSID/IGSID) + message.text o el payload
  *    de un quick_reply / postback (los ids de menú son idénticos a los de WhatsApp)
@@ -32,8 +33,8 @@ export default defineEventHandler(async (event) => {
 
       const key = `${channel}:${senderId}`
       const state = getConversation(key)
-      // Cerebro de canal: slots + lenguaje natural, reusando buildBotReplies dentro.
-      const { replies, patch } = buildMessengerReplies(incoming, state)
+      // Capa de intención omnicanal: slots + lenguaje natural, reusando el cerebro base.
+      const { replies, patch } = buildReplies(incoming, state)
 
       // Adaptar la salida del bot a Messenger (quick replies, texto con URL, etc.).
       const { messages, lastMenu } = toMessengerReplies(replies)
