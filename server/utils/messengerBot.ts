@@ -228,12 +228,37 @@ function handleText(input: WaIncoming, state: ConvState): BotResult {
   return welcome(input, state)
 }
 
+// Invitaciones a la búsqueda directa (SOLO Messenger/IG). Se anexan al cuerpo del
+// primer mensaje según el `step`, sin tocar los builders compartidos (WhatsApp no
+// los ve). Un 💡 corto, sin recargar.
+const TIP_MENU = '💡 O escríbeme lo que buscas y te lo encuentro. Ej: *spiderman talla 6*'
+const TIP_PUBLICOS = '💡 Si ya sabes cuál quieres, solo escríbelo.'
+const TIP_SUBLINK = '💡 ¿Buscas algo específico? Escríbeme el nombre y te lo busco.'
+
+function withTip(res: BotResult): BotResult {
+  const step = res.patch?.step
+  const tip = step === 'menu' ? TIP_MENU
+    : step === 'publicos' ? TIP_PUBLICOS
+      : (typeof step === 'string' && step.startsWith('link:')) ? TIP_SUBLINK
+        : null
+  const first = res.replies[0]
+  if (!tip || first?.type !== 'interactive') return res
+  const it = first.interactive as any
+  const withBody: WaMessage = { type: 'interactive', interactive: { ...it, body: { ...it.body, text: `${String(it?.body?.text ?? '')}\n${tip}` } } }
+  return { replies: [withBody, ...res.replies.slice(1)], patch: res.patch }
+}
+
 /**
  * Punto de entrada del canal Messenger/IG. Taps (quick_reply/postback) van al
  * cerebro tal cual (ids idénticos); "🏠 Menú" (main:menu) limpia slots; el texto
- * pasa por la capa de slots/lenguaje natural.
+ * pasa por la capa de slots/lenguaje natural. Al final se anexan las invitaciones
+ * a búsqueda directa (menú de bienvenida, públicos, subLink).
  */
 export function buildMessengerReplies(input: WaIncoming, state: ConvState): BotResult {
+  return withTip(_route(input, state))
+}
+
+function _route(input: WaIncoming, state: ConvState): BotResult {
   if (input.kind === 'reply') {
     if (input.replyId === 'main:menu') return welcome(input, state)
     return buildBotReplies(input, state)
