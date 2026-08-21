@@ -32,6 +32,11 @@ export interface ConvState {
   // "volver"/"atrás" hace pop de UN nivel; "menú" la vacía (reinicia). Tokens:
   // 'menu' (principal), 'publicos', 'sub:<pub>'. Ver screenFromToken().
   stack?: string[]
+  // Slots de intención (SOLO canal Messenger/IG — el flujo WhatsApp no los usa ni
+  // los llena). El bot de Messenger (server/utils/messengerBot.ts) recuerda aquí lo
+  // último que dijo el cliente para combinar mensajes cortos ("Super man" → "talla
+  // 10"). Expiran a los 30 min (updatedAt). El cerebro compartido los ignora.
+  slots?: { producto?: string, talla?: string, publico?: string, updatedAt?: number }
 }
 const store = new Map<string, ConvState>()
 

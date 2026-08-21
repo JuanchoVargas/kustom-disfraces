@@ -195,6 +195,17 @@ export function getProductBySlug(slug: string): FoundProduct | undefined {
   return buildIndex().find(e => e.p.slug === slug)?.p
 }
 
+/**
+ * Vocabulario de búsqueda: todos los tokens conocidos del índice (nombre + slug +
+ * alias). Aditivo — NO afecta a searchProducts. Lo usa la capa de typos del bot de
+ * Messenger (server/utils/messengerBot.ts) como objetivo de corrección Levenshtein.
+ */
+export function searchVocabulary(): Set<string> {
+  const vocab = new Set<string>()
+  for (const e of buildIndex()) for (const t of e.tokens) if (t.length >= 3) vocab.add(t)
+  return vocab
+}
+
 /** Formato de precio colombiano: 130000 → "$130.000". Agrupación manual (no
  *  depende del ICU de Node, que puede faltar en algunos runtimes). */
 export function formatCOP(n: number): string {

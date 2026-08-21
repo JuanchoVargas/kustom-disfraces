@@ -1,55 +1,73 @@
-// Previsualiza SIN RED el mapeo del cerebro del bot → Messenger/Instagram.
-//   node scripts/test-msg-menu.mjs            (todos los casos)
-//   node scripts/test-msg-menu.mjs "<texto>"  (un texto libre puntual)
+// Previsualiza SIN RED el bot de Messenger/IG (cerebro de canal + adaptador de
+// salida), con memoria de slots hilada entre turnos, como lo haría el webhook.
+//   node scripts/test-msg-menu.mjs            (conversación real de los pantallazos + casos sueltos)
+//   node scripts/test-msg-menu.mjs "<texto>"  (un texto libre puntual, estado nuevo)
 //
-// Carga la lógica real (server/utils/whatsappBot.ts + messenger.ts) vía jiti, sin
-// duplicarla ni tocar la red. Muestra, por cada mensaje del bot, el payload de
-// Messenger: texto + quick replies (título → payload).
+// Carga la lógica real (whatsappBot + messengerBot + messenger) vía jiti, sin red.
 import { fileURLToPath } from 'node:url'
 
 const { createJiti } = await import('jiti')
 const root = fileURLToPath(new URL('..', import.meta.url))
-globalThis.useRuntimeConfig = () => ({
-  public: { siteUrl: 'https://www.disfraceskustom.com' },
-  // El mapeo no usa el token; solo lo haría el envío real (aquí no se envía).
-  messengerPageToken: '',
-})
+globalThis.useRuntimeConfig = () => ({ public: { siteUrl: 'https://www.disfraceskustom.com' }, messengerPageToken: '' })
 const jiti = createJiti(import.meta.url, { alias: { '~~': root, '~': root, '@@': root, '@': root } })
-const bot = await jiti.import(fileURLToPath(new URL('../server/utils/whatsappBot.ts', import.meta.url)))
+const mbot = await jiti.import(fileURLToPath(new URL('../server/utils/messengerBot.ts', import.meta.url)))
 const msgr = await jiti.import(fileURLToPath(new URL('../server/utils/messenger.ts', import.meta.url)))
 
-const st = () => ({ step: 'start', flaggedForHuman: false, updatedAt: 0 })
-const repliesFor = input => bot.buildBotReplies(
-  typeof input === 'string' ? { from: 'preview', kind: 'text', text: input } : { from: 'preview', kind: 'reply', replyId: input.replyId },
-  st(),
-).replies
+const fresh = () => ({ step: 'start', flaggedForHuman: false, updatedAt: 0 })
 
-function render(label, input) {
-  console.log(`\n════════ ${label} ════════`)
-  const replies = repliesFor(input)
+// Un turno: réplica exacta de lo que hace messenger.post (cerebro de canal →
+// adaptador de salida → guarda patch + lastMenu). Devuelve los mensajes de Messenger.
+function turn(state, userInput) {
+  const input = typeof userInput === 'string'
+    ? { from: 'u', kind: 'text', text: userInput }
+    : { from: 'u', kind: 'reply', replyId: userInput.replyId }
+  const { replies, patch } = mbot.buildMessengerReplies(input, state)
   const { messages, lastMenu } = msgr.toMessengerReplies(replies)
-  messages.forEach((m, i) => {
-    console.log(`\n[messenger · mensaje ${i + 1}/${messages.length}]`)
-    console.log(m.text.split('\n').map(l => `  ${l}`).join('\n'))
+  return { messages, newState: { ...state, ...patch, updatedAt: 0, lastMenu } }
+}
+
+function printMessages(messages) {
+  for (const m of messages) {
+    console.log('\n  [bot]')
+    console.log(m.text.split('\n').map(l => `    ${l}`).join('\n'))
     if (m.quick_replies?.length) {
-      console.log(`  quick_replies (${m.quick_replies.length}):`)
-      for (const qr of m.quick_replies) console.log(`    [ ${qr.title} ] → ${qr.payload}`)
+      console.log('    ' + m.quick_replies.map(q => `( ${q.title} )`).join('  '))
     }
-  })
-  if (lastMenu) console.log(`\n  (lastMenu para respuestas numéricas: ${lastMenu.join(', ')})`)
+  }
+}
+
+function convo(title, inputs) {
+  console.log(`\n\n════════════════ ${title} ════════════════`)
+  let state = fresh()
+  for (const inp of inputs) {
+    const label = typeof inp === 'string' ? inp : `[tap ${inp.replyId}]`
+    console.log(`\n🧑 «${label}»`)
+    const { messages, newState } = turn(state, inp)
+    printMessages(messages)
+    state = newState
+    const s = state.slots
+    if (s) console.log(`     · slots → producto:${s.producto ?? '—'} talla:${s.talla ?? '—'} publico:${s.publico ?? '—'}`)
+  }
 }
 
 // Caso puntual por argumento.
 if (process.argv[2]) {
-  render(`texto libre: "${process.argv[2]}"`, process.argv[2])
+  const { messages } = turn(fresh(), process.argv[2])
+  console.log(`🧑 «${process.argv[2]}»`)
+  printMessages(messages)
   process.exit(0)
 }
 
-// Suite por defecto.
-render('MENÚ PRINCIPAL (hola)', 'hola')
-render('PÚBLICOS (tap "Ver disfraces")', { replyId: 'main:ver' })
-render('CATEGORÍAS · Niñas (tap pub:ninas)', { replyId: 'pub:ninas' })
-render('SUBLINK · Niñas/Trusas (enlace + quick replies)', { replyId: 'sub:ninas:trusas' })
-render('FICHA (goku) — texto con URL', 'goku')
-render('BÚSQUEDA (hombre araña) — texto agrupado + quick replies', 'hombre araña')
-render('CATÁLOGO (tap main:catalogo) — texto con URL', { replyId: 'main:catalogo' })
+// Secuencia REAL de los pantallazos (memoria de slots entre turnos).
+convo('SECUENCIA REAL (slots vivos entre turnos)', [
+  'Hola buenas tardes',
+  'Q precio tiene los trajes de niños',
+  'Super man',
+  'Q piecio tiene',
+  'Y hombra arañas',
+])
+
+// Casos sueltos (cada uno con estado nuevo).
+convo('SALUDO SUELTO', ['buenas noches'])
+convo('BÚSQUEDA CON TALLA', ['tienes el de astronauta talla 10'])
+convo('SIN RESULTADOS', ['diosa griega'])

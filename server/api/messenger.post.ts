@@ -32,7 +32,8 @@ export default defineEventHandler(async (event) => {
 
       const key = `${channel}:${senderId}`
       const state = getConversation(key)
-      const { replies, patch } = buildBotReplies(incoming, state)
+      // Cerebro de canal: slots + lenguaje natural, reusando buildBotReplies dentro.
+      const { replies, patch } = buildMessengerReplies(incoming, state)
 
       // Adaptar la salida del bot a Messenger (quick replies, texto con URL, etc.).
       const { messages, lastMenu } = toMessengerReplies(replies)
