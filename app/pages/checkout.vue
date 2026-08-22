@@ -97,7 +97,7 @@ async function onSubmit() {
                 <option v-for="t in TIPOS_DOCUMENTO" :key="t" :value="t">{{ t }}</option>
               </select>
             </div>
-            <div class="field field--grow">
+            <div class="field">
               <label for="f-documento">Número de documento <span class="opt">(opcional, para factura)</span></label>
               <input id="f-documento" v-model="form.documento" type="text" inputmode="numeric">
             </div>
@@ -182,7 +182,7 @@ async function onSubmit() {
           <ul class="summary__items">
             <li v-for="(it, i) in cart.items" :key="i" class="si">
               <div class="si__img">
-                <img v-if="it.image" :src="it.image" :alt="it.name">
+                <NuxtImg v-if="it.image" :src="it.image" :alt="it.name" width="104" height="104" densities="1x 2x" fit="contain" />
               </div>
               <div class="si__info">
                 <p class="si__name">{{ it.name }}</p>
@@ -233,11 +233,11 @@ async function onSubmit() {
 .form__intro { font-size: 13.5px; color: var(--mut); }
 .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
 .field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-.field--doc { flex: 0 0 96px; }
-.field--grow { flex: 1; }
 .field label, .check { font-size: 13px; font-weight: 600; color: var(--ink); }
 .opt { font-weight: 400; color: var(--mut-2); }
 .field input, .field select, .field textarea {
+  width: 100%;
+  box-sizing: border-box;
   font-family: var(--ff-body);
   font-size: 14px;
   padding: 10px 12px;
@@ -260,8 +260,8 @@ async function onSubmit() {
 .payerr { font-size: 13px; color: var(--fucsia); text-align: center; }
 .form__note { font-size: 12px; color: var(--mut-2); text-align: center; margin-top: -4px; }
 
-/* doc + número en una fila */
-.row2:has(.field--doc) { grid-template-columns: 96px 1fr; }
+/* doc + número en una fila: 30/70 (el select es corto, el número necesita más espacio) */
+.row2:has(.field--doc) { grid-template-columns: 30% 1fr; }
 
 /* ---------- resumen ---------- */
 .summary {
@@ -278,8 +278,8 @@ async function onSubmit() {
 .summary__title { font-family: var(--ff-display); font-weight: 400; font-size: var(--text-lg); }
 .summary__items { list-style: none; display: flex; flex-direction: column; gap: var(--space-3); }
 .si { display: flex; gap: 10px; align-items: center; }
-.si__img { width: 48px; height: 48px; flex-shrink: 0; border: 1px solid var(--line); border-radius: var(--r-sm); overflow: hidden; background: #fff; }
-.si__img img { width: 100%; height: 100%; object-fit: contain; }
+.si__img { width: 104px; height: 104px; flex-shrink: 0; border: 1px solid var(--line); border-radius: var(--r-md); overflow: hidden; background: #fff; }
+.si__img img { width: 100%; height: 100%; object-fit: contain; display: block; }
 .si__info { flex: 1; min-width: 0; }
 .si__name { font-size: 13px; font-weight: 600; color: var(--ink); line-height: 1.25; }
 .si__meta { font-size: 11.5px; color: var(--mut-2); margin-top: 2px; }
@@ -300,6 +300,8 @@ async function onSubmit() {
 }
 @media (max-width: 480px) {
   .row2 { grid-template-columns: 1fr; }
-  .row2:has(.field--doc) { grid-template-columns: 96px 1fr; }
+  /* en móvil apila igual que el resto de filas: el select angosto lado a lado
+     con el número de documento es lo que rompía el formulario */
+  .row2:has(.field--doc) { grid-template-columns: 1fr; }
 }
 </style>
