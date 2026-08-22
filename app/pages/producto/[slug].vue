@@ -21,7 +21,7 @@ useHead(() => {
   const p = product.value
   if (!p) return {}
   const desc = (p.description || '').replace(/\s+/g, ' ').trim().slice(0, 160)
-    || `${p.name}: disfraz de calidad premium. Envío gratis en Bogotá.`
+    || `${p.name}: disfraz de calidad premium. Envío gratis a todo el país.`
   const images = (p.images || []).map(img => (img.startsWith('http') ? img : `${siteUrl}${img}`))
   // Datos estructurados de Producto (schema.org) para el precio en Google.
   const jsonld = {
@@ -57,9 +57,17 @@ const category = computed(() => categoryBySlug(product.value!.categorySlug))
 const size = ref<number | string | null>(null)
 
 const currentPrice = computed(() => product.value?.price ?? 0)
-const savings = computed(() => {
-  const reg = product.value?.regularPrice
-  return reg && reg > currentPrice.value ? reg - currentPrice.value : 0
+
+// Precio tachado (gancho de oferta): solo si el producto no trae ya un
+// regularPrice REAL (no se apilan dos descuentos). Controlado por flag.
+const { strikeFor, pct } = useFakeDiscount()
+const oldPrice = computed(() => product.value?.regularPrice || strikeFor(currentPrice.value))
+const savings = computed(() => (oldPrice.value && oldPrice.value > currentPrice.value ? oldPrice.value - currentPrice.value : 0))
+// Badge: con regularPrice REAL se calcula el % real; con el gancho ficticio se
+// muestra el % configurado (NUXT_PUBLIC_FAKE_DISCOUNT_PCT), p. ej. "-30%".
+const discountPct = computed(() => {
+  if (!oldPrice.value) return 0
+  return product.value?.regularPrice ? Math.round((1 - currentPrice.value / oldPrice.value) * 100) : pct.value
 })
 const currentImage = computed(() => product.value?.images?.[0])
 
@@ -143,7 +151,7 @@ const related = computed(() =>
 )
 
 const perks = [
-  { t: 'Envío gratis en Bogotá', icon: '<path d="M3 7h11v8H3z"/><path d="M14 10h4l3 3v2h-7z"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/>' },
+  { t: 'Envío gratis a todo el país', icon: '<path d="M3 7h11v8H3z"/><path d="M14 10h4l3 3v2h-7z"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/>' },
   { t: 'Pago contra entrega', icon: '<rect x="2.5" y="6" width="19" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/>' },
   { t: 'Cambios fáciles', icon: '<path d="M4 12a8 8 0 0 1 13-6l3 2M20 12a8 8 0 0 1-13 6l-3-2"/>' },
 ]
@@ -220,8 +228,8 @@ const perks = [
 
         <div class="info__price">
           <span class="info__now">{{ formatCOP(currentPrice) }}</span>
-          <s v-if="product.regularPrice" class="info__old">{{ formatCOP(product.regularPrice) }}</s>
-          <KBadge v-if="savings" variant="sale">Ahorras {{ formatCOP(savings) }}</KBadge>
+          <s v-if="oldPrice" class="info__old">{{ formatCOP(oldPrice) }}</s>
+          <KBadge v-if="savings" variant="sale">-{{ discountPct }}%</KBadge>
         </div>
 
         <!-- enlace cruzado discreto a la otra línea (Súper <-> Línea Entrada) -->

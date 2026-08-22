@@ -11,6 +11,17 @@ const fav = ref(false)
 
 const isSoldOut = computed(() => props.product.badges?.some(b => b.variant === 'soldout') ?? false)
 
+// Precio tachado (gancho de oferta): solo si el producto no trae ya un
+// regularPrice REAL (no se apilan dos descuentos). Controlado por flag.
+const { strikeFor, pct } = useFakeDiscount()
+const oldPrice = computed(() => props.product.regularPrice || strikeFor(props.product.price))
+// Badge: con regularPrice REAL se calcula el % real; con el gancho ficticio se
+// muestra el % configurado (NUXT_PUBLIC_FAKE_DISCOUNT_PCT), p. ej. "-30%".
+const discountPct = computed(() => {
+  if (!oldPrice.value) return 0
+  return props.product.regularPrice ? Math.round((1 - props.product.price / oldPrice.value) * 100) : pct.value
+})
+
 const sizeLabel = computed(() => {
   if (isSoldOut.value) return 'Agotado'
   if (!props.product.sizes?.length) return ''
@@ -23,7 +34,8 @@ const to = computed(() => `/producto/${props.product.slug}`)
 <template>
   <article class="pcard">
     <div class="pimg">
-      <div v-if="product.badges?.length" class="pbadges">
+      <div v-if="product.badges?.length || discountPct" class="pbadges">
+        <KBadge v-if="discountPct" variant="sale">-{{ discountPct }}%</KBadge>
         <KBadge v-for="(b, i) in product.badges" :key="i" :variant="b.variant">
           {{ b.label }}
         </KBadge>
@@ -48,7 +60,7 @@ const to = computed(() => `/producto/${props.product.slug}`)
         <NuxtLink :to="to" class="pnamelink">{{ product.name }}</NuxtLink>
       </h3>
       <div class="pprice">
-        <s v-if="product.regularPrice">{{ formatCOP(product.regularPrice) }}</s>{{ formatCOP(product.price) }}
+        <s v-if="oldPrice">{{ formatCOP(oldPrice) }}</s>{{ formatCOP(product.price) }}
       </div>
       <div v-if="sizeLabel" class="psize">{{ sizeLabel }}</div>
     </div>
