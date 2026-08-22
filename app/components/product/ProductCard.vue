@@ -35,7 +35,7 @@ const to = computed(() => `/producto/${props.product.slug}`)
   <article class="pcard">
     <div class="pimg">
       <div v-if="product.badges?.length || discountPct" class="pbadges">
-        <KBadge v-if="discountPct" variant="sale">-{{ discountPct }}%</KBadge>
+        <KBadge v-if="discountPct" variant="sale" size="lg">-{{ discountPct }}%</KBadge>
         <KBadge v-for="(b, i) in product.badges" :key="i" :variant="b.variant">
           {{ b.label }}
         </KBadge>
@@ -159,9 +159,9 @@ const to = computed(() => `/producto/${props.product.slug}`)
   margin-top: 1px;
 }
 .pcard .pprice s {
-  font-weight: 500;
-  font-size: 12px;
-  color: var(--mut-2);
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--mut);
   margin-right: 7px;
 }
 .pcard .psize {

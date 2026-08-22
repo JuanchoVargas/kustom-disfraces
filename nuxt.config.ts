@@ -119,10 +119,10 @@ export default defineNuxtConfig({
       // para un futuro brick embebido del SDK de MP. Es pública por diseño (no secreta).
       mpPublicKey: process.env.MP_PUBLIC_KEY || '',         // -> NUXT_PUBLIC_MP_PUBLIC_KEY (TEST-... en Fase 1)
       // Precio tachado (gancho de oferta): solo VISUAL, no toca el precio real que
-      // se cobra ni la validación server-side (pricing.ts). Apagado por defecto —
-      // se activa/desactiva sin deploy cambiando la env var en Vercel.
-      showDiscount: (process.env.NUXT_PUBLIC_SHOW_DISCOUNT || 'false') === 'true', // -> NUXT_PUBLIC_SHOW_DISCOUNT
-      fakeDiscountPct: Number(process.env.NUXT_PUBLIC_FAKE_DISCOUNT_PCT) || 30,    // -> NUXT_PUBLIC_FAKE_DISCOUNT_PCT
+      // se cobra ni la validación server-side (pricing.ts). Encendido por defecto —
+      // se apaga sin deploy con NUXT_PUBLIC_SHOW_DISCOUNT=false en Vercel.
+      showDiscount: (process.env.NUXT_PUBLIC_SHOW_DISCOUNT ?? 'true') === 'true', // -> NUXT_PUBLIC_SHOW_DISCOUNT
+      fakeDiscountPct: Number(process.env.NUXT_PUBLIC_FAKE_DISCOUNT_PCT) || 30,   // -> NUXT_PUBLIC_FAKE_DISCOUNT_PCT
     },
   },
 })

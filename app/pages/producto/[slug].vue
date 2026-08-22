@@ -229,7 +229,7 @@ const perks = [
         <div class="info__price">
           <span class="info__now">{{ formatCOP(currentPrice) }}</span>
           <s v-if="oldPrice" class="info__old">{{ formatCOP(oldPrice) }}</s>
-          <KBadge v-if="savings" variant="sale">-{{ discountPct }}%</KBadge>
+          <KBadge v-if="savings" variant="sale" size="lg">-{{ discountPct }}%</KBadge>
         </div>
 
         <!-- enlace cruzado discreto a la otra línea (Súper <-> Línea Entrada) -->
@@ -410,9 +410,9 @@ const perks = [
   color: var(--ink);
 }
 .info__old {
-  font-weight: 500;
-  font-size: var(--text-md);
-  color: var(--mut-2);
+  font-weight: 600;
+  font-size: var(--text-lg);
+  color: var(--mut);
 }
 /* enlace cruzado Súper <-> Línea Entrada (discreto, bajo el precio) */
 .info__pareja {

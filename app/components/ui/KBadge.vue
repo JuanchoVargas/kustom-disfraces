@@ -6,14 +6,17 @@
  */
 interface Props {
   variant?: 'new' | 'sale' | 'promo' | 'soldout' | 'neutral'
+  /** 'md' (default, tamaño histórico) · 'lg' — para el badge de descuento, que necesita leerse a distancia. */
+  size?: 'md' | 'lg'
 }
 withDefaults(defineProps<Props>(), {
   variant: 'new',
+  size: 'md',
 })
 </script>
 
 <template>
-  <span class="kbadge" :class="`kbadge--${variant}`">
+  <span class="kbadge" :class="[`kbadge--${variant}`, `kbadge--${size}`]">
     <slot />
   </span>
 </template>
@@ -31,6 +34,10 @@ withDefaults(defineProps<Props>(), {
   padding: 4px var(--space-2);
   border-radius: var(--r-sm);
   color: #fff;
+}
+.kbadge--lg {
+  font-size: var(--text-sm);
+  padding: 6px 10px;
 }
 
 /* ---------- VARIANTES ---------- */
