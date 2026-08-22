@@ -13,6 +13,7 @@
     <TrustBar />
     <AppFooter />
     <CartDrawer />
+    <FloatingPromo />
   </div>
 </template>
 
