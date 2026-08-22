@@ -14,15 +14,26 @@ export const DEPARTAMENTOS_CO: string[] = [
 export const TIPOS_DOCUMENTO = ['CC', 'CE', 'NIT'] as const
 export type TipoDocumento = typeof TIPOS_DOCUMENTO[number]
 
-/** Datos del comprador capturados en /checkout (factura + envío). */
+/** Valor por defecto del campo País (el negocio despacha a todo el país, hoy solo Colombia). */
+export const DEFAULT_PAIS = 'Colombia'
+
+/**
+ * Datos del comprador capturados en /checkout (envío obligatorio + factura opcional).
+ * tipoDocumento/documento/notas son OPCIONALES (factura electrónica); el resto es
+ * obligatorio para habilitar el pago (validado también en el servidor).
+ */
 export interface CheckoutBuyer {
   nombre: string
   tipoDocumento: TipoDocumento
   documento: string
   email: string
   telefono: string
-  direccion: string
-  ciudad: string
+  pais: string
   departamento: string
+  ciudad: string
+  /** Localidad / zona (p. ej. Suba, Chapinero) */
+  localidad: string
+  barrio: string
+  direccion: string
   notas?: string
 }

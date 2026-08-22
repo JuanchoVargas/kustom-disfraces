@@ -63,9 +63,11 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 422, message: 'Carrito vacío' })
   }
 
-  // ---------- datos del comprador (Fase 5): factura electrónica + envío ----------
-  // Se validan en el servidor (no solo en el form). Viajan a la orden vía la
-  // metadata de la preferencia, que el webhook recupera al crear la orden en Woo.
+  // ---------- datos del comprador (envío obligatorio + factura opcional) ----------
+  // Se validan en el servidor (no solo en el form): sin ellos no se crea la
+  // preferencia, así no se puede pagar sin datos de envío. Viajan a la orden vía
+  // la metadata de la preferencia, que el webhook recupera al crear la orden en Woo.
+  // tipo_documento/documento/notas son OPCIONALES (solo factura electrónica).
   const rawBuyer = body?.buyer ?? {}
   const s = (v: unknown, max: number) => String(v ?? '').trim().slice(0, max)
   const buyer = {
@@ -74,22 +76,26 @@ export default defineEventHandler(async (event) => {
     documento: s(rawBuyer.documento, 40),
     email: s(rawBuyer.email, 160),
     telefono: s(rawBuyer.telefono, 40),
-    direccion: s(rawBuyer.direccion, 250),
-    ciudad: s(rawBuyer.ciudad, 120),
+    pais: s(rawBuyer.pais, 60),
     departamento: s(rawBuyer.departamento, 120),
+    ciudad: s(rawBuyer.ciudad, 120),
+    localidad: s(rawBuyer.localidad, 120),
+    barrio: s(rawBuyer.barrio, 120),
+    direccion: s(rawBuyer.direccion, 250),
     notas: s(rawBuyer.notas, 500),
   }
   const missing: string[] = []
   if (!buyer.nombre) missing.push('nombre')
-  if (!buyer.tipo_documento) missing.push('tipoDocumento')
-  if (!buyer.documento) missing.push('documento')
   if (!buyer.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(buyer.email)) missing.push('email')
   if (!buyer.telefono) missing.push('telefono')
-  if (!buyer.direccion) missing.push('direccion')
-  if (!buyer.ciudad) missing.push('ciudad')
+  if (!buyer.pais) missing.push('pais')
   if (!buyer.departamento) missing.push('departamento')
+  if (!buyer.ciudad) missing.push('ciudad')
+  if (!buyer.localidad) missing.push('localidad')
+  if (!buyer.barrio) missing.push('barrio')
+  if (!buyer.direccion) missing.push('direccion')
   if (missing.length) {
-    throw createError({ statusCode: 422, message: 'Datos del comprador incompletos', data: { code: 'buyer_invalid', fields: missing } })
+    throw createError({ statusCode: 422, message: 'Datos de envío incompletos', data: { code: 'buyer_invalid', fields: missing } })
   }
 
   // Las fotos son públicas y estáticas: viven en el sitio canónico (prod), no en

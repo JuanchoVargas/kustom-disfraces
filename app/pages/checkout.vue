@@ -22,9 +22,12 @@ const form = reactive<CheckoutBuyer>({
   documento: '',
   email: '',
   telefono: '',
-  direccion: '',
-  ciudad: '',
+  pais: DEFAULT_PAIS,
   departamento: '',
+  ciudad: '',
+  localidad: '',
+  barrio: '',
+  direccion: '',
   notas: '',
 })
 const acepta = ref(false)
@@ -34,17 +37,20 @@ function clearError(field: string) {
   if (errors[field]) delete errors[field]
 }
 
+// Campos obligatorios para habilitar el pago (envío + contacto). Tipo/número de
+// documento y notas quedan OPCIONALES (solo sirven para la factura electrónica).
 function validate() {
   for (const k of Object.keys(errors)) delete errors[k]
   if (!form.nombre.trim()) errors.nombre = 'Ingresa tu nombre completo'
-  if (!form.tipoDocumento) errors.tipoDocumento = 'Selecciona el tipo'
-  if (!form.documento.trim()) errors.documento = 'Ingresa tu número de documento'
   if (!form.email.trim()) errors.email = 'Ingresa tu correo'
   else if (!EMAIL_RE.test(form.email.trim())) errors.email = 'Correo no válido'
-  if (!form.telefono.trim()) errors.telefono = 'Ingresa tu teléfono / WhatsApp'
-  if (!form.direccion.trim()) errors.direccion = 'Ingresa tu dirección'
-  if (!form.ciudad.trim()) errors.ciudad = 'Ingresa tu ciudad'
+  if (!form.telefono.trim()) errors.telefono = 'Ingresa tu celular'
+  if (!form.pais.trim()) errors.pais = 'Ingresa tu país'
   if (!form.departamento) errors.departamento = 'Selecciona tu departamento'
+  if (!form.ciudad.trim()) errors.ciudad = 'Ingresa tu ciudad'
+  if (!form.localidad.trim()) errors.localidad = 'Ingresa tu localidad / zona'
+  if (!form.barrio.trim()) errors.barrio = 'Ingresa tu barrio'
+  if (!form.direccion.trim()) errors.direccion = 'Ingresa tu dirección'
   if (!acepta.value) errors.acepta = 'Debes aceptar la política de datos'
   return Object.keys(errors).length === 0
 }
@@ -86,35 +92,31 @@ async function onSubmit() {
 
           <div class="row2">
             <div class="field field--doc">
-              <label for="f-tipoDocumento">Tipo doc. *</label>
-              <select id="f-tipoDocumento" v-model="form.tipoDocumento" :class="{ err: errors.tipoDocumento }" @change="clearError('tipoDocumento')">
+              <label for="f-tipoDocumento">Tipo doc. <span class="opt">(opcional)</span></label>
+              <select id="f-tipoDocumento" v-model="form.tipoDocumento">
                 <option v-for="t in TIPOS_DOCUMENTO" :key="t" :value="t">{{ t }}</option>
               </select>
             </div>
             <div class="field field--grow">
-              <label for="f-documento">Número de documento *</label>
-              <input id="f-documento" v-model="form.documento" type="text" inputmode="numeric" :class="{ err: errors.documento }" @input="clearError('documento')">
-              <span v-if="errors.documento" class="msg">{{ errors.documento }}</span>
+              <label for="f-documento">Número de documento <span class="opt">(opcional, para factura)</span></label>
+              <input id="f-documento" v-model="form.documento" type="text" inputmode="numeric">
             </div>
           </div>
 
           <div class="row2">
             <div class="field">
-              <label for="f-email">Correo electrónico *</label>
-              <input id="f-email" v-model="form.email" type="email" autocomplete="email" :class="{ err: errors.email }" @input="clearError('email')">
-              <span v-if="errors.email" class="msg">{{ errors.email }}</span>
+              <label for="f-pais">País *</label>
+              <input id="f-pais" v-model="form.pais" type="text" autocomplete="country-name" :class="{ err: errors.pais }" @input="clearError('pais')">
+              <span v-if="errors.pais" class="msg">{{ errors.pais }}</span>
             </div>
             <div class="field">
-              <label for="f-telefono">Teléfono / WhatsApp *</label>
-              <input id="f-telefono" v-model="form.telefono" type="tel" autocomplete="tel" :class="{ err: errors.telefono }" @input="clearError('telefono')">
-              <span v-if="errors.telefono" class="msg">{{ errors.telefono }}</span>
+              <label for="f-departamento">Departamento *</label>
+              <select id="f-departamento" v-model="form.departamento" :class="{ err: errors.departamento }" @change="clearError('departamento')">
+                <option value="" disabled>Selecciona…</option>
+                <option v-for="d in DEPARTAMENTOS_CO" :key="d" :value="d">{{ d }}</option>
+              </select>
+              <span v-if="errors.departamento" class="msg">{{ errors.departamento }}</span>
             </div>
-          </div>
-
-          <div class="field">
-            <label for="f-direccion">Dirección *</label>
-            <input id="f-direccion" v-model="form.direccion" type="text" autocomplete="street-address" placeholder="Calle 00 # 00-00, barrio, indicaciones" :class="{ err: errors.direccion }" @input="clearError('direccion')">
-            <span v-if="errors.direccion" class="msg">{{ errors.direccion }}</span>
           </div>
 
           <div class="row2">
@@ -124,12 +126,34 @@ async function onSubmit() {
               <span v-if="errors.ciudad" class="msg">{{ errors.ciudad }}</span>
             </div>
             <div class="field">
-              <label for="f-departamento">Departamento *</label>
-              <select id="f-departamento" v-model="form.departamento" :class="{ err: errors.departamento }" @change="clearError('departamento')">
-                <option value="" disabled>Selecciona…</option>
-                <option v-for="d in DEPARTAMENTOS_CO" :key="d" :value="d">{{ d }}</option>
-              </select>
-              <span v-if="errors.departamento" class="msg">{{ errors.departamento }}</span>
+              <label for="f-localidad">Localidad / Zona *</label>
+              <input id="f-localidad" v-model="form.localidad" type="text" placeholder="Ej: Suba, Chapinero" :class="{ err: errors.localidad }" @input="clearError('localidad')">
+              <span v-if="errors.localidad" class="msg">{{ errors.localidad }}</span>
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="f-barrio">Barrio *</label>
+            <input id="f-barrio" v-model="form.barrio" type="text" :class="{ err: errors.barrio }" @input="clearError('barrio')">
+            <span v-if="errors.barrio" class="msg">{{ errors.barrio }}</span>
+          </div>
+
+          <div class="field">
+            <label for="f-direccion">Dirección *</label>
+            <input id="f-direccion" v-model="form.direccion" type="text" autocomplete="street-address" placeholder="Calle 00 # 00-00, indicaciones adicionales" :class="{ err: errors.direccion }" @input="clearError('direccion')">
+            <span v-if="errors.direccion" class="msg">{{ errors.direccion }}</span>
+          </div>
+
+          <div class="row2">
+            <div class="field">
+              <label for="f-email">Correo *</label>
+              <input id="f-email" v-model="form.email" type="email" autocomplete="email" :class="{ err: errors.email }" @input="clearError('email')">
+              <span v-if="errors.email" class="msg">{{ errors.email }}</span>
+            </div>
+            <div class="field">
+              <label for="f-telefono">Celular *</label>
+              <input id="f-telefono" v-model="form.telefono" type="tel" autocomplete="tel" :class="{ err: errors.telefono }" @input="clearError('telefono')">
+              <span v-if="errors.telefono" class="msg">{{ errors.telefono }}</span>
             </div>
           </div>
 

@@ -41,9 +41,12 @@ export interface CreateOrderBuyer {
   documento?: string
   email?: string
   telefono?: string
-  direccion?: string
-  ciudad?: string
+  pais?: string
   departamento?: string
+  ciudad?: string
+  localidad?: string
+  barrio?: string
+  direccion?: string
   notas?: string
 }
 
@@ -115,18 +118,34 @@ export async function createWooOrder(input: CreateOrderInput): Promise<WooOrder>
   const lastName = restName.join(' ')
   const email = b?.email || input.payerEmail || ''
 
+  // Woo solo tiene address_1/address_2 (no campos propios para barrio/localidad);
+  // van en address_2 para que se vean en la etiqueta de envío y la factura.
+  const address2 = [
+    b?.barrio ? `Barrio ${b.barrio}` : '',
+    b?.localidad ? `Localidad/Zona ${b.localidad}` : '',
+  ].filter(Boolean).join(' — ')
+
   const billing = {
     first_name: firstName,
     last_name: lastName,
     email,
     ...(b?.telefono ? { phone: b.telefono } : {}),
     ...(b?.direccion ? { address_1: b.direccion } : {}),
+    ...(address2 ? { address_2: address2 } : {}),
     ...(b?.ciudad ? { city: b.ciudad } : {}),
     ...(b?.departamento ? { state: b.departamento } : {}),
     ...(b ? { country: 'CO' } : {}),
   }
   const shipping = b?.direccion
-    ? { first_name: firstName, last_name: lastName, address_1: b.direccion, city: b.ciudad || '', state: b.departamento || '', country: 'CO' }
+    ? {
+        first_name: firstName,
+        last_name: lastName,
+        address_1: b.direccion,
+        ...(address2 ? { address_2: address2 } : {}),
+        city: b.ciudad || '',
+        state: b.departamento || '',
+        country: 'CO',
+      }
     : undefined
 
   // Documento VISIBLE en la orden (para la factura): en la nota del cliente y en meta.
@@ -140,6 +159,9 @@ export async function createWooOrder(input: CreateOrderInput): Promise<WooOrder>
     { key: MP_PAYMENT_META, value: String(input.paymentId) },
     ...(b?.documento ? [{ key: '_billing_document_type', value: b.tipoDocumento || 'CC' }, { key: '_billing_document', value: b.documento }] : []),
     ...(b?.departamento ? [{ key: '_departamento', value: b.departamento }] : []),
+    ...(b?.localidad ? [{ key: '_localidad', value: b.localidad }] : []),
+    ...(b?.barrio ? [{ key: '_barrio', value: b.barrio }] : []),
+    ...(b?.pais ? [{ key: '_pais', value: b.pais }] : []),
   ]
 
   const body = {
