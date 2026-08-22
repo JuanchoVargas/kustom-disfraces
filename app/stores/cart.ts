@@ -6,8 +6,8 @@ import type { CartItem } from '~~/shared/types/woo'
  */
 /**
  * @deprecated NO USADO. La política de envío ya no depende de un umbral en COP:
- * el envío es gratis en Bogotá (mensaje fijo en el carrito) y fuera de Bogotá
- * se cotiza al finalizar. Se conserva solo por si vuelve a aplicar un umbral.
+ * el envío es gratis a todo el país (mensaje fijo en el carrito). Se conserva
+ * solo por si vuelve a aplicar un umbral.
  */
 export const FREE_SHIPPING_THRESHOLD = 200_000
 

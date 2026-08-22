@@ -9,7 +9,7 @@ const shownCategories = computed(() => categories.filter(c => byPublico(c.slug).
 
 useHead({
   title: 'Kustom Disfraces — Disfraces para cada historia en Bogotá',
-  meta: [{ name: 'description', content: 'Disfraces de calidad para niños, niñas, damas, caballeros y bebés en Bogotá. Superhéroes, anime, animales y más. Envío gratis en Bogotá y despacho a todo el país.' }],
+  meta: [{ name: 'description', content: 'Disfraces de calidad para niños, niñas, damas, caballeros y bebés en Bogotá. Superhéroes, anime, animales y más. Envío gratis a todo el país.' }],
 })
 </script>
 

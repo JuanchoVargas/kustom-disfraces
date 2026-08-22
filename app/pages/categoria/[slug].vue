@@ -50,7 +50,7 @@ useHead(() => ({
     {
       name: 'description',
       content: known.value
-        ? `Disfraces de ${known.value.nombre} en Bogotá: calidad premium, gran variedad de personajes y tallas. Envío gratis en Bogotá y despacho a todo el país.`
+        ? `Disfraces de ${known.value.nombre} en Bogotá: calidad premium, gran variedad de personajes y tallas. Envío gratis a todo el país.`
         : 'Disfraces de calidad en Bogotá — Kustom Disfraces.',
     },
     // Categoría sin productos ("muy pronto", p. ej. Combos): no indexar hasta

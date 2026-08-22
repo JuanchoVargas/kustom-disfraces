@@ -50,10 +50,10 @@ const waCheckout = computed(() => {
             </button>
           </header>
 
-          <!-- ---------- envío gratis en Bogotá (mensaje fijo) ---------- -->
+          <!-- ---------- envío gratis a todo el país (mensaje fijo) ---------- -->
           <div v-if="cart.items.length" class="cd__ship">
-            <p class="cd__shiptext">🎉 <strong>Envío gratis en Bogotá</strong></p>
-            <p class="cd__shipsub">Fuera de Bogotá el envío se cotiza al finalizar.</p>
+            <p class="cd__shiptext">🎉 <strong>Envío gratis a todo el país</strong></p>
+            <p class="cd__shipsub">Coordinamos la entrega con la transportadora.</p>
           </div>
 
           <!-- ---------- items ---------- -->
@@ -116,7 +116,7 @@ const waCheckout = computed(() => {
               <span>Subtotal</span>
               <strong>{{ formatCOP(cart.subtotal) }}</strong>
             </div>
-            <p class="cd__note">El envío se calcula al finalizar</p>
+            <p class="cd__note">Envío gratis incluido — sin costos adicionales</p>
             <KButton variant="primary" size="lg" block to="/checkout" @click="cart.closeDrawer()">
               Pagar con Mercado Pago
             </KButton>
@@ -191,7 +191,7 @@ const waCheckout = computed(() => {
 .cd__close:hover { background: var(--hueso); }
 .cd__close:focus-visible { outline: 2px solid var(--turq); outline-offset: 2px; }
 
-/* ---------- envío gratis en Bogotá (mensaje fijo) ---------- */
+/* ---------- envío gratis a todo el país (mensaje fijo) ---------- */
 .cd__ship {
   padding: 12px 20px;
   border-bottom: 1px solid var(--line);

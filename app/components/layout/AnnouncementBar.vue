@@ -3,7 +3,7 @@
  * AnnouncementBar — barra delgada global sobre el navbar.
  * Sin animación ni botón de cierre (por ahora).
  */
-const ANNOUNCEMENT_TEXT = 'ENVÍO GRATIS EN BOGOTÁ'
+const ANNOUNCEMENT_TEXT = 'ENVÍO GRATIS A TODO EL PAÍS'
 </script>
 
 <template>

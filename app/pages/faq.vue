@@ -28,8 +28,9 @@ useHead({
     <div class="qa">
       <p class="qa__q">¿Realizan envíos a todo el país?</p>
       <p>
-        Sí. Realizamos envíos a nivel nacional y, en algunos casos, también ofrecemos envíos
-        internacionales. Los costos y tiempos de entrega dependen del destino.
+        Sí, y el envío es <strong>gratis a todo el país</strong>. Realizamos envíos a nivel
+        nacional sin costo adicional; los tiempos de entrega dependen de la empresa
+        transportadora y del destino.
       </p>
     </div>
   </ContentPage>
