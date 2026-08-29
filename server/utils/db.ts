@@ -51,6 +51,8 @@ const MIGRATION = [
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     wamid           TEXT
   )`,
+  // Anti-spam de avisos (correo + WhatsApp al encargado): último aviso por conversación.
+  `ALTER TABLE conversations ADD COLUMN IF NOT EXISTS ultimo_aviso_at TIMESTAMPTZ`,
   `CREATE INDEX IF NOT EXISTS messages_conversation_idx ON messages (conversation_id, id)`,
   `CREATE INDEX IF NOT EXISTS conversations_actividad_idx ON conversations (ultima_actividad DESC)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS messages_wamid_idx ON messages (wamid) WHERE wamid IS NOT NULL`,

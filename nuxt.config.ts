@@ -112,6 +112,10 @@ export default defineNuxtConfig({
     // La cookie de sesión se firma con una clave derivada de ella. Sin valor, la
     // bandeja responde 503. Postgres se lee directo de POSTGRES_URL (Neon↔Vercel).
     inboxPassword: process.env.NUXT_INBOX_PASSWORD || '',    // -> NUXT_INBOX_PASSWORD
+    // Alerta por WhatsApp al encargado cuando un cliente pide atención humana
+    // (plantilla aprobada en Meta). Sin destino no se envía; el correo es el respaldo.
+    alertWhatsappTo: process.env.NUXT_ALERT_WHATSAPP_TO || '',                       // -> NUXT_ALERT_WHATSAPP_TO
+    alertTemplateName: process.env.NUXT_ALERT_TEMPLATE_NAME || 'alerta_atencion',    // -> NUXT_ALERT_TEMPLATE_NAME
     public: {
       // Origen del catálogo: 'local' (catalogo.json) | 'woo' (proxy /api/products).
       // Default LOCAL — el switch a woo se hace tras verificar paridad (README).

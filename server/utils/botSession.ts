@@ -2,10 +2,11 @@ import type { ConvState, WaIncoming } from './whatsappBot'
 import type { WaMessage } from './whatsapp'
 import type { Canal, ConversationRow } from './inbox'
 import {
-  incomingToText, loadBotState, recordMessage, saveBotState, setEstado,
+  ALERT_COOLDOWN_MIN, claimHandoffAlert, incomingToText, loadBotState, recordMessage, saveBotState, setEstado,
   upsertConversation, waMessageToText,
 } from './inbox'
 import { sendHandoffAlert } from './orderEmail'
+import { sendTemplateMessage } from './whatsapp'
 
 /**
  * Ciclo de vida de un mensaje entrante compartido por los tres canales (wa/msg/ig):
@@ -76,17 +77,55 @@ export async function closeBotSession(input: CloseBotSessionInput): Promise<void
     // Handoff pedido por el cliente: pasa a humano, se marca no leída y se avisa a ventas.
     await setEstado(conv.id, 'humano', { markUnread: true })
     console.info(`[${canal}] 🙋 conversación #${conv.id} pasa a ATENCIÓN HUMANA: ${externalId}${incoming.profileName ? ` (${incoming.profileName})` : ''}`)
-    await sendHandoffAlert({
-      canal,
-      externalId,
-      nombre: incoming.profileName || conv.nombre || undefined,
-      ultimoMensaje: incomingToText(incoming),
-      conversationId: conv.id,
-    })
+    // Anti-spam: máx. un aviso (correo + WhatsApp) cada 30 min por conversación.
+    if (!await claimHandoffAlert(conv.id)) {
+      console.info(`[${canal}] aviso de handoff #${conv.id} omitido (ya se avisó hace <${ALERT_COOLDOWN_MIN} min)`)
+      return
+    }
+    const nombre = incoming.profileName || conv.nombre || undefined
+    const ultimoMensaje = incomingToText(incoming)
+    await sendHandoffAlert({ canal, externalId, nombre, ultimoMensaje, conversationId: conv.id })
+    await notifyManagerWhatsApp(canal, externalId, nombre, ultimoMensaje)
   }
   else if (patch.flaggedForHuman === false && conv.estado === 'humano') {
     // El cliente reactivó el bot con "menú" antes de que alguien lo atendiera.
     await setEstado(conv.id, 'bot')
+  }
+}
+
+/** Parámetro de plantilla válido: sin saltos de línea ni espacios dobles, máx. N caracteres. */
+function templateParam(s: string | undefined, max: number): string {
+  const clean = String(s ?? '').replace(/\s+/g, ' ').trim()
+  const chars = [...clean]
+  return chars.length > max ? `${chars.slice(0, max - 1).join('')}…` : (clean || '—')
+}
+
+/**
+ * Alerta por WhatsApp al celular del encargado (plantilla aprobada en Meta,
+ * params: nombre, número/usuario, último mensaje). Best-effort: sin destino o
+ * con fallo (plantilla aún no aprobada) solo se registra; el correo a ventas@
+ * es el respaldo. NUNCA lanza (no puede romper el webhook).
+ */
+async function notifyManagerWhatsApp(canal: Canal, externalId: string, nombre: string | undefined, ultimoMensaje: string): Promise<void> {
+  try {
+    const c = useRuntimeConfig()
+    const to = String(c.alertWhatsappTo || '').replace(/\D/g, '')
+    if (!to) {
+      console.error('[inbox-alert] NUXT_ALERT_WHATSAPP_TO sin configurar — no se envía alerta por WhatsApp (queda el correo)')
+      return
+    }
+    const contacto = canal === 'wa' ? `+${externalId}` : `${canal === 'ig' ? 'Instagram' : 'Messenger'} ${externalId}`
+    const params = [
+      templateParam(nombre || 'Cliente sin nombre', 60),
+      templateParam(contacto, 60),
+      templateParam(ultimoMensaje, 200),
+    ]
+    const ok = await sendTemplateMessage(to, String(c.alertTemplateName || 'alerta_atencion'), params)
+    if (ok) console.info(`[inbox-alert] alerta por WhatsApp enviada a ${to}`)
+    else console.error(`[inbox-alert] alerta por WhatsApp NO enviada a ${to} (ver error de Graph arriba); el correo a ventas@ es el respaldo`)
+  }
+  catch (err) {
+    console.error('[inbox-alert] error inesperado en la alerta por WhatsApp:', String((err as Error)?.message ?? err))
   }
 }
 

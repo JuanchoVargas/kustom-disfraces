@@ -170,6 +170,25 @@ export async function setEstado(id: number, estado: Estado, opts: { markUnread?:
   )
 }
 
+export const ALERT_COOLDOWN_MIN = 30
+
+/**
+ * Anti-spam de avisos al equipo (correo + WhatsApp al encargado): reclama el
+ * turno de aviso de una conversación si el último fue hace >30 min (o nunca).
+ * Atómico en BD (UPDATE condicional) → vale entre instancias serverless.
+ * Sin BD devuelve true (mejor un aviso de más que ninguno).
+ */
+export async function claimHandoffAlert(id: number): Promise<boolean> {
+  if (!await ready()) return true
+  const rows = await sql().query(
+    `UPDATE conversations SET ultimo_aviso_at = now()
+     WHERE id = $1 AND (ultimo_aviso_at IS NULL OR ultimo_aviso_at < now() - ($2 || ' minutes')::interval)
+     RETURNING id`,
+    [id, String(ALERT_COOLDOWN_MIN)],
+  ) as any[]
+  return rows.length > 0
+}
+
 export async function markRead(id: number): Promise<void> {
   if (!await ready()) return
   await sql().query(`UPDATE conversations SET no_leidos = 0 WHERE id = $1`, [id])

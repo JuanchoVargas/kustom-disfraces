@@ -502,6 +502,12 @@ en robots). La usan desde el celular.
   con alguien / un asesor / una persona…", `isHumanRequest` en `botReplies.ts`) →
   estado=humano, no leída, y **correo a `ventasTo`** (`sendHandoffAlert` en
   `orderEmail.ts`, mismo SMTP) con nombre/número, último mensaje y link a la bandeja.
+- **Alerta al encargado por WhatsApp**: junto al correo se envía la plantilla
+  `NUXT_ALERT_TEMPLATE_NAME` (default `alerta_atencion`, params: nombre, número/
+  usuario, último mensaje truncado a 200 sin saltos) a `NUXT_ALERT_WHATSAPP_TO`
+  (`sendTemplateMessage` en `whatsapp.ts`). Sin destino o si Meta la rechaza
+  (plantilla no aprobada) solo se registra: el correo es el respaldo. Anti-spam:
+  un aviso (correo+WhatsApp) cada 30 min por conversación (`ultimo_aviso_at`).
 - **Ventana de 24 h (WhatsApp)**: Meta solo acepta texto libre si el cliente
   escribió hace <24 h (`ultimo_cliente_at`). Fuera de la ventana el campo se
   deshabilita con "Ventana de 24h cerrada: este cliente debe escribir primero" y
@@ -513,7 +519,7 @@ Endpoints (`server/api/inbox/*`, todos con `requireInbox` salvo login/me):
 `POST conversations/:id/estado {estado}`, `POST conversations/:id/read`.
 
 Variables: `NUXT_INBOX_PASSWORD` (obligatoria), `POSTGRES_URL` (la inyecta la
-integración Neon↔Vercel).
+integración Neon↔Vercel), `NUXT_ALERT_WHATSAPP_TO`, `NUXT_ALERT_TEMPLATE_NAME`.
 
 ### Variables de entorno (prefijo `NUXT_` para runtime en Vercel)
 

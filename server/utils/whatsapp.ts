@@ -295,3 +295,40 @@ export async function sendWhatsAppMessage(to: string, message: WaMessage): Promi
     return false
   }
 }
+
+/**
+ * Envía una PLANTILLA aprobada (Message Template) — es lo único que la Cloud API
+ * acepta fuera de la ventana de 24 h, p. ej. la alerta al celular del encargado
+ * cuando un cliente pide atención humana. Los parámetros se inyectan en el body
+ * en orden. NO lanza: registra el fallo y devuelve false.
+ */
+export async function sendTemplateMessage(to: string, templateName: string, params: string[], lang = 'es'): Promise<boolean> {
+  const { whatsappToken, whatsappPhoneId } = useRuntimeConfig()
+  if (!whatsappToken || !whatsappPhoneId) {
+    console.warn(`[whatsapp] sin token/phone_id — no se envía plantilla ${templateName} a ${to}`)
+    return false
+  }
+  try {
+    await $fetch(`https://graph.facebook.com/${GRAPH_VERSION}/${whatsappPhoneId}/messages`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${whatsappToken}` },
+      body: {
+        messaging_product: 'whatsapp',
+        to,
+        type: 'template',
+        template: {
+          name: templateName,
+          language: { code: lang },
+          components: [{ type: 'body', parameters: params.map(t => ({ type: 'text', text: t })) }],
+        },
+      },
+    })
+    return true
+  }
+  catch (err: any) {
+    // Detalle real de Graph en err.data (plantilla no aprobada, params de más, etc.).
+    const detail = JSON.stringify(err?.data ?? err?.response?._data ?? err?.message ?? err).replace(/Bearer\s+[^\s"']+/gi, 'Bearer ***')
+    console.error(`[whatsapp] fallo al enviar plantilla ${templateName} a ${to}:`, detail)
+    return false
+  }
+}
