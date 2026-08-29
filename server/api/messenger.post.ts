@@ -5,10 +5,11 @@
  *  - body.object === "page" (Messenger/Marketplace) o "instagram" (DMs de IG)
  *  - por cada entry.messaging[]: sender.id (PSID/IGSID) + message.text o el payload
  *    de un quick_reply / postback (los ids de menú son idénticos a los de WhatsApp)
- *  - estado por clave "canal:senderId" (mismo ConvState en memoria)
+ *  - conversación por (canal, senderId) en la bandeja; estado del bot persistido
  * SIEMPRE responde 200 rápido (Meta reintenta si no).
  */
 import type { WaIncoming } from '../utils/whatsappBot'
+import type { MessengerMessage } from '../utils/messenger'
 
 export default defineEventHandler(async (event) => {
   const body = await readBody(event).catch(() => null)
@@ -31,21 +32,20 @@ export default defineEventHandler(async (event) => {
       const incoming = parseMessengerEvent(String(senderId), ev)
       if (!incoming) continue // read/delivery u otros eventos sin texto/payload
 
-      const key = `${channel}:${senderId}`
-      const state = getConversation(key)
+      const session = await openBotSession(channel, String(senderId), incoming)
+      if (session.silenced) continue
+
       // Capa de intención omnicanal: slots + lenguaje natural, reusando el cerebro base.
-      const { replies, patch } = buildReplies(incoming, state)
+      const { replies, patch } = buildReplies(incoming, session.state)
 
       // Adaptar la salida del bot a Messenger (quick replies, texto con URL, etc.).
       const { messages, lastMenu } = toMessengerReplies(replies)
+      const sentTexts: string[] = []
       for (const msg of messages) {
-        await sendMessengerMessage(String(senderId), msg)
+        const ok = await sendMessengerMessage(String(senderId), msg)
+        if (ok || !messengerConfigured()) sentTexts.push(messengerToText(msg))
       }
-      setConversation(key, { ...patch, lastMenu })
-
-      if (patch.flaggedForHuman) {
-        console.info(`[messenger] 🙋 conversación marcada para ATENCIÓN HUMANA: ${key}`)
-      }
+      await closeBotSession({ session, canal: channel, externalId: String(senderId), incoming, sentTexts, patch: { ...patch, lastMenu } })
     }
   }
 
@@ -54,14 +54,21 @@ export default defineEventHandler(async (event) => {
 
 /** Extrae texto o payload de un evento de messaging → WaIncoming para el cerebro. */
 function parseMessengerEvent(senderId: string, ev: any): WaIncoming | null {
+  const wamid = ev?.message?.mid ? String(ev.message.mid) : undefined
   // Quick reply: trae el payload (= id de menú) además del texto visible.
-  const qrPayload = ev?.message?.quick_reply?.payload
-  if (qrPayload) return { from: senderId, kind: 'reply', replyId: String(qrPayload) }
+  const qr = ev?.message?.quick_reply?.payload
+  if (qr) return { from: senderId, kind: 'reply', replyId: String(qr), replyTitle: ev?.message?.text, wamid }
   // Postback (botones de plantilla / menú persistente / get started).
-  const pbPayload = ev?.postback?.payload
-  if (pbPayload) return { from: senderId, kind: 'reply', replyId: String(pbPayload) }
+  const pb = ev?.postback?.payload
+  if (pb) return { from: senderId, kind: 'reply', replyId: String(pb), replyTitle: ev?.postback?.title, wamid }
   // Texto libre.
   const text = ev?.message?.text
-  if (typeof text === 'string' && text.trim()) return { from: senderId, kind: 'text', text }
+  if (typeof text === 'string' && text.trim()) return { from: senderId, kind: 'text', text, wamid }
   return null
+}
+
+/** Texto plano de un mensaje de Messenger (texto + quick replies numerados) para la bandeja. */
+function messengerToText(m: MessengerMessage): string {
+  const qrs = m.quick_replies?.length ? `\n\n${m.quick_replies.map((q, i) => `${i + 1}. ${q.title}`).join('\n')}` : ''
+  return `${m.text}${qrs}`
 }

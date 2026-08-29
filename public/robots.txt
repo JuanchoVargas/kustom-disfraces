@@ -6,4 +6,6 @@ Disallow: /buscar
 Disallow: /design-system
 Disallow: /preview
 
+Disallow: /admin
+
 Sitemap: https://www.disfraceskustom.com/sitemap.xml

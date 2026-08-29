@@ -509,3 +509,87 @@ export async function sendOrderFailureAlert(data: OrderFailureAlert): Promise<{ 
     return { sent: false, reason: 'send_failed' }
   }
 }
+
+// ---------- aviso de ATENCIÓN HUMANA (bandeja) ----------
+
+export interface HandoffAlert {
+  canal: 'wa' | 'msg' | 'ig'
+  externalId: string
+  nombre?: string
+  ultimoMensaje: string
+  conversationId: number
+}
+
+const CANAL_LABEL: Record<HandoffAlert['canal'], string> = { wa: 'WhatsApp', msg: 'Messenger', ig: 'Instagram' }
+
+/**
+ * Avisa a ventas@ cuando un cliente pide "hablar con alguien" (la conversación
+ * pasa a estado=humano en la bandeja). Reusa el SMTP compartido. NO lanza.
+ */
+export async function sendHandoffAlert(data: HandoffAlert): Promise<{ sent: boolean, reason?: string }> {
+  if (!mailerConfigured()) {
+    console.warn(`[inbox-alert] SMTP sin configurar — no se avisa del handoff #${data.conversationId}`)
+    return { sent: false, reason: 'smtp_not_configured' }
+  }
+  const c = useRuntimeConfig()
+  const to = c.ventasTo || 'ventas@disfraceskustom.com'
+  const from = c.smtpFrom || c.smtpUser
+  const site = (c.public.siteUrl || 'https://www.disfraceskustom.com').replace(/\/$/, '')
+  const inboxUrl = `${site}/admin/chats?c=${data.conversationId}`
+  const canal = CANAL_LABEL[data.canal]
+  const quien = data.nombre ? `${data.nombre} (${data.externalId})` : data.externalId
+  const contacto = data.canal === 'wa' ? `+${data.externalId}` : `${canal} · ${data.externalId}`
+
+  const row = (label: string, value: string) =>
+    `<tr><td style="padding:3px 0;font-family:Arial,sans-serif;font-size:13px;color:#888;width:120px;vertical-align:top;">${label}</td><td style="padding:3px 0;font-family:Arial,sans-serif;font-size:13px;color:${C.ink};font-weight:bold;">${value}</td></tr>`
+
+  const html = `<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Cliente pide atención — Kustom Disfraces</title></head>
+<body style="margin:0;padding:0;background:${C.crema};-webkit-text-size-adjust:100%;">
+  <div style="max-width:600px;margin:0 auto;background:${C.white};">
+    <div style="background:${C.purple};color:#fff;padding:16px 20px;border-radius:12px 12px 0 0;font-family:Arial,sans-serif;">
+      <div style="font-size:18px;font-weight:800;">🙋 Un cliente pide hablar con alguien</div>
+      <div style="font-size:13px;opacity:.92;margin-top:4px;">El bot se pausó. Respóndele desde la bandeja de chats.</div>
+    </div>
+    <div style="border:1px solid ${C.line};border-top:0;border-radius:0 0 12px 12px;padding:18px 20px;">
+      <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+        ${row('Canal', esc(canal))}
+        ${row('Cliente', esc(data.nombre || '—'))}
+        ${row('Contacto', esc(contacto))}
+        ${row('Último mensaje', `<span style="font-weight:normal;white-space:pre-wrap;">${esc(data.ultimoMensaje || '—')}</span>`)}
+      </table>
+      <div style="margin-top:18px;">
+        <a href="${inboxUrl}" style="display:inline-block;background:${C.purple};color:#fff;text-decoration:none;font-family:Arial,sans-serif;font-size:14px;font-weight:bold;padding:11px 18px;border-radius:999px;">Abrir en la bandeja</a>
+      </div>
+      <div style="margin-top:14px;font-family:Arial,sans-serif;font-size:12px;color:#888;line-height:1.5;">En WhatsApp solo se puede responder con texto libre dentro de las 24 horas siguientes al último mensaje del cliente.</div>
+    </div>
+  </div>
+</body>
+</html>`
+
+  const text = [
+    `Un cliente pide hablar con alguien (${canal}).`,
+    `Cliente: ${quien}`,
+    `Último mensaje: ${data.ultimoMensaje || '—'}`,
+    '',
+    `Bandeja: ${inboxUrl}`,
+  ].join('\n')
+
+  try {
+    await createMailTransport().sendMail({
+      from: `"Alertas Kustom" <${from}>`,
+      to,
+      subject: `🙋 ${canal}: ${data.nombre || data.externalId} pide atención`,
+      text,
+      html,
+      headers: { 'List-Unsubscribe': LIST_UNSUB },
+    })
+    console.info(`[inbox-alert] aviso de handoff #${data.conversationId} enviado a ${to}`)
+    return { sent: true }
+  }
+  catch (err) {
+    console.error(`[inbox-alert] fallo al enviar aviso #${data.conversationId}:`, String((err as Error)?.message ?? err))
+    return { sent: false, reason: 'send_failed' }
+  }
+}

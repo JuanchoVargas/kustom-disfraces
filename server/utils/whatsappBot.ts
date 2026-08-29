@@ -38,15 +38,8 @@ export interface ConvState {
   // (updatedAt). Este cerebro base (buildBotReplies) los ignora por completo.
   slots?: { producto?: string, talla?: string, publico?: string, updatedAt?: number }
 }
-const store = new Map<string, ConvState>()
-
-export function getConversation(from: string): ConvState {
-  return store.get(from) ?? { step: 'start', flaggedForHuman: false, updatedAt: 0 }
-}
-export function setConversation(from: string, patch: Partial<ConvState>): void {
-  const cur = getConversation(from)
-  store.set(from, { ...cur, ...patch, updatedAt: Date.now() })
-}
+// El estado vive en Postgres (conversations.bot_state) — ver server/utils/inbox.ts
+// (loadBotState / saveBotState). Sin BD configurada cae a un Map en memoria.
 
 // ---------- parseo del webhook entrante ----------
 export interface WaIncoming {
@@ -56,6 +49,9 @@ export interface WaIncoming {
   replyId?: string
   replyTitle?: string
   profileName?: string
+  // id del mensaje en el canal (wamid en WhatsApp, mid en Messenger). Sirve para
+  // deduplicar los reintentos de Meta al guardar en la bandeja.
+  wamid?: string
 }
 
 export function parseIncoming(body: any): WaIncoming | null {
@@ -64,15 +60,16 @@ export function parseIncoming(body: any): WaIncoming | null {
   if (!msg?.from) return null // statuses (entregado/leído) u otros eventos -> se ignoran
   const from = String(msg.from)
   const profileName = value?.contacts?.[0]?.profile?.name
+  const wamid = msg.id ? String(msg.id) : undefined
 
-  if (msg.type === 'text') return { from, kind: 'text', text: msg.text?.body ?? '', profileName }
+  if (msg.type === 'text') return { from, kind: 'text', text: msg.text?.body ?? '', profileName, wamid }
   if (msg.type === 'interactive') {
     const it = msg.interactive
-    if (it?.type === 'button_reply') return { from, kind: 'reply', replyId: it.button_reply?.id, replyTitle: it.button_reply?.title, profileName }
-    if (it?.type === 'list_reply') return { from, kind: 'reply', replyId: it.list_reply?.id, replyTitle: it.list_reply?.title, profileName }
+    if (it?.type === 'button_reply') return { from, kind: 'reply', replyId: it.button_reply?.id, replyTitle: it.button_reply?.title, profileName, wamid }
+    if (it?.type === 'list_reply') return { from, kind: 'reply', replyId: it.list_reply?.id, replyTitle: it.list_reply?.title, profileName, wamid }
   }
-  if (msg.type === 'button') return { from, kind: 'reply', replyId: msg.button?.payload ?? msg.button?.text, replyTitle: msg.button?.text, profileName }
-  return { from, kind: 'other', profileName }
+  if (msg.type === 'button') return { from, kind: 'reply', replyId: msg.button?.payload ?? msg.button?.text, replyTitle: msg.button?.text, profileName, wamid }
+  return { from, kind: 'other', profileName, wamid }
 }
 
 /**

@@ -462,18 +462,58 @@ La navegación se codifica en el **id** de cada botón/fila (`main:ver`, `pub:<s
 Código del árbol: `server/utils/whatsappBot.ts` (`buildBotReplies`, función pura
 testeable); Cloud API: `server/utils/whatsapp.ts`; navegación: `server/utils/catalogNav.ts`.
 
-### Estado de conversación (limitación)
+### Estado de conversación (persistido en Postgres)
 
-El estado (último paso + flag de atención humana) vive **en memoria**
-(`Map` en `whatsappBot.ts`). Es **efímero**: se pierde en cada reinicio/cold start
-y **no se comparte entre instancias** serverless (Vercel). Suficiente para Fase 1,
-porque la navegación va en los ids de los botones. Para producción robusta (colas,
-handoff a un agente, historial) hay que mover el estado a un store persistente
-(Redis/KV/DB). El flag de atención humana hoy solo se **registra** (`console.info`).
+El estado del bot (paso, pila de navegación, slots, flag de handoff) vive en
+`conversations.bot_state` (JSONB) en **Neon Postgres** (`server/utils/inbox.ts`:
+`loadBotState` / `saveBotState`). Sobrevive cold starts y se comparte entre
+instancias serverless. Sin `POSTGRES_URL` cae a un `Map` en memoria (solo local).
 
-> Mientras una conversación está marcada para atención humana, el bot **no
-> responde** (para no interrumpir al asesor); el cliente puede escribir *menú*
-> para reactivar el bot.
+> Mientras una conversación está en **estado=humano** el bot **no responde**.
+> Si el handoff lo pidió el cliente y nadie lo ha atendido, puede escribir *menú*
+> para reactivar el bot; en cuanto un agente toma la conversación o responde desde
+> la bandeja, el bot queda apagado hasta "Devolver al bot".
+
+## 📥 Bandeja de atención humana (`/admin/chats`)
+
+El 311 884 4547 está en la Cloud API, así que **no existe bandeja de Meta**: la
+bandeja propia vive en `/admin/chats` (Nuxt, layout `inbox`, `noindex` + `Disallow`
+en robots). La usan desde el celular.
+
+- **Persistencia** (`server/utils/db.ts`, `inbox.ts`): tablas `conversations`
+  (canal `wa|msg|ig`, external_id, nombre, ultimo_mensaje, ultima_actividad,
+  ultimo_cliente_at, estado `bot|humano|cerrado`, no_leidos, bot_state) y
+  `messages` (direccion `in|out`, texto, autor `cliente|bot|agente`, wamid).
+  Migración **idempotente** (`CREATE … IF NOT EXISTS`) que corre al arrancar
+  (`ensureSchema()`, una vez por instancia). `wamid` único → los reintentos de
+  Meta no duplican mensajes. Todo mensaje entrante y saliente de los 3 canales
+  queda guardado (`server/utils/botSession.ts`, usado por ambos webhooks).
+- **Login**: contraseña única `NUXT_INBOX_PASSWORD` → cookie `kinbox` httpOnly
+  firmada (HMAC derivado de la contraseña), 7 días. Cambiar la contraseña en
+  Vercel invalida todas las sesiones. Sin la variable, la bandeja responde 503.
+- **UI**: lista (recientes arriba, badge de no leídos, ícono de canal, buscador
+  por nombre/número) + chat. Polling cada 5 s (sin websockets). En móvil se ve
+  lista **o** chat. `?c=<id>` abre una conversación directa (link del correo).
+- **Acciones**: *Tomar conversación* (estado=humano, pausa el bot), *Devolver al
+  bot* (estado=bot, reinicia el estado del bot), *Cerrar*. Responder desde la
+  bandeja **toma** la conversación automáticamente. El envío usa los adaptadores
+  existentes (`sendWhatsAppMessage` / `sendMessengerMessage`).
+- **Handoff automático**: botón "Hablar con alguien" **o texto** ("quiero hablar
+  con alguien / un asesor / una persona…", `isHumanRequest` en `botReplies.ts`) →
+  estado=humano, no leída, y **correo a `ventasTo`** (`sendHandoffAlert` en
+  `orderEmail.ts`, mismo SMTP) con nombre/número, último mensaje y link a la bandeja.
+- **Ventana de 24 h (WhatsApp)**: Meta solo acepta texto libre si el cliente
+  escribió hace <24 h (`ultimo_cliente_at`). Fuera de la ventana el campo se
+  deshabilita con "Ventana de 24h cerrada: este cliente debe escribir primero" y
+  el endpoint responde 409 `window_closed`. Messenger/IG no se bloquean.
+
+Endpoints (`server/api/inbox/*`, todos con `requireInbox` salvo login/me):
+`POST login`, `POST logout`, `GET me`, `GET conversations?q=`,
+`GET conversations/:id`, `POST conversations/:id/send {text}`,
+`POST conversations/:id/estado {estado}`, `POST conversations/:id/read`.
+
+Variables: `NUXT_INBOX_PASSWORD` (obligatoria), `POSTGRES_URL` (la inyecta la
+integración Neon↔Vercel).
 
 ### Variables de entorno (prefijo `NUXT_` para runtime en Vercel)
 

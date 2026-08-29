@@ -108,6 +108,10 @@ export default defineNuxtConfig({
     // valida la cabecera x-signature (HMAC) y rechaza notificaciones no auténticas.
     // Sin él, el webhook igual verifica el pago consultando la API de MP.
     mpWebhookSecret: process.env.MP_WEBHOOK_SECRET || '',    // -> NUXT_MP_WEBHOOK_SECRET
+    // Bandeja de atención humana (/admin/chats): contraseña única, solo servidor.
+    // La cookie de sesión se firma con una clave derivada de ella. Sin valor, la
+    // bandeja responde 503. Postgres se lee directo de POSTGRES_URL (Neon↔Vercel).
+    inboxPassword: process.env.NUXT_INBOX_PASSWORD || '',    // -> NUXT_INBOX_PASSWORD
     public: {
       // Origen del catálogo: 'local' (catalogo.json) | 'woo' (proxy /api/products).
       // Default LOCAL — el switch a woo se hace tras verificar paridad (README).

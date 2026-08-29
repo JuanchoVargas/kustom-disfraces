@@ -3,9 +3,12 @@
  * mensaje, decide la respuesta con el árbol (buildBotReplies) y la envía por la
  * Cloud API. Responde SIEMPRE 200 rápido (Meta reintenta si no).
  *
- * Fase 1: el estado de conversación es en memoria (ver README). El bot es reactivo
- * (menús + botones) y lleva al cliente a la web.
+ * Persistencia: cada mensaje entrante y saliente queda en la bandeja (Postgres,
+ * server/utils/inbox.ts) y el estado del bot vive en conversations.bot_state.
+ * Con estado=humano el bot calla (ver botSession.ts).
  */
+import type { WaMessage } from '../utils/whatsapp'
+
 export default defineEventHandler(async (event) => {
   const body = await readBody(event).catch(() => null)
 
@@ -17,11 +20,13 @@ export default defineEventHandler(async (event) => {
   const incoming = parseIncoming(body)
   if (!incoming) return { received: true, ignored: true } // statuses u otros eventos
 
-  const state = getConversation(incoming.from)
+  const session = await openBotSession('wa', incoming.from, incoming)
+  if (session.silenced) return { received: true, replied: 0, human: true }
+
   // Capa de intención omnicanal (slots, saludos, typos, sin-resultados, tips) sobre
   // el cerebro base. El formato de salida (chunking de botones / fallback numerado)
   // no cambia: se aplica igual sobre los mensajes resultantes, más abajo.
-  const { replies, patch } = buildReplies(incoming, state)
+  const { replies, patch } = buildReplies(incoming, session.state)
 
   // Enviar cada respuesta del árbol (en orden). Si WhatsApp no está configurado,
   // sendWhatsAppMessage lo registra y no rompe (útil en local sin credenciales).
@@ -37,6 +42,7 @@ export default defineEventHandler(async (event) => {
   // nunca se parten. toButtonChunks deja intacto lo que no es un menú-lista.
   const outgoing = forceText ? replies : replies.flatMap(toButtonChunks)
   let lastMenu: string[] | undefined
+  const sent: WaMessage[] = []
   for (const msg of outgoing) {
     const violations = forceText ? [] : validateInteractive(msg)
     if (violations.length) {
@@ -44,10 +50,15 @@ export default defineEventHandler(async (event) => {
     }
     const skipInteractive = forceText && msg.type === 'interactive'
     const ok = (skipInteractive || violations.length) ? false : await sendWhatsAppMessage(incoming.from, msg)
-    if (!ok && msg.type === 'interactive') {
+    if (ok) {
+      sent.push(msg)
+      continue
+    }
+    if (msg.type === 'interactive') {
       const fb = waNumberedFallback(msg)
       if (fb && await sendWhatsAppMessage(incoming.from, fb.message)) {
         lastMenu = fb.ids
+        sent.push(fb.message)
       }
     }
   }
@@ -55,12 +66,10 @@ export default defineEventHandler(async (event) => {
   // lastMenu refleja lo que REALMENTE se envió: se setea solo si hubo fallback a
   // texto; si el interactivo se entregó bien (o no hubo menú), se limpia para que
   // números viejos no queden mapeados a un menú obsoleto.
-  setConversation(incoming.from, { ...patch, lastMenu })
-
-  // Log del handoff para atención humana (Fase 1: solo log/flag).
-  if (patch.flaggedForHuman) {
-    console.info(`[whatsapp] 🙋 conversación marcada para ATENCIÓN HUMANA: ${incoming.from}${incoming.profileName ? ` (${incoming.profileName})` : ''}`)
-  }
+  // Sin credenciales (local) nada se envía: igual se guarda lo PLANEADO para poder
+  // ver la conversación en la bandeja.
+  const sentTexts = waTexts(whatsappConfigured() ? sent : outgoing)
+  await closeBotSession({ session, canal: 'wa', externalId: incoming.from, incoming, sentTexts, patch: { ...patch, lastMenu } })
 
   return { received: true, replied: replies.length }
 })

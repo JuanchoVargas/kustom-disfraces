@@ -177,6 +177,19 @@ function sinResultados(state: ConvState, slots: NonNullable<ConvState['slots']>)
 }
 
 // ---------- núcleo de texto ----------
+/**
+ * ¿Pide atención humana por texto? Cubre "hablar con alguien/asesor/persona/humano/
+ * agente/vendedor", "me atiende alguien", "asesor", "necesito ayuda de una persona".
+ * El texto llega ya normalizado (minúsculas, sin tildes).
+ */
+function isHumanRequest(norm: string): boolean {
+  if (/\b(asesor|asesora|agente|humano|humana|vendedor|vendedora|operador|operadora)\b/.test(norm)) return true
+  if (/\b(hablar|habla|chatear|comunicar|comunicarme|contactar|contactarme|escribir)\b.*\b(alguien|persona|humano|asesor|equipo|ustedes|encargad[oa])\b/.test(norm)) return true
+  if (/\b(atiende|atienda|atenderme|atencion)\b.*\b(alguien|persona|humano)\b/.test(norm)) return true
+  if (/\b(alguien|persona)\b.*\b(me atienda|me ayude|real|de verdad)\b/.test(norm)) return true
+  return false
+}
+
 function handleText(input: WaIncoming, state: ConvState): BotResult {
   const text = (input.text ?? '').trim()
   const norm = normalize(text)
@@ -188,6 +201,10 @@ function handleText(input: WaIncoming, state: ConvState): BotResult {
   if (BACK_WORDS.has(norm)) return withSlots(buildBotReplies(input, state), slots, {})
   // Saludo o "menú"/"inicio" → bienvenida y LIMPIA slots.
   if (isSaludo(text) || RESET_WORDS.has(norm)) return welcome(input, state)
+  // "quiero hablar con alguien / un asesor / una persona" escrito → handoff a humano
+  // (mismo camino que el botón "Hablar con alguien"). La bandeja lo recoge como
+  // estado=humano + no leído y avisa a ventas@ (ver botSession.ts).
+  if (isHumanRequest(norm)) return withSlots(buildBotReplies({ ...input, kind: 'reply', replyId: 'main:human' }, state), slots, {})
 
   // Extracción: precio → fuera; talla → fuera; público (para memoria/prompt).
   const priceStripped = stripWords(norm, PRICE_WORDS)
@@ -263,6 +280,16 @@ export function buildReplies(input: WaIncoming, state: ConvState): BotResult {
 }
 
 function _route(input: WaIncoming, state: ConvState): BotResult {
+  // Handoff pendiente (el cliente pidió hablar con alguien): el bot CALLA. Solo un
+  // saludo/"menú" (o el botón 🏠 Menú) lo reactiva. Antes esta capa buscaba
+  // producto en cualquier texto y pisaba el silencio del cerebro base.
+  if (state.flaggedForHuman) {
+    const text = (input.text ?? '').trim()
+    const revive = (input.kind === 'reply' && input.replyId === 'main:menu')
+      || (input.kind === 'text' && (isSaludo(text) || RESET_WORDS.has(normalize(text))))
+    if (!revive) return { replies: [], patch: {} }
+    return welcome(input, state)
+  }
   if (input.kind === 'reply') {
     if (input.replyId === 'main:menu') return welcome(input, state)
     return buildBotReplies(input, state)
