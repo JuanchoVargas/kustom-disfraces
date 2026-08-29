@@ -130,7 +130,7 @@ export default defineNuxtConfig({
       // se cobra ni la validación server-side (pricing.ts). Encendido por defecto —
       // se apaga sin deploy con NUXT_PUBLIC_SHOW_DISCOUNT=false en Vercel.
       showDiscount: (process.env.NUXT_PUBLIC_SHOW_DISCOUNT ?? 'true') === 'true', // -> NUXT_PUBLIC_SHOW_DISCOUNT
-      fakeDiscountPct: Number(process.env.NUXT_PUBLIC_FAKE_DISCOUNT_PCT) || 30,   // -> NUXT_PUBLIC_FAKE_DISCOUNT_PCT
+      fakeDiscountPct: Number(process.env.NUXT_PUBLIC_FAKE_DISCOUNT_PCT) || 20,   // -> NUXT_PUBLIC_FAKE_DISCOUNT_PCT
     },
   },
 })

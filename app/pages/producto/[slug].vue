@@ -64,7 +64,7 @@ const { strikeFor, pct } = useFakeDiscount()
 const oldPrice = computed(() => product.value?.regularPrice || strikeFor(currentPrice.value))
 const savings = computed(() => (oldPrice.value && oldPrice.value > currentPrice.value ? oldPrice.value - currentPrice.value : 0))
 // Badge: con regularPrice REAL se calcula el % real; con el gancho ficticio se
-// muestra el % configurado (NUXT_PUBLIC_FAKE_DISCOUNT_PCT), p. ej. "-30%".
+// muestra el % configurado (NUXT_PUBLIC_FAKE_DISCOUNT_PCT), p. ej. "-20%".
 const discountPct = computed(() => {
   if (!oldPrice.value) return 0
   return product.value?.regularPrice ? Math.round((1 - currentPrice.value / oldPrice.value) * 100) : pct.value

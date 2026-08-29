@@ -8,12 +8,13 @@
 export function useFakeDiscount() {
   const config = useRuntimeConfig().public
   const enabled = computed(() => !!config.showDiscount)
-  const pct = computed(() => Number(config.fakeDiscountPct) || 30)
+  const pct = computed(() => Number(config.fakeDiscountPct) || 20)
 
-  // Precio "anterior" inventado: precio real × (1 + pct%), redondeado a mil.
+  // Precio "anterior" inventado: precio real × (1 + pct%), redondeado a cien
+  // (coincide con la columna PRECIO TACHADO de PRECIOS WEB.xlsx, ago 2026).
   function strikeFor(price: number): number | null {
     if (!enabled.value || !price) return null
-    return Math.round((price * (1 + pct.value / 100)) / 1000) * 1000
+    return Math.round((price * (1 + pct.value / 100)) / 100) * 100
   }
 
   return { enabled, pct, strikeFor }

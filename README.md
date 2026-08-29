@@ -92,27 +92,29 @@ Súper Adulto, vestidos dama, chaquetas…). El sitio solo muestra `disponibleWe
 
 ### 1. Los precios son los REALES de la lista del cliente
 
-Los `precio` de `catalogo.json` provienen de `DISFRACES PRECIOS.xlsx`
-(`app/insumos/`, local-only). Cada valor sale de una celda del Excel — no hay precios
-inventados. No hay `regularPrice` (la lista no trae descuentos). Precios por grupo:
+Los `precio` de `catalogo.json` provienen de **`PRECIOS WEB.xlsx`** (`app/insumos/`,
+local-only; lista entregada por el cliente el 29-ago-2026, reemplaza a `DISFRACES
+PRECIOS.xlsx`). Se carga la columna **PRECIO BASE** (lo que se cobra); la columna
+PRECIO TACHADO del Excel es base × 1,20 y la reproduce `useFakeDiscount` (20 %,
+redondeo a cien) — no se guarda en el catálogo. Precios por grupo:
 
 | Tipo | Precio oficial |
 |---|---|
-| Súper Acolchado | $120.000 (Iron Spider-Man, Spider-Man Clásico, Miles Morales y Batman $130.000; Aquaman $99.000) |
-| Línea Entrada | $65.000 |
-| Vestidos superheroínas (niña) | $85.000 |
-| Trusas infantiles | Spider Gwen y Elastic Girl $80.000 · Katrina y Esqueleto $70.000 · Lady Bug $65.000 |
-| Anime (conjuntos) | $130.000 |
-| Ninjas | $80.000 |
-| Personajes (Michael Jackson) | $120.000 |
-| Trusas adultos | $150.000 |
-| Bebés · Animales (Línea) | $89.000 |
-| Bebés · Línea Plus (Stitch, Gato con Botas) | $110.000 |
+| Súper Acolchado | $146.000 (Iron Spider-Man, Spider-Man Clásico, Miles Morales y Batman $159.000; Aquaman $120.000) |
+| Línea Eco | $69.000 |
+| Vestidos superheroínas (niña) | $110.000 (Capitana América $99.000) |
+| Trusas infantiles | Spider Gwen y Elastic Girl $110.000 · Katrina y Esqueleto $85.000 · Lady Bug $75.000 |
+| Anime (conjuntos) | $159.000 |
+| Ninjas | $89.000 |
+| Personajes (Michael Jackson) | $130.000 |
+| Trusas adultos | $155.000 |
+| Bebés · Animales (Línea) | $95.000 |
+| Bebés · Línea Plus (Stitch, Gato con Botas) | $129.000 |
 
-**Corrección de cero faltante (confirmada por el cliente, jul 2026):** el Excel traía
-Pantera Negra en $12.000 y los 5 anime Nezuko, Rengoku, Tanjiro, Tomioka y Zenitzu en
-$13.000 (un cero de menos). El cliente confirmó los valores: Pantera Negra **$120.000**
-y los 5 anime **$130.000** (ya cargados).
+**Ajustes al cargar (ago 2026):** Esqueleto trusa adulto venía en $155.555 (error de
+digitación; se cargó $155.000 como el resto del grupo). El Excel trae Harley Queen,
+Woody y Jessie (Personajes) que **no existen en el catálogo**; quedan pendientes de
+foto/código para crearse. Kokushibo (oculto) se actualizó a $159.000 pero sigue sin foto.
 
 **Sin precio en el Excel:** Spider Gwen (trusa adulto, `001005010`) no aparece en la
 lista de precios. Queda **oculta** (`disponibleWeb: false`, `precio: null`) hasta que el
