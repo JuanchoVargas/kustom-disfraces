@@ -18,6 +18,15 @@ import type { WaMessage } from '../utils/whatsapp'
 export default defineEventHandler(async (event) => {
   const body = await readBody(event).catch(() => null)
 
+  // ⏳ LOG TEMPORAL (quitar ~24h después de cazar el bot mudo): payload COMPLETO
+  // de TODOS los webhooks, sin recortes ni resúmenes, ANTES de cualquier parseo.
+  // Hay remitentes con dos checks grises (Meta SÍ entregó y disparó el webhook)
+  // que igual no reciben respuesta: con esto queda el JSON exacto que llegó.
+  console.log('[wa-raw]', JSON.stringify(body))
+  // Radiografía del parseo: entries, changes con su field, y messages/statuses
+  // encontrados en cada uno — para ver de un vistazo qué clasificó el parser.
+  console.log('[wa-parse]', parseDebugSummary(body))
+
   // VISIBILIDAD: los eventos "statuses" (entregado/leído/FALLIDO) no traen mensaje.
   // Un status "failed" es justamente donde muere un interactivo aceptado por Graph
   // (200+wamid) pero descartado en la entrega.

@@ -102,6 +102,32 @@ export function parseIncoming(body: any): WaIncoming | null {
 }
 
 /**
+ * Radiografía ESTRUCTURAL del webhook para el log [wa-parse]: cuántos entries,
+ * cuántos changes por entry con su `field`, y cuántos messages (con tipos y from)
+ * y statuses encontró en cada value. Sirve para comparar contra [wa-raw] y ver en
+ * qué paso el parser clasifica mal un payload real de Meta.
+ */
+export function parseDebugSummary(body: any): string {
+  const entries: any[] = Array.isArray(body?.entry) ? body.entry : []
+  if (!entries.length) return `entries=0 keys=${Object.keys(body ?? {}).join(',') || 'body vacío'}`
+  const parts: string[] = [`entries=${entries.length}`]
+  entries.forEach((entry, ei) => {
+    const changes: any[] = Array.isArray(entry?.changes) ? entry.changes : []
+    if (!changes.length) parts.push(`e${ei}: changes=0 keys=${Object.keys(entry ?? {}).join(',')}`)
+    changes.forEach((change, ci) => {
+      const value = change?.value
+      const messages: any[] = Array.isArray(value?.messages) ? value.messages : []
+      const statuses: any[] = Array.isArray(value?.statuses) ? value.statuses : []
+      const msgInfo = messages.length
+        ? ` [${messages.map(m => `${m?.type ?? '?'}←${m?.from ?? '?'}`).join(', ')}]`
+        : ''
+      parts.push(`e${ei}.c${ci} field=${change?.field ?? '—'} messages=${messages.length}${msgInfo} statuses=${statuses.length}${!messages.length && !statuses.length ? ` valueKeys=${Object.keys(value ?? {}).join(',') || 'ninguna'}` : ''}`)
+    })
+  })
+  return parts.join(' | ')
+}
+
+/**
  * Resumen corto de un webhook SIN mensajes, para el log obligatorio: qué statuses
  * traía (sent/delivered/read/failed) o, si no trae nada reconocible, sus claves.
  * Así un evento con forma inesperada deja rastro en vez de ignorarse a ciegas.
