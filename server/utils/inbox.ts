@@ -27,6 +27,8 @@ export interface ConversationRow {
   no_leidos: number
   bot_state: Partial<ConvState>
   created_at: string
+  /** última vez que pasó a estado=humano (para el auto-retorno al bot) */
+  humano_at?: string | null
 }
 export interface MessageRow {
   id: number
@@ -36,6 +38,8 @@ export interface MessageRow {
   autor: string
   created_at: string
   wamid: string | null
+  /** entrantes: cuándo se les envió respuesta con éxito (null = aún sin responder) */
+  replied_at?: string | null
 }
 
 export const WA_WINDOW_MS = 24 * 60 * 60 * 1000
@@ -164,10 +168,63 @@ export async function setEstado(id: number, estado: Estado, opts: { markUnread?:
   if (!await ready()) return
   await sql().query(
     `UPDATE conversations
-     SET estado = $2, no_leidos = CASE WHEN $3::boolean THEN GREATEST(no_leidos, 1) ELSE no_leidos END
+     SET estado = $2,
+         humano_at = CASE WHEN $2 = 'humano' THEN now() ELSE humano_at END,
+         no_leidos = CASE WHEN $3::boolean THEN GREATEST(no_leidos, 1) ELSE no_leidos END
      WHERE id = $1`,
     [id, estado, !!opts.markUnread],
   )
+}
+
+export const HUMAN_TIMEOUT_MIN = 30
+
+/**
+ * AUTO-RETORNO AL BOT: si la conversación lleva >30 min en estado=humano sin que
+ * ningún agente haya escrito, vuelve a manos del bot (y limpia flaggedForHuman en
+ * bot_state) para que el cliente no quede hablando al vacío. Atómico en BD: solo
+ * una instancia serverless "gana" el retorno. Devuelve true si se devolvió.
+ */
+export async function autoReturnToBot(id: number): Promise<boolean> {
+  if (!await ready()) return false
+  const rows = await sql().query(
+    `UPDATE conversations c
+     SET estado = 'bot', bot_state = c.bot_state || '{"flaggedForHuman": false}'::jsonb
+     WHERE c.id = $1 AND c.estado = 'humano'
+       AND COALESCE(c.humano_at, c.created_at) < now() - ($2 || ' minutes')::interval
+       AND NOT EXISTS (
+         SELECT 1 FROM messages m
+         WHERE m.conversation_id = c.id AND m.autor = 'agente'
+           AND m.created_at > now() - ($2 || ' minutes')::interval
+       )
+     RETURNING id`,
+    [id, String(HUMAN_TIMEOUT_MIN)],
+  ) as any[]
+  return rows.length > 0
+}
+
+/** Devuelve TODAS las conversaciones en humano al bot ya (endpoint de emergencia). */
+export async function resetAllHumanToBot(): Promise<number[]> {
+  if (!await ready()) return []
+  const rows = await sql().query(
+    `UPDATE conversations
+     SET estado = 'bot', bot_state = bot_state || '{"flaggedForHuman": false}'::jsonb
+     WHERE estado = 'humano'
+     RETURNING id`,
+  ) as any[]
+  return rows.map(r => Number(r.id))
+}
+
+/** Busca un entrante ya guardado por su wamid (para decidir el dedupe de reintentos). */
+export async function getMessageByWamid(wamid: string): Promise<MessageRow | null> {
+  if (!await ready()) return null
+  const rows = await sql().query(`SELECT * FROM messages WHERE wamid = $1`, [wamid]) as any[]
+  return rows[0] ? normMsg(rows[0]) : null
+}
+
+/** Marca un entrante como RESPONDIDO CON ÉXITO (solo entonces el dedupe salta reintentos). */
+export async function markWamidReplied(wamid: string): Promise<void> {
+  if (!await ready()) return
+  await sql().query(`UPDATE messages SET replied_at = now() WHERE wamid = $1`, [wamid])
 }
 
 export const ALERT_COOLDOWN_MIN = 30

@@ -110,6 +110,21 @@ async function refreshList() {
 }
 
 const totalUnread = computed(() => convs.value.reduce((n, c) => n + (c.no_leidos || 0), 0))
+const totalHumano = computed(() => convs.value.filter(c => c.estado === 'humano').length)
+
+// Botón de emergencia: devuelve TODAS las conversaciones en humano al bot ya.
+async function resetHumano() {
+  if (!window.confirm(`¿Devolver ${totalHumano.value} conversación(es) en atención humana al bot?`)) return
+  try {
+    await $fetch('/api/inbox/conversations/reset-humano', { method: 'POST' })
+    await refreshList()
+    if (selected.value) await loadConv(selected.value.id)
+  }
+  catch (e) {
+    onUnauthorized(e)
+    listError.value = 'No se pudo devolver las conversaciones al bot.'
+  }
+}
 
 // ---------- conversación abierta ----------
 const selected = ref<Conv | null>(null)
@@ -320,6 +335,11 @@ function windowLeft(c: Conv) {
             placeholder="Buscar por nombre o número"
             aria-label="Buscar conversación"
           >
+        </div>
+        <div v-if="totalHumano" class="list__search">
+          <button class="btn btn--sm" type="button" style="width:100%" @click="resetHumano">
+            🤖 Devolver TODAS al bot ({{ totalHumano }})
+          </button>
         </div>
         <p v-if="!dbOk" class="list__warn">Sin base de datos configurada (POSTGRES_URL).</p>
         <p v-else-if="listError" class="list__warn">{{ listError }}</p>

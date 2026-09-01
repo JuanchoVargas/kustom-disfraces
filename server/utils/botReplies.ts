@@ -177,16 +177,30 @@ function sinResultados(state: ConvState, slots: NonNullable<ConvState['slots']>)
 }
 
 // ---------- núcleo de texto ----------
+// Roles que significan "una persona del equipo" cuando se piden EXPLÍCITAMENTE.
+const HUMAN_ROLE = '(asesora?|agente|humanos?|humanas?|vendedora?|operadora?)'
+
 /**
- * ¿Pide atención humana por texto? Cubre "hablar con alguien/asesor/persona/humano/
- * agente/vendedor", "me atiende alguien", "asesor", "necesito ayuda de una persona".
- * El texto llega ya normalizado (minúsculas, sin tildes).
+ * ¿Pide atención humana por texto? SOLO con frases explícitas: el mensaje ES el
+ * pedido ("un asesor", "asesor por favor", "humano") o hay verbo de intención +
+ * rol/persona ("quiero hablar con alguien", "necesito un asesor", "que me atienda
+ * una persona"). Un rol suelto en mitad de una frase YA NO dispara: antes "disfraz
+ * de agente secreto" o "traje de vendedor" mandaban la conversación a handoff y el
+ * bot quedaba mudo. El texto llega ya normalizado (minúsculas, sin tildes).
  */
 function isHumanRequest(norm: string): boolean {
-  if (/\b(asesor|asesora|agente|humano|humana|vendedor|vendedora|operador|operadora)\b/.test(norm)) return true
-  if (/\b(hablar|habla|chatear|comunicar|comunicarme|contactar|contactarme|escribir)\b.*\b(alguien|persona|humano|asesor|equipo|ustedes|encargad[oa])\b/.test(norm)) return true
-  if (/\b(atiende|atienda|atenderme|atencion)\b.*\b(alguien|persona|humano)\b/.test(norm)) return true
-  if (/\b(alguien|persona)\b.*\b(me atienda|me ayude|real|de verdad)\b/.test(norm)) return true
+  // Mensaje que ES el pedido: "asesor", "un asesor porfa", "humano por favor".
+  if (new RegExp(`^(una? |el |la )?${HUMAN_ROLE}( por ?favor| porfa+| porfis| pf)?$`).test(norm.trim())) return true
+  // Verbo de comunicación + con quién (cerca, no en cualquier parte de la frase).
+  if (new RegExp(`\\b(hablar|habla|chatear|comunicar(me|se)?|contactar(me)?|escribirle)\\b.{0,30}\\b(alguien|una persona|${HUMAN_ROLE}|equipo|ustedes|encargad[oa])\\b`).test(norm)) return true
+  // "necesito/quiero/busco/pasame (a) un asesor/agente/humano…" (rol explícito, no "persona"
+  // ni "alguien" sueltos: "quiero un disfraz para una persona adulta" NO es handoff). Si la
+  // frase habla de producto ("busco disfraz de agente secreto"), esta regla NO aplica.
+  const hablaDeProducto = /\b(disfraz|disfraces|disfracez|traje|trajes|talla|tallas)\b/.test(norm)
+  if (!hablaDeProducto && new RegExp(`\\b(necesito|quiero|busco|pasa(me|r)|pon(me|ga)|comunique(me)?)\\b.{0,20}\\b${HUMAN_ROLE}\\b`).test(norm)) return true
+  // "que me atienda alguien / una persona", "atencion humana".
+  if (/\b(atiende|atienda|atiendan|atenderme|atencion)\b.{0,20}\b(alguien|una persona|human[oa])\b/.test(norm)) return true
+  if (/\b(alguien|persona)\b.{0,20}\b(me atienda|me ayude|real|de verdad)\b/.test(norm)) return true
   return false
 }
 

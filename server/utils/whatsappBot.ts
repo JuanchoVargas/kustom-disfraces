@@ -54,12 +54,13 @@ export interface WaIncoming {
   wamid?: string
 }
 
-export function parseIncoming(body: any): WaIncoming | null {
-  const value = body?.entry?.[0]?.changes?.[0]?.value
-  const msg = value?.messages?.[0]
-  if (!msg?.from) return null // statuses (entregado/leído) u otros eventos -> se ignoran
+function parseWaMessage(msg: any, value: any): WaIncoming | null {
+  if (!msg?.from) return null
   const from = String(msg.from)
-  const profileName = value?.contacts?.[0]?.profile?.name
+  // El nombre de perfil del contacto que corresponde a ESTE remitente (Meta puede
+  // traer varios contacts en un batch).
+  const contacts: any[] = Array.isArray(value?.contacts) ? value.contacts : []
+  const profileName = (contacts.find(c => String(c?.wa_id ?? '') === from) ?? contacts[0])?.profile?.name
   const wamid = msg.id ? String(msg.id) : undefined
 
   if (msg.type === 'text') return { from, kind: 'text', text: msg.text?.body ?? '', profileName, wamid }
@@ -70,6 +71,58 @@ export function parseIncoming(body: any): WaIncoming | null {
   }
   if (msg.type === 'button') return { from, kind: 'reply', replyId: msg.button?.payload ?? msg.button?.text, replyTitle: msg.button?.text, profileName, wamid }
   return { from, kind: 'other', profileName, wamid }
+}
+
+/**
+ * TODOS los mensajes entrantes del webhook. Meta puede agrupar varios entries,
+ * varios changes por entry y varios messages por change en un mismo POST; la
+ * versión anterior solo miraba entry[0].changes[0].value.messages[0] y cualquier
+ * mensaje en otra posición se descartaba EN SILENCIO (bot mudo sin rastro).
+ */
+export function parseIncomingAll(body: any): WaIncoming[] {
+  const out: WaIncoming[] = []
+  const entries: any[] = Array.isArray(body?.entry) ? body.entry : []
+  for (const entry of entries) {
+    const changes: any[] = Array.isArray(entry?.changes) ? entry.changes : []
+    for (const change of changes) {
+      const value = change?.value
+      const messages: any[] = Array.isArray(value?.messages) ? value.messages : []
+      for (const msg of messages) {
+        const inc = parseWaMessage(msg, value)
+        if (inc) out.push(inc)
+      }
+    }
+  }
+  return out
+}
+
+/** Compatibilidad: primer mensaje del webhook (usada por scripts de prueba). */
+export function parseIncoming(body: any): WaIncoming | null {
+  return parseIncomingAll(body)[0] ?? null
+}
+
+/**
+ * Resumen corto de un webhook SIN mensajes, para el log obligatorio: qué statuses
+ * traía (sent/delivered/read/failed) o, si no trae nada reconocible, sus claves.
+ * Así un evento con forma inesperada deja rastro en vez de ignorarse a ciegas.
+ */
+export function webhookSummary(body: any): string {
+  const kinds: string[] = []
+  const entries: any[] = Array.isArray(body?.entry) ? body.entry : []
+  for (const entry of entries) {
+    for (const change of (Array.isArray(entry?.changes) ? entry.changes : [])) {
+      const value = change?.value
+      const statuses: any[] = Array.isArray(value?.statuses) ? value.statuses : []
+      for (const st of statuses) kinds.push(`status:${st?.status ?? '?'}→${st?.recipient_id ?? '?'}`)
+      const errors: any[] = Array.isArray(value?.errors) ? value.errors : []
+      for (const e of errors) kinds.push(`error:${e?.code ?? '?'}`)
+      if (!statuses.length && !errors.length && !Array.isArray(value?.messages)) {
+        kinds.push(`field:${change?.field ?? '?'} keys:${Object.keys(value ?? {}).join(',') || 'ninguna'}`)
+      }
+    }
+  }
+  if (!entries.length) kinds.push(`sin entry — keys:${Object.keys(body ?? {}).join(',') || 'body vacío'}`)
+  return kinds.join(' | ')
 }
 
 /**

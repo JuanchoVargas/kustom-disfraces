@@ -53,6 +53,12 @@ const MIGRATION = [
   )`,
   // Anti-spam de avisos (correo + WhatsApp al encargado): último aviso por conversación.
   `ALTER TABLE conversations ADD COLUMN IF NOT EXISTS ultimo_aviso_at TIMESTAMPTZ`,
+  // Cuándo pasó a estado=humano por última vez (para el auto-retorno al bot a los 30 min).
+  `ALTER TABLE conversations ADD COLUMN IF NOT EXISTS humano_at TIMESTAMPTZ`,
+  // DEDUPE de reintentos de Meta: un entrante se marca replied_at SOLO cuando el bot
+  // envió la respuesta con éxito. Un reintento del mismo wamid sin replied_at puede
+  // volver a responder (antes un duplicado guardado ya no volvía a intentarse).
+  `ALTER TABLE messages ADD COLUMN IF NOT EXISTS replied_at TIMESTAMPTZ`,
   `CREATE INDEX IF NOT EXISTS messages_conversation_idx ON messages (conversation_id, id)`,
   `CREATE INDEX IF NOT EXISTS conversations_actividad_idx ON conversations (ultima_actividad DESC)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS messages_wamid_idx ON messages (wamid) WHERE wamid IS NOT NULL`,

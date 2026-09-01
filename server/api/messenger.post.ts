@@ -33,6 +33,11 @@ export default defineEventHandler(async (event) => {
       if (!incoming) continue // read/delivery u otros eventos sin texto/payload
 
       const session = await openBotSession(channel, String(senderId), incoming)
+      // Dedupe de reintentos (mismo mid ya respondido o en vuelo) y silencio por humano.
+      if (session.skip) {
+        console.info(`[${channel}] mid=${incoming.wamid ?? '—'} from=${senderId} replied=false skip=${session.skip}`)
+        continue
+      }
       if (session.silenced) continue
 
       // Capa de intención omnicanal: slots + lenguaje natural, reusando el cerebro base.
@@ -41,11 +46,13 @@ export default defineEventHandler(async (event) => {
       // Adaptar la salida del bot a Messenger (quick replies, texto con URL, etc.).
       const { messages, lastMenu } = toMessengerReplies(replies)
       const sentTexts: string[] = []
+      let delivered = false
       for (const msg of messages) {
         const ok = await sendMessengerMessage(String(senderId), msg)
+        if (ok) delivered = true
         if (ok || !messengerConfigured()) sentTexts.push(messengerToText(msg))
       }
-      await closeBotSession({ session, canal: channel, externalId: String(senderId), incoming, sentTexts, patch: { ...patch, lastMenu } })
+      await closeBotSession({ session, canal: channel, externalId: String(senderId), incoming, sentTexts, delivered, patch: { ...patch, lastMenu } })
     }
   }
 
