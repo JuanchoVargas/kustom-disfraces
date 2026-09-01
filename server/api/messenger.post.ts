@@ -71,6 +71,9 @@ function parseMessengerEvent(senderId: string, ev: any): WaIncoming | null {
   // Texto libre.
   const text = ev?.message?.text
   if (typeof text === 'string' && text.trim()) return { from: senderId, kind: 'text', text, wamid }
+  // Adjuntos sin texto (audio, sticker, imagen, ubicación…): antes se ignoraban en
+  // silencio; ahora reciben el aviso de "solo texto" + menú (kind 'other').
+  if (ev?.message?.attachments?.length) return { from: senderId, kind: 'other', wamid }
   return null
 }
 

@@ -517,7 +517,8 @@ export interface HandoffAlert {
   externalId: string
   nombre?: string
   ultimoMensaje: string
-  conversationId: number
+  /** undefined si la BD estaba caída al registrar el handoff (la alerta sale igual) */
+  conversationId?: number
 }
 
 const CANAL_LABEL: Record<HandoffAlert['canal'], string> = { wa: 'WhatsApp', msg: 'Messenger', ig: 'Instagram' }
@@ -535,7 +536,7 @@ export async function sendHandoffAlert(data: HandoffAlert): Promise<{ sent: bool
   const to = c.ventasTo || 'ventas@disfraceskustom.com'
   const from = c.smtpFrom || c.smtpUser
   const site = (c.public.siteUrl || 'https://www.disfraceskustom.com').replace(/\/$/, '')
-  const inboxUrl = `${site}/admin/chats?c=${data.conversationId}`
+  const inboxUrl = data.conversationId ? `${site}/admin/chats?c=${data.conversationId}` : `${site}/admin/chats`
   const canal = CANAL_LABEL[data.canal]
   const quien = data.nombre ? `${data.nombre} (${data.externalId})` : data.externalId
   const contacto = data.canal === 'wa' ? `+${data.externalId}` : `${canal} · ${data.externalId}`

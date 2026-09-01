@@ -309,5 +309,21 @@ function _route(input: WaIncoming, state: ConvState): BotResult {
     return buildBotReplies(input, state)
   }
   if (input.kind === 'text') return handleText(input, state)
-  return welcome(input, state)
+  // Mensaje NO-TEXTO (audio, sticker, imagen, ubicación…): antes caía al saludo
+  // genérico como si nada; ahora se le dice al cliente qué puede hacer + menú.
+  return nonTextReply(input, state)
+}
+
+const NON_TEXT_NOTICE = 'Por ahora solo puedo leer mensajes de texto 😅 Escríbeme el nombre del disfraz que buscas o toca una opción 👇'
+
+/** Audio/sticker/imagen/ubicación → aviso claro con el menú principal debajo. */
+function nonTextReply(input: WaIncoming, state: ConvState): BotResult {
+  const del = welcome(input, state)
+  const first = del.replies[0]
+  // El menú principal es interactivo: se reemplaza su cuerpo por el aviso (un solo
+  // mensaje con botones). Si por algo no lo fuera, el aviso va como texto aparte.
+  if (first?.type === 'interactive') {
+    return { replies: [cloneWithBody(first, NON_TEXT_NOTICE), ...del.replies.slice(1)], patch: del.patch }
+  }
+  return { replies: [waText(NON_TEXT_NOTICE, false), ...del.replies], patch: del.patch }
 }

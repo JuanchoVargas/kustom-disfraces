@@ -94,17 +94,27 @@ export async function getConversationById(id: number): Promise<ConversationRow |
   return rows[0] ? normConv(rows[0]) : null
 }
 
-/** Estado del bot (slots, stack, handoff…) — persistido en conversations.bot_state. */
+/**
+ * Estado del bot (slots, stack, handoff…) — persistido en conversations.bot_state.
+ * RESILIENCIA: si la BD falla A MITAD de consulta (Neon suspendido/caído), degrada
+ * al Map en memoria en vez de lanzar — el bot debe responder siempre.
+ */
 export async function loadBotState(canal: Canal, externalId: string): Promise<ConvState> {
   const key = `${canal}:${externalId}`
   if (!await ready()) return memState.get(key) ?? DEFAULT_STATE
-  const rows = await sql().query(
-    `SELECT bot_state FROM conversations WHERE canal = $1 AND external_id = $2`,
-    [canal, externalId],
-  ) as Array<{ bot_state: Partial<ConvState> }>
-  const st = rows[0]?.bot_state
-  if (!st || typeof st !== 'object' || !('step' in st)) return DEFAULT_STATE
-  return { ...DEFAULT_STATE, ...st }
+  try {
+    const rows = await sql().query(
+      `SELECT bot_state FROM conversations WHERE canal = $1 AND external_id = $2`,
+      [canal, externalId],
+    ) as Array<{ bot_state: Partial<ConvState> }>
+    const st = rows[0]?.bot_state
+    if (!st || typeof st !== 'object' || !('step' in st)) return DEFAULT_STATE
+    return { ...DEFAULT_STATE, ...st }
+  }
+  catch (err) {
+    console.error(`[inbox] ⚠️ BD falló leyendo bot_state (${key}) — se usa memoria:`, String((err as Error)?.message ?? err))
+    return memState.get(key) ?? DEFAULT_STATE
+  }
 }
 
 export async function saveBotState(canal: Canal, externalId: string, patch: Partial<ConvState>): Promise<void> {
@@ -116,11 +126,17 @@ export async function saveBotState(canal: Canal, externalId: string, patch: Part
     memState.set(key, next)
     return
   }
-  await sql().query(
-    `INSERT INTO conversations (canal, external_id, bot_state) VALUES ($1, $2, $3::jsonb)
-     ON CONFLICT (canal, external_id) DO UPDATE SET bot_state = EXCLUDED.bot_state`,
-    [canal, externalId, JSON.stringify(next)],
-  )
+  try {
+    await sql().query(
+      `INSERT INTO conversations (canal, external_id, bot_state) VALUES ($1, $2, $3::jsonb)
+       ON CONFLICT (canal, external_id) DO UPDATE SET bot_state = EXCLUDED.bot_state`,
+      [canal, externalId, JSON.stringify(next)],
+    )
+  }
+  catch (err) {
+    memState.set(key, next) // que al menos esta instancia caliente recuerde el estado
+    console.error(`[inbox] ⚠️ BD falló guardando bot_state (${key}) — queda en memoria:`, String((err as Error)?.message ?? err))
+  }
 }
 
 export interface RecordMessageInput {

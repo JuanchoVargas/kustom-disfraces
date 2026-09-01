@@ -14,6 +14,34 @@ import { neon } from '@neondatabase/serverless'
 type Sql = ReturnType<typeof neon>
 let client: Sql | null = null
 let schemaReady: Promise<void> | null = null
+// Circuit breaker: tras un fallo de conexión, durante este lapso ready() falla
+// RÁPIDO (sin reintentos) para que el bot responda al cliente sin esperar a una
+// BD caída — cada función de inbox degrada a memoria (ver inbox.ts).
+let schemaFailedAt = 0
+const FAIL_COOLDOWN_MS = 30_000
+
+// Reintentos con backoff para el COLD START de Neon (el plan free suspende la BD
+// tras ~5 min de inactividad y la primera consulta puede fallar mientras despierta).
+// Nota: este proyecto usa el driver HTTP de Neon (cada consulta es un fetch), no un
+// Pool — no existe connectionTimeoutMillis; el tiempo de espera lo gobiernan el
+// timeout del fetch de la plataforma (>>10s) y estos reintentos (≈3.5s extra máx).
+const RETRY_DELAYS_MS = [500, 1000, 2000]
+
+async function withRetry<T>(fn: () => Promise<T>, label: string): Promise<T> {
+  let lastErr: unknown
+  for (let i = 0; i <= RETRY_DELAYS_MS.length; i++) {
+    try {
+      return await fn()
+    }
+    catch (err) {
+      lastErr = err
+      if (i === RETRY_DELAYS_MS.length) break
+      console.warn(`[db] ${label} falló (intento ${i + 1}/${RETRY_DELAYS_MS.length + 1}) — reintento en ${RETRY_DELAYS_MS[i]}ms:`, String((err as Error)?.message ?? err))
+      await new Promise(r => setTimeout(r, RETRY_DELAYS_MS[i]))
+    }
+  }
+  throw lastErr
+}
 
 export function dbConfigured(): boolean {
   return !!(process.env.POSTGRES_URL || process.env.DATABASE_URL)
@@ -66,11 +94,20 @@ const MIGRATION = [
 
 export function ensureSchema(): Promise<void> {
   if (!schemaReady) {
+    // Fallo reciente → no volver a esperar reintentos: el llamador degrada a
+    // memoria de inmediato y el cliente recibe su respuesta sin demora.
+    if (Date.now() - schemaFailedAt < FAIL_COOLDOWN_MS) {
+      return Promise.reject(new Error('db_en_cooldown_tras_fallo (se reintenta en <30s)'))
+    }
     schemaReady = (async () => {
       const q = sql()
-      for (const stmt of MIGRATION) await q.query(stmt)
+      // PRIMERA consulta con reintentos 500ms/1s/2s: cubre el cold start de Neon.
+      await withRetry(() => q.query(MIGRATION[0]), 'primera consulta (cold start)')
+      for (const stmt of MIGRATION.slice(1)) await q.query(stmt)
+      schemaFailedAt = 0
     })().catch((err) => {
       schemaReady = null // permitir reintento en la siguiente petición
+      schemaFailedAt = Date.now()
       throw err
     })
   }

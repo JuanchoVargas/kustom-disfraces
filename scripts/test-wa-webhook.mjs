@@ -36,22 +36,26 @@ function loadEnv() {
 const env = loadEnv()
 const sql = neon(env.POSTGRES_URL || env.DATABASE_URL)
 
-function webhook(text, wamid) {
+function webhook(text, wamid, type = 'text') {
+  const msg = { from: FROM, id: wamid, timestamp: String(Date.now() / 1000 | 0), type }
+  if (type === 'text') msg.text = { body: text }
+  else if (type === 'audio') msg.audio = { id: 'fake-audio', mime_type: 'audio/ogg' }
+  else if (type === 'sticker') msg.sticker = { id: 'fake-sticker', mime_type: 'image/webp' }
   return {
     object: 'whatsapp_business_account',
     entry: [{ id: '0', changes: [{ field: 'messages', value: {
       messaging_product: 'whatsapp',
       contacts: [{ profile: { name: 'Prueba Webhook' }, wa_id: FROM }],
-      messages: [{ from: FROM, id: wamid, timestamp: String(Date.now() / 1000 | 0), type: 'text', text: { body: text } }],
+      messages: [msg],
     } }] }],
   }
 }
 
-async function post(text, wamid) {
+async function post(text, wamid, type = 'text') {
   const r = await fetch(`${BASE}/api/whatsapp`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(webhook(text, wamid)),
+    body: JSON.stringify(webhook(text, wamid, type)),
   })
   return r.json()
 }
@@ -130,6 +134,21 @@ await sql.query(`UPDATE conversations SET estado='bot', humano_at=NULL, bot_stat
 await post('tienen disfraz de agente secreto?', `wamid.TEST-${uid}-5b`)
 const c5b = await conv()
 check('5b. "disfraz de agente secreto" NO dispara handoff', c5b.estado === 'bot', `estado=${c5b.estado}`)
+
+// --- 6: mensajes NO-TEXTO (audio, sticker) → aviso "solo texto" + menú ---
+await sql.query(`UPDATE conversations SET estado='bot', humano_at=NULL, bot_state='{}'::jsonb WHERE id=$1`, [c0.id])
+const r6 = await post(null, `wamid.TEST-${uid}-6`, 'audio')
+check('6. audio → responde (no se ignora)', r6.replied >= 1, JSON.stringify(r6))
+// El menú se parte en chunks de botones (≤3): el aviso va en el PRIMER chunk,
+// así que se busca en los últimos salientes, no solo en el último.
+const out6 = await sql.query(`SELECT texto FROM messages WHERE conversation_id=$1 AND direccion='out' ORDER BY id DESC LIMIT 3`, [c0.id])
+check('6. la respuesta avisa "solo puedo leer mensajes de texto" + menú', out6.some(m => /solo puedo leer mensajes de texto/.test(m.texto)), JSON.stringify(out6.map(m => m.texto.slice(0, 50))))
+const r6b = await post(null, `wamid.TEST-${uid}-6b`, 'sticker')
+check('6b. sticker → responde igual', r6b.replied >= 1, JSON.stringify(r6b))
+
+// --- 7: keepalive con BD viva ---
+const ka = await (await fetch(`${BASE}/api/cron/keepalive`)).json()
+check('7. /api/cron/keepalive responde ok con BD viva', ka.ok === true, JSON.stringify(ka))
 
 await cleanup()
 console.log(fails ? `\n${fails} PRUEBA(S) FALLARON` : '\nTODAS LAS PRUEBAS PASARON')

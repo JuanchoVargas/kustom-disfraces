@@ -39,46 +39,59 @@ export interface BotSession {
 // replied_at. Pasada la ventana, un reintento sin replied_at SÍ vuelve a procesarse.
 const INFLIGHT_MS = 60 * 1000
 
+/**
+ * RESILIENCIA: NADA de lo que hace esta función puede impedir que el bot responda.
+ * Si la BD falla (Neon suspendido/caído), se degrada: sin conversación en bandeja,
+ * sin dedupe y estado en memoria — pero el cliente SIEMPRE recibe respuesta.
+ */
 export async function openBotSession(canal: Canal, externalId: string, incoming: WaIncoming): Promise<BotSession> {
-  const conv = await upsertConversation(canal, externalId, incoming.profileName)
+  let conv: ConversationRow | null = null
   let duplicate = false
   let skip: BotSession['skip']
   let autoReturned = false
-  if (conv) {
-    const recorded = await recordMessage({
-      conversationId: conv.id,
-      direccion: 'in',
-      texto: incomingToText(incoming),
-      autor: 'cliente',
-      wamid: incoming.wamid,
-    })
-    // DEDUPE: recordMessage devuelve null si el wamid ya existía (reintento de Meta).
-    // Se salta el procesamiento SOLO si al original ya se le respondió con éxito
-    // (replied_at) o si acaba de llegar y sigue en vuelo. Un reintento de un mensaje
-    // al que NUNCA se le respondió se procesa de nuevo (antes de este fix el
-    // duplicado solo dejaba de guardarse, y un fallo de envío quedaba sin reintento).
-    if (!recorded && incoming.wamid) {
-      const prev = await getMessageByWamid(incoming.wamid)
-      if (prev) {
-        duplicate = true
-        if (prev.replied_at) skip = 'duplicado_ya_respondido'
-        else if (Date.now() - new Date(prev.created_at).getTime() < INFLIGHT_MS) skip = 'duplicado_en_vuelo'
+  try {
+    conv = await upsertConversation(canal, externalId, incoming.profileName)
+    if (conv) {
+      const recorded = await recordMessage({
+        conversationId: conv.id,
+        direccion: 'in',
+        texto: incomingToText(incoming),
+        autor: 'cliente',
+        wamid: incoming.wamid,
+      })
+      // DEDUPE: recordMessage devuelve null si el wamid ya existía (reintento de Meta).
+      // Se salta el procesamiento SOLO si al original ya se le respondió con éxito
+      // (replied_at) o si acaba de llegar y sigue en vuelo. Un reintento de un mensaje
+      // al que NUNCA se le respondió se procesa de nuevo (antes de este fix el
+      // duplicado solo dejaba de guardarse, y un fallo de envío quedaba sin reintento).
+      if (!recorded && incoming.wamid) {
+        const prev = await getMessageByWamid(incoming.wamid)
+        if (prev) {
+          duplicate = true
+          if (prev.replied_at) skip = 'duplicado_ya_respondido'
+          else if (Date.now() - new Date(prev.created_at).getTime() < INFLIGHT_MS) skip = 'duplicado_en_vuelo'
+        }
+      }
+      // Una conversación cerrada que recibe mensaje vuelve a manos del bot.
+      if (conv.estado === 'cerrado') {
+        await setEstado(conv.id, 'bot')
+        conv.estado = 'bot'
+      }
+      // HANDOFF CON TIMEOUT: en humano SIN respuesta de un agente en 30 min, la
+      // conversación vuelve sola al bot (y se limpia flaggedForHuman en bot_state)
+      // para que el cliente no quede hablando al vacío.
+      if (conv.estado === 'humano' && await autoReturnToBot(conv.id)) {
+        conv.estado = 'bot'
+        autoReturned = true
+        console.info(`[${canal}] ⏱️ conversación #${conv.id} (${externalId}) devuelta al BOT (${HUMAN_TIMEOUT_MIN} min sin agente)`)
       }
     }
-    // Una conversación cerrada que recibe mensaje vuelve a manos del bot.
-    if (conv.estado === 'cerrado') {
-      await setEstado(conv.id, 'bot')
-      conv.estado = 'bot'
-    }
-    // HANDOFF CON TIMEOUT: en humano SIN respuesta de un agente en 30 min, la
-    // conversación vuelve sola al bot (y se limpia flaggedForHuman en bot_state)
-    // para que el cliente no quede hablando al vacío.
-    if (conv.estado === 'humano' && await autoReturnToBot(conv.id)) {
-      conv.estado = 'bot'
-      autoReturned = true
-      console.info(`[${canal}] ⏱️ conversación #${conv.id} (${externalId}) devuelta al BOT (${HUMAN_TIMEOUT_MIN} min sin agente)`)
-    }
   }
+  catch (err) {
+    conv = null // sesión degradada: sin bandeja ni dedupe, pero el bot responde
+    console.error(`[${canal}] ⚠️ BD caída al abrir sesión de ${externalId} — el bot responde igual (estado en memoria):`, String((err as Error)?.message ?? err))
+  }
+  // loadBotState nunca lanza: degrada por sí solo al Map en memoria.
   const state = await loadBotState(canal, externalId)
   if (autoReturned) state.flaggedForHuman = false // ya limpiado en BD por autoReturnToBot
   const silenced = conv?.estado === 'humano' && !state.flaggedForHuman
@@ -101,38 +114,56 @@ export interface CloseBotSessionInput {
   delivered: boolean
 }
 
+/**
+ * RESILIENCIA: la respuesta al cliente YA SE ENVIÓ cuando esto corre. Toda la
+ * persistencia va en try/catch que solo loguea — un fallo de BD aquí no puede
+ * romper el webhook ni afectar lo que el cliente ya recibió.
+ */
 export async function closeBotSession(input: CloseBotSessionInput): Promise<void> {
   const { session, canal, externalId, incoming, sentTexts, patch, delivered } = input
   const conv = session.conv
-  if (conv) {
-    for (const texto of sentTexts) {
-      await recordMessage({ conversationId: conv.id, direccion: 'out', texto, autor: 'bot' })
+  try {
+    if (conv) {
+      for (const texto of sentTexts) {
+        await recordMessage({ conversationId: conv.id, direccion: 'out', texto, autor: 'bot' })
+      }
     }
+    if (delivered && incoming.wamid) await markWamidReplied(incoming.wamid)
   }
-  if (delivered && incoming.wamid) await markWamidReplied(incoming.wamid)
+  catch (err) {
+    console.error(`[${canal}] ⚠️ BD caída al persistir salientes de ${externalId} (la respuesta YA se envió):`, String((err as Error)?.message ?? err))
+  }
+  // saveBotState nunca lanza: degrada por sí solo al Map en memoria.
   await saveBotState(canal, externalId, patch)
 
-  if (!conv) {
-    if (patch.flaggedForHuman) console.info(`[${canal}] 🙋 conversación marcada para ATENCIÓN HUMANA: ${externalId}`)
-    return
-  }
   if (patch.flaggedForHuman) {
-    // Handoff pedido por el cliente: pasa a humano, se marca no leída y se avisa a ventas.
-    await setEstado(conv.id, 'humano', { markUnread: true })
-    console.info(`[${canal}] 🙋 conversación #${conv.id} pasa a ATENCIÓN HUMANA: ${externalId}${incoming.profileName ? ` (${incoming.profileName})` : ''}`)
-    // Anti-spam: máx. un aviso (correo + WhatsApp) cada 30 min por conversación.
-    if (!await claimHandoffAlert(conv.id)) {
-      console.info(`[${canal}] aviso de handoff #${conv.id} omitido (ya se avisó hace <${ALERT_COOLDOWN_MIN} min)`)
-      return
+    // Handoff pedido por el cliente: pasa a humano, se marca no leída y se avisa a
+    // ventas. Las ALERTAS (correo + WhatsApp al encargado) salen AUNQUE la BD esté
+    // caída (conv null): sin bandeja disponible son el único rastro del pedido.
+    console.info(`[${canal}] 🙋 conversación ${conv ? `#${conv.id}` : `(sin BD)`} pasa a ATENCIÓN HUMANA: ${externalId}${incoming.profileName ? ` (${incoming.profileName})` : ''}`)
+    try {
+      if (conv) {
+        await setEstado(conv.id, 'humano', { markUnread: true })
+        // Anti-spam: máx. un aviso (correo + WhatsApp) cada 30 min por conversación.
+        if (!await claimHandoffAlert(conv.id)) {
+          console.info(`[${canal}] aviso de handoff #${conv.id} omitido (ya se avisó hace <${ALERT_COOLDOWN_MIN} min)`)
+          return
+        }
+      }
     }
-    const nombre = incoming.profileName || conv.nombre || undefined
+    catch (err) {
+      console.error(`[${canal}] ⚠️ BD caída al marcar handoff de ${externalId} — las alertas salen igual:`, String((err as Error)?.message ?? err))
+    }
+    const nombre = incoming.profileName || conv?.nombre || undefined
     const ultimoMensaje = incomingToText(incoming)
-    await sendHandoffAlert({ canal, externalId, nombre, ultimoMensaje, conversationId: conv.id })
-    await notifyManagerWhatsApp(canal, externalId, nombre, ultimoMensaje)
+    await sendHandoffAlert({ canal, externalId, nombre, ultimoMensaje, conversationId: conv?.id }).catch(err =>
+      console.error(`[${canal}] fallo enviando correo de handoff:`, String((err as Error)?.message ?? err)))
+    await notifyManagerWhatsApp(canal, externalId, nombre, ultimoMensaje) // nunca lanza
   }
-  else if (patch.flaggedForHuman === false && conv.estado === 'humano') {
+  else if (patch.flaggedForHuman === false && conv?.estado === 'humano') {
     // El cliente reactivó el bot con "menú" antes de que alguien lo atendiera.
-    await setEstado(conv.id, 'bot')
+    await setEstado(conv.id, 'bot').catch(err =>
+      console.error(`[${canal}] ⚠️ BD caída devolviendo #${conv.id} al bot:`, String((err as Error)?.message ?? err)))
   }
 }
 
