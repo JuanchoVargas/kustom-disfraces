@@ -11,6 +11,11 @@
         {
           "slug": "peluches-linea",
           "nombre": "Peluches de Línea"
+        },
+        {
+          "slug": "fantasia",
+          "nombre": "Fantasía",
+          "placeholder": true
         }
       ]
     },
@@ -43,6 +48,11 @@
         {
           "slug": "ninjas",
           "nombre": "Ninjas"
+        },
+        {
+          "slug": "fantasia",
+          "nombre": "Fantasía",
+          "placeholder": true
         }
       ]
     },
@@ -66,6 +76,11 @@
           "slug": "princesas",
           "nombre": "Princesas",
           "placeholder": true
+        },
+        {
+          "slug": "fantasia",
+          "nombre": "Fantasía",
+          "placeholder": true
         }
       ]
     },
@@ -85,6 +100,11 @@
           "slug": "princesas",
           "nombre": "Princesas",
           "placeholder": true
+        },
+        {
+          "slug": "fantasia",
+          "nombre": "Fantasía",
+          "placeholder": true
         }
       ]
     },
@@ -99,6 +119,11 @@
         {
           "slug": "trusas",
           "nombre": "Trusas"
+        },
+        {
+          "slug": "fantasia",
+          "nombre": "Fantasía",
+          "placeholder": true
         }
       ]
     },
@@ -106,7 +131,13 @@
       "slug": "combos",
       "nombre": "Combos",
       "placeholder": false,
-      "subcategorias": []
+      "subcategorias": [
+        {
+          "slug": "fantasia",
+          "nombre": "Fantasía",
+          "placeholder": true
+        }
+      ]
     }
   ]
 }

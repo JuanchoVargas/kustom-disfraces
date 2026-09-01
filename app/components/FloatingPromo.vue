@@ -1,15 +1,22 @@
 <script setup lang="ts">
 /**
- * Banner flotante de envío gratis. Solo en home y PDP (`/`, `/producto/*`).
- * Se cierra con la X y no vuelve a aparecer en esa sesión — usa sessionStorage
- * (NO localStorage: en una pestaña/sesión nueva vuelve a aparecer). CSS puro.
+ * Banner flotante del 20% de descuento. SOLO en PDP (`/producto/*`): en el home
+ * el mensaje ya lo da el banner grande (DiscountBanner) y el envío gratis vive
+ * en la barra superior — distribución aprobada por el cliente (sep 2026).
+ * Atado al mismo flag que badges y banner (NUXT_PUBLIC_SHOW_DISCOUNT): promo
+ * apagada = flotante oculto. Se cierra con la X y no vuelve a aparecer en esa
+ * sesión — usa sessionStorage (NO localStorage: en una pestaña/sesión nueva
+ * vuelve a aparecer). CSS puro.
  */
 const route = useRoute()
-const STORAGE_KEY = 'kustom-promo-envio-cerrado'
+// Key nueva (antes 'kustom-promo-envio-cerrado'): quien cerró el aviso de envío
+// gratis sí debe ver esta promo distinta.
+const STORAGE_KEY = 'kustom-promo-descuento-cerrado'
 
-const showOnThisRoute = computed(() => route.path === '/' || route.path.startsWith('/producto/'))
+const { enabled, pct } = useFakeDiscount()
+const showOnThisRoute = computed(() => route.path.startsWith('/producto/'))
 const dismissed = ref(false)
-const visible = computed(() => showOnThisRoute.value && !dismissed.value)
+const visible = computed(() => enabled.value && showOnThisRoute.value && !dismissed.value)
 
 onMounted(() => {
   try {
@@ -30,8 +37,8 @@ function close() {
 
 <template>
   <Transition name="promo">
-    <div v-if="visible" class="promo" role="note" aria-label="Promoción de envío">
-      <span class="promo__text">🚚 Envío gratis a todo el país</span>
+    <div v-if="visible" class="promo" role="note" aria-label="Promoción de descuento">
+      <span class="promo__text">🎉 {{ pct }}% de descuento en todos nuestros disfraces</span>
       <button type="button" class="promo__close" aria-label="Cerrar aviso" @click="close">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">
           <path d="M6 6l12 12M18 6L6 18" />

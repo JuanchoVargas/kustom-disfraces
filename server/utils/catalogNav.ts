@@ -10,7 +10,7 @@ import catalogoData from '~~/app/data/catalogo.json'
  * disponibilidad podría variar; la estructura de públicos/subcategorías no.
  */
 
-interface RawSub { slug: string, nombre: string }
+interface RawSub { slug: string, nombre: string, placeholder?: boolean }
 interface RawPublico { slug: string, nombre: string, placeholder?: boolean, subcategorias: RawSub[] }
 interface RawCatalogoItem { publicos?: string[], subcategoriaNav?: string | null, disponibleWeb?: boolean }
 
@@ -29,7 +29,9 @@ export function getPublicos(): NavPublico[] {
         slug: pub.slug,
         nombre: pub.nombre,
         count: prods.length,
-        rawSubs: pub.subcategorias.length,
+        // subs "por llenar" (placeholder, ej. Fantasía) no cuentan para mostrar
+        // un público vacío: Combos sigue oculto hasta tener productos reales.
+        rawSubs: pub.subcategorias.filter(s => !s.placeholder).length,
         subcategorias: pub.subcategorias
           .map(s => ({ slug: s.slug, nombre: s.nombre, count: prods.filter(p => p.subcategoriaNav === s.slug).length }))
           .filter(s => s.count > 0),

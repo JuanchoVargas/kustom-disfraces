@@ -25,6 +25,11 @@ useHead({
     <HeroCarousel />
   </div>
 
+  <!-- Banner 20% dcto (full-width, morado): mensaje del descuento en el home.
+       El envío gratis vive en la barra superior; el flotante (PDP) repite el
+       20%. Distribución aprobada por el cliente (sep 2026). -->
+  <DiscountBanner />
+
   <!-- Zona texturizada estándar: patrón crema a 0.045 detrás del resto
        de secciones (las cards van en blanco encima) -->
   <div class="textured">

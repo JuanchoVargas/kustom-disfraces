@@ -84,6 +84,8 @@ export default defineNuxtConfig({
     smtpPass: process.env.SMTP_PASS || '',                  // -> NUXT_SMTP_PASS (clave del buzón)
     smtpFrom: process.env.SMTP_FROM || '',                  // -> NUXT_SMTP_FROM (remitente; por defecto = smtpUser)
     mayoristasTo: process.env.MAYORISTAS_TO || 'contacto@disfraceskustom.com', // -> NUXT_MAYORISTAS_TO
+    // Buzón principal de PQRS (la copia oculta va a ventasTo). Cambiable sin código.
+    pqrsTo: process.env.PQRS_TO || 'contacto@disfraceskustom.com', // -> NUXT_PQRS_TO
     // Buzón de VENTAS: adónde llega el aviso de cada pago aprobado (Fase 4). Distinto
     // del remitente (contacto@) para que no se deduplique. Cambiable sin tocar código.
     ventasTo: process.env.VENTAS_TO || 'ventas@disfraceskustom.com', // -> NUXT_VENTAS_TO

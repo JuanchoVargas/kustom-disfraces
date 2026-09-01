@@ -27,6 +27,7 @@ export const useSiteNav = () => {
     { label: 'Guía de tallas', to: '/tallas' },
     { label: 'Preguntas frecuentes', to: '/faq' },
     { label: 'Ventas al por mayor', to: '/mayoristas' },
+    { label: 'PQRS', to: '/pqrs' },
     { label: 'Política de tratamiento de datos', to: '/politica-datos' },
   ]
 
