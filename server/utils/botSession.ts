@@ -188,7 +188,11 @@ async function notifyManagerWhatsApp(canal: Canal, externalId: string, nombre: s
       console.error('[inbox-alert] NUXT_ALERT_WHATSAPP_TO sin configurar — no se envía alerta por WhatsApp (queda el correo)')
       return
     }
-    const contacto = canal === 'wa' ? `+${externalId}` : `${canal === 'ig' ? 'Instagram' : 'Messenger'} ${externalId}`
+    // Un external_id de solo dígitos es teléfono (se muestra con +); un BSUID
+    // ("CO.1041…", usuarios con username sin teléfono visible) se muestra tal cual.
+    const contacto = canal === 'wa'
+      ? (/^\d+$/.test(externalId) ? `+${externalId}` : externalId)
+      : `${canal === 'ig' ? 'Instagram' : 'Messenger'} ${externalId}`
     const params = [
       templateParam(nombre || 'Cliente sin nombre', 60),
       templateParam(contacto, 60),

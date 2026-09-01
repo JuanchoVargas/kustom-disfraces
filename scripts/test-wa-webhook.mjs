@@ -150,6 +150,35 @@ check('6b. sticker → responde igual', r6b.replied >= 1, JSON.stringify(r6b))
 const ka = await (await fetch(`${BASE}/api/cron/keepalive`)).json()
 check('7. /api/cron/keepalive responde ok con BD viva', ka.ok === true, JSON.stringify(ka))
 
+// --- 8: FIXTURE REAL del esquema nuevo de Meta (BSUID/username, sin from ni wa_id) ---
+// Payload capturado con [wa-raw] de un mensaje que el bot ignoraba: contacts trae
+// user_id + username (sin wa_id) y el mensaje trae from_user_id (sin from).
+const BSUID = 'CO.1041701705436358'
+async function cleanupBsuid() {
+  await sql.query(`DELETE FROM conversations WHERE canal='wa' AND external_id=$1`, [BSUID])
+}
+await cleanupBsuid()
+const bsuidPayload = {
+  object: 'whatsapp_business_account',
+  entry: [{ id: '0', changes: [{ field: 'messages', value: {
+    messaging_product: 'whatsapp',
+    contacts: [{ profile: { name: 'Nicolas Vargas', username: 'n._.vargas._.r' }, user_id: BSUID }],
+    messages: [{ from_user_id: BSUID, id: 'wamid.HBgTQ08uMTA0MTcwMTcwNTQzNjM1OBUU-fixture', timestamp: '1788237267', text: { body: 'Hola' }, type: 'text' }],
+  } }] }],
+}
+const r8 = await (await fetch(`${BASE}/api/whatsapp`, {
+  method: 'POST',
+  headers: { 'content-type': 'application/json' },
+  body: JSON.stringify(bsuidPayload),
+})).json()
+check('8. payload BSUID (sin from/wa_id) → se procesa y responde', r8.replied >= 1, JSON.stringify(r8))
+const conv8 = (await sql.query(`SELECT external_id, nombre, estado FROM conversations WHERE canal='wa' AND external_id=$1`, [BSUID]))[0]
+check('8. conversación creada con external_id = BSUID', conv8?.external_id === BSUID, JSON.stringify(conv8))
+check('8. nombre del contacto = "Nicolas Vargas"', conv8?.nombre === 'Nicolas Vargas', JSON.stringify(conv8?.nombre))
+const in8 = (await sql.query(`SELECT wamid, texto FROM messages m JOIN conversations c ON c.id=m.conversation_id WHERE c.external_id=$1 AND m.direccion='in'`, [BSUID]))[0]
+check('8. entrante guardado con su wamid', !!in8?.wamid && in8.texto === 'Hola', JSON.stringify(in8))
+await cleanupBsuid()
+
 await cleanup()
 console.log(fails ? `\n${fails} PRUEBA(S) FALLARON` : '\nTODAS LAS PRUEBAS PASARON')
 process.exit(fails ? 1 : 0)

@@ -539,7 +539,10 @@ export async function sendHandoffAlert(data: HandoffAlert): Promise<{ sent: bool
   const inboxUrl = data.conversationId ? `${site}/admin/chats?c=${data.conversationId}` : `${site}/admin/chats`
   const canal = CANAL_LABEL[data.canal]
   const quien = data.nombre ? `${data.nombre} (${data.externalId})` : data.externalId
-  const contacto = data.canal === 'wa' ? `+${data.externalId}` : `${canal} · ${data.externalId}`
+  // Solo dígitos = teléfono (con +); un BSUID ("CO.1041…") se muestra tal cual.
+  const contacto = data.canal === 'wa'
+    ? (/^\d+$/.test(data.externalId) ? `+${data.externalId}` : data.externalId)
+    : `${canal} · ${data.externalId}`
 
   const row = (label: string, value: string) =>
     `<tr><td style="padding:3px 0;font-family:Arial,sans-serif;font-size:13px;color:#888;width:120px;vertical-align:top;">${label}</td><td style="padding:3px 0;font-family:Arial,sans-serif;font-size:13px;color:${C.ink};font-weight:bold;">${value}</td></tr>`

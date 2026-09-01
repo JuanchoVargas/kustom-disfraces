@@ -55,12 +55,21 @@ export interface WaIncoming {
 }
 
 function parseWaMessage(msg: any, value: any): WaIncoming | null {
-  if (!msg?.from) return null
-  const from = String(msg.from)
-  // El nombre de perfil del contacto que corresponde a ESTE remitente (Meta puede
-  // traer varios contacts en un batch).
   const contacts: any[] = Array.isArray(value?.contacts) ? value.contacts : []
-  const profileName = (contacts.find(c => String(c?.wa_id ?? '') === from) ?? contacts[0])?.profile?.name
+  // IDENTIDAD DEL REMITENTE en cascada. Meta migró a Business-Scoped User IDs
+  // (BSUID, p. ej. "CO.1041701705436358"): con username activo el teléfono puede
+  // NO venir — llega from_user_id en el mensaje y user_id en contacts, SIN "from"
+  // ni "wa_id". Antes eso descartaba el mensaje en silencio (bot mudo).
+  const rawFrom = msg?.from ?? msg?.from_user_id ?? contacts[0]?.wa_id ?? contacts[0]?.user_id
+  if (!rawFrom) {
+    // Sin NINGÚN identificador no hay a quién responder — pero jamás en silencio.
+    console.error('[whatsapp] ❌ mensaje SIN identidad de remitente (ni from, ni from_user_id, ni contacts) — msg:', JSON.stringify(msg))
+    return null
+  }
+  const from = String(rawFrom)
+  // El nombre de perfil del contacto que corresponde a ESTE remitente (Meta puede
+  // traer varios contacts en un batch): casa por wa_id O por user_id (BSUID).
+  const profileName = (contacts.find(c => String(c?.wa_id ?? '') === from || String(c?.user_id ?? '') === from) ?? contacts[0])?.profile?.name
   const wamid = msg.id ? String(msg.id) : undefined
 
   if (msg.type === 'text') return { from, kind: 'text', text: msg.text?.body ?? '', profileName, wamid }
@@ -119,7 +128,7 @@ export function parseDebugSummary(body: any): string {
       const messages: any[] = Array.isArray(value?.messages) ? value.messages : []
       const statuses: any[] = Array.isArray(value?.statuses) ? value.statuses : []
       const msgInfo = messages.length
-        ? ` [${messages.map(m => `${m?.type ?? '?'}←${m?.from ?? '?'}`).join(', ')}]`
+        ? ` [${messages.map(m => `${m?.type ?? '?'}←${m?.from ?? m?.from_user_id ?? '?'}`).join(', ')}]`
         : ''
       parts.push(`e${ei}.c${ci} field=${change?.field ?? '—'} messages=${messages.length}${msgInfo} statuses=${statuses.length}${!messages.length && !statuses.length ? ` valueKeys=${Object.keys(value ?? {}).join(',') || 'ninguna'}` : ''}`)
     })

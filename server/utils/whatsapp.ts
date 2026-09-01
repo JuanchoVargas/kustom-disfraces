@@ -273,6 +273,18 @@ export function whatsappConfigured(): boolean {
   return !!(c.whatsappToken && c.whatsappPhoneId)
 }
 
+/**
+ * Campo de DESTINO según el tipo de identidad. Meta migró a Business-Scoped User
+ * IDs (BSUID, p. ej. "CO.1041701705436358") para usuarios con username: a esos NO
+ * se les puede poner en "to" (formato teléfono); la Cloud API pide `recipient:
+ * <BSUID>` OMITIENDO `to` (recipient_type sigue "individual"). Un destino de solo
+ * dígitos es un teléfono E.164 y va en `to` como siempre.
+ * Doc: developers.facebook.com/documentation/business-messaging/whatsapp/business-scoped-user-ids/
+ */
+function recipientFields(to: string): Record<string, string> {
+  return /^\d+$/.test(to) ? { to } : { recipient: to }
+}
+
 /** Envía un mensaje por la Cloud API. NO lanza: registra el fallo y devuelve false. */
 export async function sendWhatsAppMessage(to: string, message: WaMessage): Promise<boolean> {
   const { whatsappToken, whatsappPhoneId } = useRuntimeConfig()
@@ -284,14 +296,15 @@ export async function sendWhatsAppMessage(to: string, message: WaMessage): Promi
     await $fetch(`https://graph.facebook.com/${GRAPH_VERSION}/${whatsappPhoneId}/messages`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${whatsappToken}` },
-      body: { messaging_product: 'whatsapp', recipient_type: 'individual', to, ...sanitizeForSend(message) },
+      body: { messaging_product: 'whatsapp', recipient_type: 'individual', ...recipientFields(to), ...sanitizeForSend(message) },
     })
     return true
   }
-  catch (err) {
-    // Se redacta el Bearer por si apareciera en el error.
-    const msg = String((err as Error)?.message ?? err).replace(/Bearer\s+[^\s"']+/gi, 'Bearer ***')
-    console.error(`[whatsapp] fallo al enviar a ${to}:`, msg)
+  catch (err: any) {
+    // Detalle REAL de Graph (code/title/details) — clave para depurar destinos
+    // BSUID; se redacta el Bearer por si apareciera en el error.
+    const detail = JSON.stringify(err?.data ?? err?.response?._data ?? err?.message ?? err).replace(/Bearer\s+[^\s"']+/gi, 'Bearer ***')
+    console.error(`[whatsapp] fallo al enviar a ${to} (${/^\d+$/.test(to) ? 'to=teléfono' : 'recipient=BSUID'}):`, detail)
     return false
   }
 }
@@ -314,7 +327,7 @@ export async function sendTemplateMessage(to: string, templateName: string, para
       headers: { Authorization: `Bearer ${whatsappToken}` },
       body: {
         messaging_product: 'whatsapp',
-        to,
+        ...recipientFields(to),
         type: 'template',
         template: {
           name: templateName,
