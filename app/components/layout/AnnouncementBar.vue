@@ -17,6 +17,9 @@ const ANNOUNCEMENT_TEXT_2 = 'A TODO EL PAÍS'
       <span class="announce__spark" aria-hidden="true">✦</span>
       <p class="announce__text">
         <span class="announce__part">{{ ANNOUNCEMENT_TEXT_1 }}</span>
+        <!-- Espacio explícito: Vue (whitespace: 'condense') elimina el blanco
+             entre elementos cuando incluye salto de línea → "GRATISA" en desktop -->
+        {{ ' ' }}
         <span class="announce__part">{{ ANNOUNCEMENT_TEXT_2 }}</span>
       </p>
       <span class="announce__spark" aria-hidden="true">✦</span>
