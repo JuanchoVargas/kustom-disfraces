@@ -55,6 +55,8 @@ export interface Product {
   pareja?: ProductPareja
   /** Foto de figura única (sin frente+espalda): los crops "solo frontal" no aplican */
   fotoIndividual?: boolean
+  /** Grupo del catálogo (super|economico|anime…) — decide p. ej. la guía de tallas */
+  grupo?: string
 }
 
 export interface Category {

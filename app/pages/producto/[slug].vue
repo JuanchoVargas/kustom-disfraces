@@ -121,6 +121,8 @@ const parejaPrompt = computed(() => {
 const added = ref(false)
 const needsSize = ref(false)
 const showSizeGuide = ref(false)
+// La Línea Eco (grupo economico) tiene su propia tabla de medidas.
+const sizeGuideVariant = computed(() => (product.value?.grupo === 'economico' ? 'eco' : 'general'))
 // El aviso se apaga apenas el usuario elige talla
 watch(size, (s) => { if (s !== null) needsSize.value = false })
 function addToCart() {
@@ -291,7 +293,7 @@ const perks = [
     </template>
   </div>
 
-  <SizeGuideModal v-model="showSizeGuide" />
+  <SizeGuideModal v-model="showSizeGuide" :variant="sizeGuideVariant" />
   </div>
 </template>
 

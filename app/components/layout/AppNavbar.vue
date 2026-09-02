@@ -167,6 +167,15 @@ watch(() => route.fullPath, () => {
           Mayoristas
         </NuxtLink>
 
+        <!-- acceso al formulario PQRS (mismo estilo pill que Mayoristas) -->
+        <NuxtLink to="/pqrs" class="mayolink" :class="{ on: route.path === '/pqrs' }">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="3" y="5" width="18" height="14" rx="2" />
+            <path d="m3 7 9 6 9-6" />
+          </svg>
+          Contáctenos
+        </NuxtLink>
+
         <KButton variant="whatsapp" size="sm" :to="contact.whatsapp">
           <template #icon-left>
             <svg class="wa-ico" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -280,6 +289,15 @@ watch(() => route.fullPath, () => {
             <circle cx="7.5" cy="7.5" r="1.3" fill="currentColor" stroke="none" />
           </svg>
           Ventas al por mayor
+        </NuxtLink>
+
+        <!-- acceso al formulario PQRS, junto al comercial -->
+        <NuxtLink to="/pqrs" class="menu__mayo menu__contact" :class="{ on: route.path === '/pqrs' }">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="3" y="5" width="18" height="14" rx="2" />
+            <path d="m3 7 9 6 9-6" />
+          </svg>
+          Contáctenos
         </NuxtLink>
       </div>
     </nav>
@@ -621,6 +639,8 @@ watch(() => route.fullPath, () => {
   outline: 2px solid var(--turq);
   outline-offset: -2px;
 }
+/* Contáctenos va pegado a Mayoristas (comparten bloque, sin doble margen) */
+.m .menu__contact { margin-top: 0; }
 
 /* ===================== compartido: logo + iconbtn + cartdot ===================== */
 .logo {

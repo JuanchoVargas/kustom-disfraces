@@ -33,6 +33,7 @@ export const catalogoToProducts = (catalogo: ProductoCatalogo[]): Product[] => {
         season: item.temporada,
         publicos: item.publicos,
         subcategoriasNav: item.subcategoriaNav ? [item.subcategoriaNav] : [],
+        grupo: item.grupo,
       }
       if (item.destacado) product.featured = true
       if (item.fotoIndividual) product.fotoIndividual = true

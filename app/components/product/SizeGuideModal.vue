@@ -4,8 +4,19 @@
  * de tallas) y muestra la imagen nítida. Cierra con la X, con clic afuera y con
  * Escape. En móvil ocupa casi toda la pantalla. Bloquea el scroll del fondo
  * mientras está abierto.
+ *
+ * `variant`: la Línea Eco tiene su propia tabla de medidas (guia-tallas-eco);
+ * el resto de líneas usa la guía general. La PDP decide por product.grupo.
  */
 const open = defineModel<boolean>({ required: true })
+
+const { variant = 'general' } = defineProps<{ variant?: 'general' | 'eco' }>()
+
+const GUIDES = {
+  general: { src: '/images/guia-tallas.webp', alt: 'Guía de tallas de Kustom Disfraces', width: 1080, height: 1350 },
+  eco: { src: '/images/guia-tallas-eco.webp', alt: 'Guía de tallas de la Línea Eco de Kustom Disfraces', width: 1132, height: 1600 },
+} as const
+const guide = computed(() => GUIDES[variant])
 
 function close() {
   open.value = false
@@ -53,11 +64,11 @@ onBeforeUnmount(() => {
             </svg>
           </button>
           <img
-            src="/images/guia-tallas.webp"
-            alt="Guía de tallas de Kustom Disfraces"
+            :src="guide.src"
+            :alt="guide.alt"
             class="sg__img"
-            width="1080"
-            height="1350"
+            :width="guide.width"
+            :height="guide.height"
           >
         </div>
       </div>
