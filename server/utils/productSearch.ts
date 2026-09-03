@@ -190,6 +190,13 @@ export function searchProducts(query: string, limit = 8): SearchResult | null {
   return { matches: scored.slice(0, limit).map(x => x.e.p), requestedSize: size }
 }
 
+/** Rango de precios del catálogo visible (para la respuesta general de "¿precios?"). */
+export function priceRange(): { min: number, max: number } {
+  const precios = buildIndex().map(e => e.p.precio).filter(n => Number.isFinite(n) && n > 0)
+  if (!precios.length) return { min: 0, max: 0 }
+  return { min: Math.min(...precios), max: Math.max(...precios) }
+}
+
 /** Lookup directo por slug (no búsqueda difusa). undefined si no existe/visible. */
 export function getProductBySlug(slug: string): FoundProduct | undefined {
   return buildIndex().find(e => e.p.slug === slug)?.p

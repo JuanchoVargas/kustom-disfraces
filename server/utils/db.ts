@@ -87,6 +87,32 @@ const MIGRATION = [
   // envió la respuesta con éxito. Un reintento del mismo wamid sin replied_at puede
   // volver a responder (antes un duplicado guardado ya no volvía a intentarse).
   `ALTER TABLE messages ADD COLUMN IF NOT EXISTS replied_at TIMESTAMPTZ`,
+  // BANDEJA v2 — medios (imágenes, audios, documentos…) guardados en la propia BD
+  // (BYTEA, máx. 4 MB por archivo: límite de respuesta de Vercel). `token` es la
+  // clave PÚBLICA e inadivinable con la que se sirve en /api/media/<token>.
+  `CREATE TABLE IF NOT EXISTS media (
+    id         BIGSERIAL PRIMARY KEY,
+    token      TEXT NOT NULL UNIQUE,
+    mime       TEXT NOT NULL,
+    bytes      INTEGER NOT NULL,
+    filename   TEXT,
+    data       BYTEA NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  )`,
+  // Tipo del mensaje (text|image|sticker|audio|video|document|location|contacts|
+  // reaction|unsupported), archivo asociado y metadatos (caption, coordenadas,
+  // nombre de archivo, motivo si no se pudo descargar…).
+  `ALTER TABLE messages ADD COLUMN IF NOT EXISTS tipo TEXT NOT NULL DEFAULT 'text'`,
+  `ALTER TABLE messages ADD COLUMN IF NOT EXISTS media_id BIGINT REFERENCES media(id) ON DELETE SET NULL`,
+  `ALTER TABLE messages ADD COLUMN IF NOT EXISTS meta JSONB`,
+  // Identidad del cliente de WhatsApp: teléfono (si Meta lo entrega), BSUID
+  // (identidad nueva, p. ej. CO.1041…) y username. external_id sigue siendo la
+  // clave de la conversación; estos son datos de contacto para la bandeja.
+  `ALTER TABLE conversations ADD COLUMN IF NOT EXISTS telefono TEXT`,
+  `ALTER TABLE conversations ADD COLUMN IF NOT EXISTS bsuid TEXT`,
+  `ALTER TABLE conversations ADD COLUMN IF NOT EXISTS username TEXT`,
+  // Cuándo se archivó (estado='cerrado' = "Archivada" en la bandeja; nunca se borra).
+  `ALTER TABLE conversations ADD COLUMN IF NOT EXISTS archivada_at TIMESTAMPTZ`,
   `CREATE INDEX IF NOT EXISTS messages_conversation_idx ON messages (conversation_id, id)`,
   `CREATE INDEX IF NOT EXISTS conversations_actividad_idx ON conversations (ultima_actividad DESC)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS messages_wamid_idx ON messages (wamid) WHERE wamid IS NOT NULL`,

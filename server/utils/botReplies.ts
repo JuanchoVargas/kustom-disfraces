@@ -3,7 +3,7 @@ import type { ConvState, WaIncoming } from './whatsappBot'
 import { interactiveOptions, waButtons, waText } from './whatsapp'
 import { buildBotReplies } from './whatsappBot'
 import { publicoNombre } from './catalogNav'
-import { normalize, searchProducts, searchVocabulary } from './productSearch'
+import { formatCOP, normalize, priceRange, searchProducts, searchVocabulary } from './productSearch'
 
 /**
  * Capa de intención OMNICANAL (WhatsApp + Messenger/Instagram). Envuelve al cerebro
@@ -165,14 +165,77 @@ function askPersonaje(state: ConvState, slots: NonNullable<ConvState['slots']>, 
   }
 }
 
-/** 0 coincidencias: copy + link al PDF + acciones. */
+/** 0 coincidencias: copy (sin carita triste) + link al PDF + catálogo/asesor/menú. */
 function sinResultados(state: ConvState, slots: NonNullable<ConvState['slots']>): BotResult {
   return {
     replies: [waButtons(
-      `No tenemos ese disfraz por ahora 😔. Mira el catálogo completo aquí 👇\n${site()}/catalogo-kustom.pdf`,
+      `No encontré ese disfraz en nuestro catálogo. Puedes ver el catálogo completo aquí 👇\n${site()}/catalogo-kustom.pdf\nO si prefieres, te paso con una persona del equipo 🙌`,
       [{ id: 'main:catalogo', title: 'Ver catálogo' }, { id: 'main:human', title: 'Hablar con alguien' }, { id: 'main:menu', title: '🏠 Menú' }],
     )],
     patch: { step: 'sin-resultados', stack: [], slots: mergeSlots(slots, {}) },
+  }
+}
+
+// ---------- preguntas informativas (tallas, envíos, pago, garantías, mayoristas, horario, dirección, precio) ----------
+// Se detectan ANTES de dar por fallida una búsqueda de producto: "¿en qué talla
+// vienen los disfraces?" es una pregunta general, no un disfraz que no tenemos.
+// El texto llega normalizado (minúsculas, sin tildes). El orden importa: la
+// primera regla que casa gana ("contra entrega" es pago aunque diga "entrega").
+type InfoKind = 'mayoristas' | 'garantia' | 'pago' | 'tallas' | 'envio' | 'horario' | 'direccion' | 'precio'
+const INFO_RULES: Array<[InfoKind, RegExp]> = [
+  ['mayoristas', /\b(mayoristas?|al por mayor|por mayor|al mayor|distribuidor(es|a|as)?|revender|reventa|docenas?)\b/],
+  ['garantia', /\b(garantias?|cambios?|cambiar(lo|la)?|devolucion(es)?|devolver(lo|la)?|reembolso|defectos?|defectuos[oa])\b/],
+  ['pago', /\b(pagos?|pagar(lo|la)?|pagan?|pagas|pagamos|pagando|nequi|daviplata|transferencia|consignacion|efectivo|tarjeta|contra ?entrega|contraentrega|mercado ?pago|pse|bancolombia|datafono|cuotas|metodos? de pago|formas? de pago)\b/],
+  ['tallas', /\b(tallas?|talles?|medidas?|tamanos?|miden|mide|centimetros|cm|estatura)\b/],
+  ['envio', /\b(envios?|envian|envia|enviar|domicilios?|entregas?|entregan|transportadora|llega|llegan|llegaria|demora|demoran|tardan?|servientrega|interrapidisimo|coordinadora)\b/],
+  ['horario', /\b(horarios?|hora de atencion|abren|cierran|atienden|abiertos?|hasta que hora|a que hora|que dias)\b/],
+  ['direccion', /\b(direccion|ubicados?|ubicacion|donde (estan|quedan|queda|se encuentran)|local|tienda fisica|punto de venta|sede|almacen|visitarlos|ir personalmente)\b/],
+  ['precio', /\b(precios?|piecio|preci|vale|valen|cuesta|cuestan|costo|costos|cuanto|cuantos)\b/],
+]
+
+/** Qué pregunta informativa es (o null). `rest` = texto sin "talla N" (así "talla 8" no es pregunta de tallas). */
+function detectInfo(norm: string, rest: string): InfoKind | null {
+  for (const [kind, re] of INFO_RULES) {
+    if (re.test(kind === 'tallas' ? rest : norm)) return kind
+  }
+  return null
+}
+
+const INFO_TEXT: Record<InfoKind, () => string> = {
+  tallas: () => 'Manejamos tallas de la 0 a la 14 según el disfraz 📏\n'
+    + `Mira la guía completa aquí 👇\n${site()}/tallas\n\n`
+    + 'Si me dices el personaje y la talla, te confirmo si la tenemos 😉',
+  envio: () => '🚚 ¡El envío es *GRATIS* a todo el país!\n'
+    + 'Enviamos a Bogotá y a toda Colombia con guía de la transportadora para que hagas seguimiento. El tiempo de entrega depende del destino.\n'
+    + `Más info: ${site()}/envios`,
+  pago: () => '💳 Puedes pagar por *Nequi*, *transferencia o consignación bancaria*, con *Mercado Pago* en la web, o *contra entrega* (pagas al recibir) 🏠\n'
+    + `Aquí te explicamos paso a paso: ${site()}/como-comprar`,
+  garantia: () => '🔁 *Cambios y garantías*\n'
+    + 'La garantía cubre defectos de fabricación (costuras, roturas o manchas) si nos devuelves el disfraz en máximo 3 días, con su empaque y comprobante de compra.\n'
+    + 'Los cambios se hacen en nuestros puntos de venta o escribiendo a contacto@disfraceskustom.com.\n'
+    + `Todos los detalles: ${site()}/devoluciones`,
+  mayoristas: () => '🏷️ ¡Sí manejamos ventas al por mayor!\n'
+    + `Déjanos tus datos aquí y te contactamos con precios especiales 👇\n${site()}/mayoristas`,
+  horario: () => '🕒 Nuestro horario de atención es de *lunes a sábado, de 8:00 a.m. a 7:00 p.m.*\n'
+    + 'Por aquí puedes escribirnos a cualquier hora y te respondemos en ese horario.',
+  direccion: () => '📍 Estamos en Bogotá y enviamos *gratis* a todo el país 🚚\n'
+    + 'Si quieres visitarnos o recoger tu pedido, toca *Hablar con alguien* y te pasamos la dirección exacta.',
+  precio: () => {
+    const { min, max } = priceRange()
+    return `💲 Nuestros disfraces van desde ${formatCOP(min)} hasta ${formatCOP(max)} según la línea y la talla.\n`
+      + 'Escríbeme el personaje que buscas y te paso el precio exacto 😉\n'
+      + `Catálogo completo: ${site()}/catalogo-kustom.pdf`
+  },
+}
+
+/** Respuesta informativa: texto útil (con link) + el menú principal debajo (sin repetir el saludo). */
+function infoReply(kind: InfoKind, input: WaIncoming, state: ConvState, slots: NonNullable<ConvState['slots']>): BotResult {
+  const menu = buildBotReplies({ from: input.from, kind: 'reply', replyId: 'main:menu', profileName: input.profileName }, state)
+  const first = menu.replies[0]
+  const follow = first?.type === 'interactive' ? cloneWithBody(first, '¿Qué más quieres hacer? 👇') : first
+  return {
+    replies: [waText(INFO_TEXT[kind](), true), ...(follow ? [follow] : [])],
+    patch: { step: `info:${kind}`, stack: [], askedSize: undefined, slots: mergeSlots(slots, {}) },
   }
 }
 
@@ -235,13 +298,26 @@ function handleText(input: WaIncoming, state: ConvState): BotResult {
   // Producto encontrado. Se delega al cerebro para reusar su formato: 1 coincidencia
   // → ficha directa (con ✅/⚠️ de talla), >1 → lista de variantes con precio. La talla
   // combinada (esta o previa) se inyecta en el query para que la ficha/lista la usen.
-  if (res && res.matches.length) {
+  const productFlow = (): BotResult => {
     const talla2 = talla ?? slots.talla ?? undefined
     const query = talla2 ? `${fixed} talla ${talla2}` : fixed
     const del = buildBotReplies({ from: input.from, kind: 'text', text: query, profileName: input.profileName }, state)
     // Se recuerda el mejor match como producto activo (para re-precio "¿cuánto vale?").
-    return withSlots(del, slots, { producto: res.matches[0].slug, talla: talla2 })
+    return withSlots(del, slots, { producto: res!.matches[0]!.slug, talla: talla2 })
   }
+  const found = !!(res && res.matches.length)
+
+  // ¿Pregunta INFORMATIVA (tallas, envíos, pago…)? Un producto nombrado SIN typo
+  // gana siempre ("precio del spiderman" → ficha con precio). Una coincidencia
+  // lograda solo por corrección de typo NO pisa una pregunta informativa ("en qué
+  // talla vienen los disfraces" no debe convertirse en un disfraz parecido).
+  const info = detectInfo(norm, rest)
+  const rawHit = !!info && !!searchProducts(rest)?.matches.length
+  if (found && (!info || rawHit)) return productFlow()
+  // "precio de diosa griega" (precio + producto desconocido) sigue siendo búsqueda
+  // fallida; el resto responde aunque traiga palabras sueltas ("envían a medellín").
+  if (info && !(info === 'precio' && hasProducto)) return infoReply(info, input, state, slots)
+  if (found) return productFlow()
 
   // Había términos de producto pero SIN coincidencia (p. ej. "diosa griega") → sin resultados.
   if (hasProducto) return sinResultados(state, slots)
@@ -309,6 +385,8 @@ function _route(input: WaIncoming, state: ConvState): BotResult {
     return buildBotReplies(input, state)
   }
   if (input.kind === 'text') return handleText(input, state)
+  // Una REACCIÓN (👍 a un mensaje) no merece respuesta: el bot calla.
+  if (input.otherType === 'reaction') return { replies: [], patch: {} }
   // Mensaje NO-TEXTO (audio, sticker, imagen, ubicación…): antes caía al saludo
   // genérico como si nada; ahora se le dice al cliente qué puede hacer + menú.
   return nonTextReply(input, state)

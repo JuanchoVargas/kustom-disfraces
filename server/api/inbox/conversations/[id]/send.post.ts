@@ -1,8 +1,13 @@
 /**
- * Responder desde la bandeja. Usa el adaptador del canal (WhatsApp Cloud API o
- * Send API de Messenger/Instagram). Responder TOMA la conversación (estado=humano)
- * para que el bot no pise al agente. En WhatsApp se rechaza fuera de la ventana de
- * 24h (Meta solo acepta texto libre si el cliente escribió hace <24h).
+ * Responder desde la bandeja (texto). Usa el adaptador del canal (WhatsApp Cloud
+ * API o Send API de Messenger/Instagram). Responder TOMA la conversación
+ * (estado=humano) para que el bot no pise al agente. En WhatsApp se rechaza fuera
+ * de la ventana de 24h (Meta solo acepta texto libre si el cliente escribió hace
+ * <24h). Una conversación archivada vuelve a activa al responder.
+ *
+ * SOLO EN `nuxt dev` sin credenciales del canal: el mensaje se guarda como
+ * "no enviado (local)" (meta.dry_run) para poder probar la bandeja sin Meta. En
+ * producción sin credenciales sigue respondiendo 503.
  */
 export default defineEventHandler(async (event) => {
   requireInbox(event)
@@ -16,23 +21,21 @@ export default defineEventHandler(async (event) => {
   const conv = await getConversationById(id)
   if (!conv) throw createError({ statusCode: 404, statusMessage: 'not_found' })
 
-  let ok = false
-  if (conv.canal === 'wa') {
-    if (!windowOpen(conv.ultimo_cliente_at)) throw createError({ statusCode: 409, statusMessage: 'window_closed' })
-    if (!whatsappConfigured()) throw createError({ statusCode: 503, statusMessage: 'whatsapp_not_configured' })
-    ok = await sendWhatsAppMessage(conv.external_id, waText(text, false))
-  }
-  else {
-    if (!messengerConfigured()) throw createError({ statusCode: 503, statusMessage: 'messenger_not_configured' })
-    ok = await sendMessengerMessage(conv.external_id, { text })
-  }
+  const dryRun = deliverOrDryRun(conv.canal, () => {
+    if (conv.canal === 'wa') {
+      if (!windowOpen(conv.ultimo_cliente_at)) throw createError({ statusCode: 409, statusMessage: 'window_closed' })
+      return sendWhatsAppMessage(conv.external_id, waText(text, false))
+    }
+    return sendMessengerMessage(conv.external_id, { text })
+  })
+  const ok = await dryRun.send()
   if (!ok) throw createError({ statusCode: 502, statusMessage: 'send_failed' })
 
-  const msg = await recordMessage({ conversationId: id, direccion: 'out', texto: text, autor: 'agente' })
+  const msg = await recordMessage({ conversationId: id, direccion: 'out', texto: text, autor: 'agente', meta: dryRun.dry ? { dry_run: true } : null })
   if (conv.estado !== 'humano') {
     await setEstado(id, 'humano')
     await saveBotState(conv.canal, conv.external_id, { flaggedForHuman: false })
   }
   await markRead(id)
-  return { ok: true, message: msg }
+  return { ok: true, message: msg, dry_run: dryRun.dry }
 })

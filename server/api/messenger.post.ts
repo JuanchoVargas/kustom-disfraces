@@ -10,6 +10,7 @@
  */
 import type { WaIncoming } from '../utils/whatsappBot'
 import type { MessengerMessage } from '../utils/messenger'
+import type { MediaKind } from '../utils/media'
 
 export default defineEventHandler(async (event) => {
   const body = await readBody(event).catch(() => null)
@@ -68,12 +69,29 @@ function parseMessengerEvent(senderId: string, ev: any): WaIncoming | null {
   // Postback (botones de plantilla / menú persistente / get started).
   const pb = ev?.postback?.payload
   if (pb) return { from: senderId, kind: 'reply', replyId: String(pb), replyTitle: ev?.postback?.title, wamid }
-  // Texto libre.
   const text = ev?.message?.text
-  if (typeof text === 'string' && text.trim()) return { from: senderId, kind: 'text', text, wamid }
-  // Adjuntos sin texto (audio, sticker, imagen, ubicación…): antes se ignoraban en
-  // silencio; ahora reciben el aviso de "solo texto" + menú (kind 'other').
-  if (ev?.message?.attachments?.length) return { from: senderId, kind: 'other', wamid }
+  const hasText = typeof text === 'string' && !!text.trim()
+  // Adjuntos (imagen/sticker, audio, video, archivo, ubicación): se describen para
+  // que la bandeja los descargue y muestre. Con texto acompañante el bot procesa el
+  // texto (kind 'text') y el archivo igual queda guardado; sin texto, kind 'other'
+  // (aviso de "solo texto" + menú).
+  const atts: any[] = Array.isArray(ev?.message?.attachments) ? ev.message.attachments : []
+  const a = atts[0]
+  const p = a?.payload ?? {}
+  const base: WaIncoming = hasText ? { from: senderId, kind: 'text', text, wamid } : { from: senderId, kind: 'other', wamid }
+  if (a?.type === 'location' && p?.coordinates) {
+    return { ...base, otherType: 'location', location: { lat: Number(p.coordinates.lat), lng: Number(p.coordinates.long), name: p?.title ? String(p.title) : undefined } }
+  }
+  const kind: MediaKind | null = a?.type === 'image'
+    ? (p?.sticker_id ? 'sticker' : 'image')
+    : a?.type === 'audio' ? 'audio' : a?.type === 'video' ? 'video' : a?.type === 'file' ? 'document' : null
+  if (kind && p?.url) {
+    const url = String(p.url)
+    const filename = p?.title ? String(p.title) : (kind === 'document' ? decodeURIComponent(url.split('?')[0]?.split('/').pop() ?? '') || undefined : undefined)
+    return { ...base, otherType: kind, media: { kind, url, filename, caption: hasText ? text : undefined } }
+  }
+  if (hasText) return base
+  if (atts.length) return { ...base, otherType: String(a?.type ?? 'unsupported') }
   return null
 }
 
