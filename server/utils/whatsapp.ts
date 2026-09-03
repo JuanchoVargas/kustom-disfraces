@@ -26,6 +26,9 @@ export interface WaSection { title: string, rows: WaRow[] }
 export type WaMessage =
   | { type: 'text', text: { body: string, preview_url?: boolean } }
   | { type: 'interactive', interactive: Record<string, unknown> }
+  // Imagen enviada desde la bandeja: por `id` (subida antes a /media de Meta) o por
+  // `link` (URL pública que Meta descarga). caption opcional (≤ 1024).
+  | { type: 'image', image: { id?: string, link?: string, caption?: string } }
 
 const cut = (s: string, max: number) => {
   const t = String(s ?? '')
@@ -34,6 +37,13 @@ const cut = (s: string, max: number) => {
 
 export function waText(body: string, previewUrl = true): WaMessage {
   return { type: 'text', text: { body: cut(body, 4096), preview_url: previewUrl } }
+}
+
+/** Mensaje de imagen (Cloud API): referencia por id de medio subido o por URL pública. */
+export function waImage(ref: { id?: string, link?: string }, caption?: string): WaMessage {
+  const image: { id?: string, link?: string, caption?: string } = ref.id ? { id: ref.id } : { link: ref.link }
+  if (caption?.trim()) image.caption = cut(caption.trim(), 1024)
+  return { type: 'image', image }
 }
 
 export function waButtons(body: string, buttons: WaButton[]): WaMessage {
@@ -306,6 +316,34 @@ export async function sendWhatsAppMessage(to: string, message: WaMessage): Promi
     const detail = JSON.stringify(err?.data ?? err?.response?._data ?? err?.message ?? err).replace(/Bearer\s+[^\s"']+/gi, 'Bearer ***')
     console.error(`[whatsapp] fallo al enviar a ${to} (${/^\d+$/.test(to) ? 'to=teléfono' : 'recipient=BSUID'}):`, detail)
     return false
+  }
+}
+
+/**
+ * Sube un archivo a la Cloud API (POST /<phone_id>/media, multipart) y devuelve el
+ * media id para enviarlo con `image: { id }`. Así el envío NO depende de que Meta
+ * pueda descargar nuestra URL pública. NO lanza: null si falla (el llamador puede
+ * caer al envío por `link`).
+ */
+export async function uploadWhatsAppMedia(data: Buffer, mime: string, filename: string): Promise<string | null> {
+  const { whatsappToken, whatsappPhoneId } = useRuntimeConfig()
+  if (!whatsappToken || !whatsappPhoneId) return null
+  try {
+    const form = new FormData()
+    form.append('messaging_product', 'whatsapp')
+    form.append('type', mime)
+    form.append('file', new Blob([new Uint8Array(data)], { type: mime }), filename)
+    const res = await $fetch<{ id?: string }>(`https://graph.facebook.com/${GRAPH_VERSION}/${whatsappPhoneId}/media`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${whatsappToken}` },
+      body: form,
+    })
+    return res?.id ? String(res.id) : null
+  }
+  catch (err: any) {
+    const detail = JSON.stringify(err?.data ?? err?.response?._data ?? err?.message ?? err).replace(/Bearer\s+[^\s"']+/gi, 'Bearer ***')
+    console.error('[whatsapp] fallo subiendo medio a la Cloud API:', detail)
+    return null
   }
 }
 

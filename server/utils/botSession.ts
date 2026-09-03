@@ -2,9 +2,10 @@ import type { ConvState, WaIncoming } from './whatsappBot'
 import type { WaMessage } from './whatsapp'
 import type { Canal, ConversationRow } from './inbox'
 import {
-  ALERT_COOLDOWN_MIN, autoReturnToBot, claimHandoffAlert, getMessageByWamid, HUMAN_TIMEOUT_MIN, incomingToText,
-  loadBotState, markWamidReplied, recordMessage, saveBotState, setEstado, upsertConversation, waMessageToText,
+  ALERT_COOLDOWN_MIN, attachMedia, autoReturnToBot, claimHandoffAlert, getMessageByWamid, HUMAN_TIMEOUT_MIN, incomingMeta,
+  incomingTipo, incomingToText, loadBotState, markWamidReplied, recordMessage, saveBotState, setEstado, upsertConversation, waMessageToText,
 } from './inbox'
+import { downloadFromUrl, downloadWaMedia, saveMedia } from './media'
 import { sendHandoffAlert } from './orderEmail'
 import { sendTemplateMessage } from './whatsapp'
 
@@ -50,7 +51,12 @@ export async function openBotSession(canal: Canal, externalId: string, incoming:
   let skip: BotSession['skip']
   let autoReturned = false
   try {
-    conv = await upsertConversation(canal, externalId, incoming.profileName)
+    conv = await upsertConversation(canal, externalId, {
+      nombre: incoming.profileName,
+      telefono: incoming.phone,
+      bsuid: incoming.bsuid,
+      username: incoming.username,
+    })
     if (conv) {
       const recorded = await recordMessage({
         conversationId: conv.id,
@@ -58,7 +64,13 @@ export async function openBotSession(canal: Canal, externalId: string, incoming:
         texto: incomingToText(incoming),
         autor: 'cliente',
         wamid: incoming.wamid,
+        tipo: incomingTipo(incoming),
+        meta: incomingMeta(incoming),
       })
+      // Medio adjunto (foto, audio, documento…): se descarga de Meta y se guarda en
+      // la BD para verlo en la bandeja. Si falla, el mensaje conserva su texto de
+      // aviso ("[Audio recibido]") y meta.download_failed explica por qué.
+      if (recorded && incoming.media) await ingestMedia(canal, recorded.id, incoming.media)
       // DEDUPE: recordMessage devuelve null si el wamid ya existía (reintento de Meta).
       // Se salta el procesamiento SOLO si al original ya se le respondió con éxito
       // (replied_at) o si acaba de llegar y sigue en vuelo. Un reintento de un mensaje
@@ -164,6 +176,34 @@ export async function closeBotSession(input: CloseBotSessionInput): Promise<void
     // El cliente reactivó el bot con "menú" antes de que alguien lo atendiera.
     await setEstado(conv.id, 'bot').catch(err =>
       console.error(`[${canal}] ⚠️ BD caída devolviendo #${conv.id} al bot:`, String((err as Error)?.message ?? err)))
+  }
+}
+
+/**
+ * Descarga el archivo de un entrante (Media API de WhatsApp por id, o URL directa
+ * del CDN en Messenger/Instagram), lo guarda en la tabla media y lo asocia al
+ * mensaje. NUNCA lanza: un fallo deja el mensaje con su texto de aviso.
+ */
+async function ingestMedia(canal: Canal, messageId: number, media: NonNullable<WaIncoming['media']>): Promise<void> {
+  try {
+    const ref = media.id ? `id=${media.id}` : `url=${(media.url ?? '').slice(0, 80)}`
+    const got = media.id ? await downloadWaMedia(media.id) : media.url ? await downloadFromUrl(media.url) : 'error'
+    if (typeof got === 'string') {
+      console.warn(`[${canal}] medio ${media.kind} (${ref}) no descargado: ${got}`)
+      await attachMedia(messageId, null, { download_failed: got })
+      return
+    }
+    const saved = await saveMedia(got.data, media.mime || got.mime, media.filename)
+    if (!saved) {
+      await attachMedia(messageId, null, { download_failed: 'demasiado_grande' })
+      return
+    }
+    await attachMedia(messageId, saved.id, { mime: saved.mime, bytes: saved.bytes })
+    console.info(`[${canal}] medio ${media.kind} guardado (${saved.bytes} bytes, ${saved.mime}) para el mensaje #${messageId}`)
+  }
+  catch (err) {
+    console.error(`[${canal}] ⚠️ error guardando medio del mensaje #${messageId}:`, String((err as Error)?.message ?? err))
+    await attachMedia(messageId, null, { download_failed: 'error' }).catch(() => {})
   }
 }
 

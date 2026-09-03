@@ -493,13 +493,47 @@ en robots). La usan desde el celular.
 - **Login**: contraseña única `NUXT_INBOX_PASSWORD` → cookie `kinbox` httpOnly
   firmada (HMAC derivado de la contraseña), 7 días. Cambiar la contraseña en
   Vercel invalida todas las sesiones. Sin la variable, la bandeja responde 503.
-- **UI**: lista (recientes arriba, badge de no leídos, ícono de canal, buscador
-  por nombre/número) + chat. Polling cada 5 s (sin websockets). En móvil se ve
-  lista **o** chat. `?c=<id>` abre una conversación directa (link del correo).
+- **UI**: pestañas *Activas / Archivadas / Todas*, buscador sobre el **histórico
+  completo** (nombre, número, BSUID, username y el texto de cualquier mensaje),
+  filtro por fecha (desde/hasta sobre la última actividad), badge de no leídos,
+  ícono de canal + chat. Polling cada 5 s (sin websockets). En móvil se ve lista
+  **o** chat. `?c=<id>` abre una conversación directa (link del correo).
+- **Nunca se borra nada**: no existe cierre automático ni botón "Cerrar". *Archivar*
+  (estado=`cerrado`, `archivada_at`) solo mueve la conversación a la pestaña
+  Archivadas; *Desarchivar* (o que el cliente vuelva a escribir) la devuelve a
+  Activas. Todas quedan consultables sin importar su antigüedad (remarketing).
+- **Número del cliente visible** en la lista y en la cabecera del chat, con botón
+  *copiar*. Meta ya no entrega el teléfono de los usuarios con username (identidad
+  BSUID, p. ej. `CO.1041…`): en ese caso se guarda `bsuid` + `username` (columnas
+  `conversations.telefono/bsuid/username`) y la bandeja muestra "Número no
+  disponible (identidad protegida de WhatsApp)" + `@username`. **No hay endpoint
+  de Meta para resolver el teléfono de un BSUID**: solo vuelve a llegar en los
+  webhooks si hubo mensajes/llamadas por teléfono en los últimos 30 días o el
+  usuario está en la agenda del negocio.
+- **Medios recibidos** (fotos, stickers, audios, videos, documentos, ubicación,
+  contactos): `messages.tipo` + `meta` + `media_id`. El archivo se descarga con la
+  **Media API** de Meta (`downloadWaMedia`: GET `/<media_id>` → URL de 5 min →
+  binario con Bearer) o por la URL del CDN en Messenger/IG, y se guarda en la
+  tabla **`media`** (BYTEA en la misma BD Neon, tope 4 MB; sin Vercel Blob ni otro
+  token). Se sirve en `GET /api/media/<token>` (token aleatorio de 128 bits,
+  público para que Meta pueda descargarlo; cache inmutable). La bandeja muestra
+  miniatura (clic para ampliar), reproductor de audio/video, nombre + descarga
+  del documento y mapa (OpenStreetMap) + link a Google Maps. Si no se puede
+  descargar (sin token, >4 MB, error) queda el aviso "[Audio recibido]" y
+  `meta.download_failed`. Las **reacciones** (👍) se guardan y el bot calla.
+- **Enviar imágenes** desde la bandeja (📎, JPG/PNG/WebP, máx. 5 MB; el navegador
+  las reduce a 1600 px JPEG antes de subir): `POST conversations/:id/media`
+  (multipart `file` + `caption`). WhatsApp: se sube a la Media API (`POST
+  /<phone_id>/media`) y se envía por `image.id` (respaldo: `image.link` con nuestra
+  URL); Messenger/IG: `attachment.payload.url`. Queda en el historial como
+  mensaje `tipo=image` del agente. Fuera de la ventana de 24 h responde 409.
 - **Acciones**: *Tomar conversación* (estado=humano, pausa el bot), *Devolver al
-  bot* (estado=bot, reinicia el estado del bot), *Cerrar*. Responder desde la
-  bandeja **toma** la conversación automáticamente. El envío usa los adaptadores
-  existentes (`sendWhatsAppMessage` / `sendMessengerMessage`).
+  bot* (estado=bot, reinicia el estado del bot), *Archivar / Desarchivar*.
+  Responder desde la bandeja **toma** la conversación automáticamente (y la
+  desarchiva). El envío usa los adaptadores existentes (`sendWhatsAppMessage` /
+  `sendMessengerMessage`). Solo en `nuxt dev` sin credenciales del canal el envío
+  es "en seco" (`inboxSend.ts`: se guarda con `meta.dry_run` y la burbuja dice
+  "no enviado (local)"); en producción sin credenciales sigue siendo 503.
 - **Handoff automático**: botón "Hablar con alguien" **o texto** ("quiero hablar
   con alguien / un asesor / una persona…", `isHumanRequest` en `botReplies.ts`) →
   estado=humano, no leída, y **correo a `ventasTo`** (`sendHandoffAlert` en
@@ -516,9 +550,16 @@ en robots). La usan desde el celular.
   el endpoint responde 409 `window_closed`. Messenger/IG no se bloquean.
 
 Endpoints (`server/api/inbox/*`, todos con `requireInbox` salvo login/me):
-`POST login`, `POST logout`, `GET me`, `GET conversations?q=`,
+`POST login`, `POST logout`, `GET me`,
+`GET conversations?q=&estado=activas|archivadas|todas&desde=&hasta=`,
 `GET conversations/:id`, `POST conversations/:id/send {text}`,
+`POST conversations/:id/media (multipart file, caption)`,
 `POST conversations/:id/estado {estado}`, `POST conversations/:id/read`.
+Público (sin sesión, token inadivinable): `GET /api/media/:token`.
+
+Prueba de punta a punta sin Meta: `node scripts/test-bandeja-v2.mjs [--keep]`
+contra `npm run dev` (webhooks simulados con audio/imagen/ubicación/BSUID +
+preguntas informativas + API de la bandeja; `cleanup` borra las filas de prueba).
 
 Variables: `NUXT_INBOX_PASSWORD` (obligatoria), `POSTGRES_URL` (la inyecta la
 integración Neon↔Vercel), `NUXT_ALERT_WHATSAPP_TO`, `NUXT_ALERT_TEMPLATE_NAME`.

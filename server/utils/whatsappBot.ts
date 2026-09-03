@@ -1,5 +1,6 @@
 import type { WaMessage } from './whatsapp'
 import type { FoundProduct } from './productSearch'
+import type { MediaKind } from './media'
 import { waButtons, waList, waListSections, waText } from './whatsapp'
 import { getPublico, getPublicos, publicoNombre, subNombre } from './catalogNav'
 import { formatCOP, getProductBySlug, hasSize, searchProducts } from './productSearch'
@@ -52,7 +53,21 @@ export interface WaIncoming {
   // id del mensaje en el canal (wamid en WhatsApp, mid en Messenger). Sirve para
   // deduplicar los reintentos de Meta al guardar en la bandeja.
   wamid?: string
+  // Identidad extendida (WhatsApp): teléfono SOLO si Meta lo entrega (con la
+  // identidad nueva BSUID puede no venir), BSUID y username del cliente.
+  phone?: string
+  bsuid?: string
+  username?: string
+  // Mensajes NO textuales (kind 'other'): qué era y su contenido para la bandeja.
+  // media = archivo (por id de la Media API en WhatsApp o por URL en Messenger).
+  otherType?: string
+  media?: { kind: MediaKind, id?: string, url?: string, mime?: string, filename?: string, caption?: string }
+  location?: { lat: number, lng: number, name?: string, address?: string }
+  contactsText?: string
+  reaction?: string
 }
+
+const WA_MEDIA_TYPES: Record<string, MediaKind> = { image: 'image', sticker: 'sticker', audio: 'audio', video: 'video', document: 'document' }
 
 function parseWaMessage(msg: any, value: any): WaIncoming | null {
   const contacts: any[] = Array.isArray(value?.contacts) ? value.contacts : []
@@ -67,19 +82,55 @@ function parseWaMessage(msg: any, value: any): WaIncoming | null {
     return null
   }
   const from = String(rawFrom)
-  // El nombre de perfil del contacto que corresponde a ESTE remitente (Meta puede
-  // traer varios contacts en un batch): casa por wa_id O por user_id (BSUID).
-  const profileName = (contacts.find(c => String(c?.wa_id ?? '') === from || String(c?.user_id ?? '') === from) ?? contacts[0])?.profile?.name
+  // El contacto que corresponde a ESTE remitente (Meta puede traer varios contacts
+  // en un batch): casa por wa_id O por user_id (BSUID).
+  const contact = contacts.find(c => String(c?.wa_id ?? '') === from || String(c?.user_id ?? '') === from) ?? contacts[0]
+  const profileName = contact?.profile?.name
+  // Identidad extendida para la bandeja: teléfono SOLO si vino como tal (solo
+  // dígitos), BSUID y username (Meta lo incluye si el usuario activó la función).
+  const phoneRaw = msg?.from ?? contact?.wa_id
+  const phone = phoneRaw && /^\d+$/.test(String(phoneRaw)) ? String(phoneRaw) : undefined
+  const bsuidRaw = msg?.from_user_id ?? contact?.user_id
+  const bsuid = bsuidRaw ? String(bsuidRaw) : undefined
+  const usernameRaw = contact?.profile?.username ?? contact?.username
+  const username = usernameRaw ? String(usernameRaw).replace(/^@/, '') : undefined
   const wamid = msg.id ? String(msg.id) : undefined
+  const base = { from, profileName, wamid, phone, bsuid, username }
 
-  if (msg.type === 'text') return { from, kind: 'text', text: msg.text?.body ?? '', profileName, wamid }
+  if (msg.type === 'text') return { ...base, kind: 'text', text: msg.text?.body ?? '' }
   if (msg.type === 'interactive') {
     const it = msg.interactive
-    if (it?.type === 'button_reply') return { from, kind: 'reply', replyId: it.button_reply?.id, replyTitle: it.button_reply?.title, profileName, wamid }
-    if (it?.type === 'list_reply') return { from, kind: 'reply', replyId: it.list_reply?.id, replyTitle: it.list_reply?.title, profileName, wamid }
+    if (it?.type === 'button_reply') return { ...base, kind: 'reply', replyId: it.button_reply?.id, replyTitle: it.button_reply?.title }
+    if (it?.type === 'list_reply') return { ...base, kind: 'reply', replyId: it.list_reply?.id, replyTitle: it.list_reply?.title }
   }
-  if (msg.type === 'button') return { from, kind: 'reply', replyId: msg.button?.payload ?? msg.button?.text, replyTitle: msg.button?.text, profileName, wamid }
-  return { from, kind: 'other', profileName, wamid }
+  if (msg.type === 'button') return { ...base, kind: 'reply', replyId: msg.button?.payload ?? msg.button?.text, replyTitle: msg.button?.text }
+
+  // NO textuales: se describen para que la bandeja los guarde y muestre (el archivo
+  // se descarga después con la Media API por su id — ver botSession.ts).
+  const mediaKind = WA_MEDIA_TYPES[String(msg.type)]
+  if (mediaKind) {
+    const m = msg[msg.type] ?? {}
+    return {
+      ...base,
+      kind: 'other',
+      otherType: mediaKind,
+      media: { kind: mediaKind, id: m.id ? String(m.id) : undefined, mime: m.mime_type, filename: m.filename, caption: m.caption },
+    }
+  }
+  if (msg.type === 'location') {
+    const l = msg.location ?? {}
+    return { ...base, kind: 'other', otherType: 'location', location: { lat: Number(l.latitude), lng: Number(l.longitude), name: l.name, address: l.address } }
+  }
+  if (msg.type === 'contacts') {
+    const list: any[] = Array.isArray(msg.contacts) ? msg.contacts : []
+    const lines = list.map((c) => {
+      const phones = (Array.isArray(c?.phones) ? c.phones : []).map((p: any) => p?.phone ?? p?.wa_id).filter(Boolean)
+      return `${c?.name?.formatted_name ?? 'Contacto'}${phones.length ? `: ${phones.join(', ')}` : ''}`
+    })
+    return { ...base, kind: 'other', otherType: 'contacts', contactsText: lines.join('\n') }
+  }
+  if (msg.type === 'reaction') return { ...base, kind: 'other', otherType: 'reaction', reaction: msg.reaction?.emoji ? String(msg.reaction.emoji) : '👍' }
+  return { ...base, kind: 'other', otherType: String(msg.type ?? 'unsupported') }
 }
 
 /**

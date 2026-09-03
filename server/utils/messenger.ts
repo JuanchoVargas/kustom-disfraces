@@ -66,8 +66,10 @@ function withoutNavRows(m: WaMessage): WaMessage {
  */
 export function toMessengerMessages(m: WaMessage): { messages: MessengerMessage[], optionIds: string[] } {
   if (m.type !== 'interactive') {
-    // Texto (ficha, catálogo, enlaces): solo el "🏠 Menú".
-    return { messages: [{ text: cut(cleanChannelText(m.text.body), 2000), quick_replies: [HOME_QR] }], optionIds: [] }
+    // Texto (ficha, catálogo, enlaces): solo el "🏠 Menú". Una imagen (solo la manda
+    // la bandeja, nunca el bot) se representa por su caption.
+    const body = m.type === 'text' ? m.text.body : (m.image.caption || '[Imagen]')
+    return { messages: [{ text: cut(cleanChannelText(body), 2000), quick_replies: [HOME_QR] }], optionIds: [] }
   }
   const opts = interactiveOptions(m) ?? []
   // Las filas ya incluyen "⬅️ Volver" y "🏠 Menú" (omnicanal) → se mapean directo.
@@ -81,9 +83,8 @@ export function toMessengerMessages(m: WaMessage): { messages: MessengerMessage[
   // que el quick reply no muestra. Los menús normales van con su cuerpo tal cual.
   const it = m.interactive as any
   const multiSection = it?.type === 'list' && (it?.action?.sections?.length ?? 0) > 1
-  const raw = multiSection
-    ? (waNumberedFallback(withoutNavRows(m))?.message.text.body ?? String(it?.body?.text ?? ''))
-    : String(it?.body?.text ?? '')
+  const fallback = multiSection ? waNumberedFallback(withoutNavRows(m))?.message : undefined
+  const raw = fallback?.type === 'text' ? fallback.text.body : String(it?.body?.text ?? '')
   const text = `${cleanChannelText(raw)}\n\nToca una opción 👇`
   return { messages: [{ text: cut(text, 2000), quick_replies }], optionIds: opts.map(o => o.id) }
 }
@@ -102,6 +103,34 @@ export function toMessengerReplies(replies: WaMessage[]): { messages: MessengerM
     lastMenu = optionIds.length ? optionIds : undefined
   }
   return { messages, lastMenu }
+}
+
+/** Adjunto de Messenger/Instagram (Send API): imagen, audio, video o archivo por URL pública. */
+export type MessengerAttachmentType = 'image' | 'audio' | 'video' | 'file'
+
+/**
+ * Envía un ADJUNTO por la Send API (`attachment: { type, payload: { url } }`). Meta
+ * descarga la URL (debe ser pública). NO lanza: registra el fallo y devuelve false.
+ */
+export async function sendMessengerAttachment(recipientId: string, type: MessengerAttachmentType, url: string): Promise<boolean> {
+  const { messengerPageToken } = useRuntimeConfig()
+  if (!messengerPageToken) {
+    console.warn('[messenger] sin page token — no se envía adjunto (planeado):', type, url)
+    return false
+  }
+  try {
+    await $fetch(`https://graph.facebook.com/${GRAPH_VERSION}/me/messages`, {
+      method: 'POST',
+      query: { access_token: messengerPageToken },
+      body: { recipient: { id: recipientId }, messaging_type: 'RESPONSE', message: { attachment: { type, payload: { url, is_reusable: false } } } },
+    })
+    return true
+  }
+  catch (err: any) {
+    const detail = err?.data ?? err?.response?._data ?? err?.message ?? err
+    console.error(`[messenger] fallo al enviar adjunto a ${recipientId}:`, JSON.stringify(detail))
+    return false
+  }
 }
 
 export function messengerConfigured(): boolean {
