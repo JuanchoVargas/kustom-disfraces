@@ -218,8 +218,9 @@ const INFO_TEXT: Record<InfoKind, () => string> = {
     + `Déjanos tus datos aquí y te contactamos con precios especiales 👇\n${site()}/mayoristas`,
   horario: () => '🕒 Nuestro horario de atención es de *lunes a sábado, de 8:00 a.m. a 7:00 p.m.*\n'
     + 'Por aquí puedes escribirnos a cualquier hora y te respondemos en ese horario.',
-  direccion: () => '📍 Estamos en Bogotá y enviamos *gratis* a todo el país 🚚\n'
-    + 'Si quieres visitarnos o recoger tu pedido, toca *Hablar con alguien* y te pasamos la dirección exacta.',
+  direccion: () => '📍 Estamos en *Cra 52 #39-89 sur, Bogotá*.\n'
+    + 'Horario: lunes a sábado, de 8:00 a.m. a 7:00 p.m. 🕒\n'
+    + 'Y si prefieres, enviamos *gratis* a todo el país 🚚',
   precio: () => {
     const { min, max } = priceRange()
     return `💲 Nuestros disfraces van desde ${formatCOP(min)} hasta ${formatCOP(max)} según la línea y la talla.\n`
