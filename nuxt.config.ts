@@ -73,8 +73,16 @@ export default defineNuxtConfig({
     // Llave de WooCommerce con permiso de ESCRITURA — SOLO para crear órdenes al
     // confirmarse un pago (Fase 3). Separada de la de lectura (mínimo privilegio).
     // Misma tienda (WOO_API_URL). Sin ella, el webhook registra el pago pero no crea orden.
-    wooOrdersConsumerKey: process.env.WOO_ORDERS_CONSUMER_KEY || '',       // -> NUXT_WOO_ORDERS_CONSUMER_KEY
-    wooOrdersConsumerSecret: process.env.WOO_ORDERS_CONSUMER_SECRET || '', // -> NUXT_WOO_ORDERS_CONSUMER_SECRET
+    // Llave de ESCRITURA de WooCommerce ("Checkout Orders v2", Read/Write). Las
+    // llaves de Woo no distinguen recursos: la misma crea órdenes (checkout) y
+    // edita productos (inventario). Nombre nuevo que refleja su uso real:
+    wooWriteConsumerKey: process.env.WOO_WRITE_CONSUMER_KEY || '',         // -> NUXT_WOO_WRITE_CONSUMER_KEY
+    wooWriteConsumerSecret: process.env.WOO_WRITE_CONSUMER_SECRET || '',   // -> NUXT_WOO_WRITE_CONSUMER_SECRET
+    // Nombre ANTERIOR de la misma llave (se sigue leyendo como respaldo para no
+    // romper el checkout; ver server/utils/wooWrite.ts). Retirar cuando Vercel
+    // tenga las NUXT_WOO_WRITE_* y se haya verificado un pago.
+    wooOrdersConsumerKey: process.env.WOO_ORDERS_CONSUMER_KEY || '',       // -> NUXT_WOO_ORDERS_CONSUMER_KEY (legado)
+    wooOrdersConsumerSecret: process.env.WOO_ORDERS_CONSUMER_SECRET || '', // -> NUXT_WOO_ORDERS_CONSUMER_SECRET (legado)
     // SMTP para el formulario de mayoristas (solo servidor; nunca al cliente).
     // Defaults del .env en build; en runtime se sobrescriben con NUXT_SMTP_*.
     // Sin credenciales configuradas, /api/mayoristas responde 503 "not_configured".
@@ -120,6 +128,10 @@ export default defineNuxtConfig({
     //   woo            = escribe de verdad en WooCommerce con la llave de escritura
     //                    (wooOrders*). Cambiar SOLO tras el checklist docs/inventario-activacion.md.
     inventoryBackend: process.env.NUXT_INVENTORY_BACKEND || 'mock', // -> NUXT_INVENTORY_BACKEND (mock | woo)
+    // Guarda de validación: mientras sea 'true' el adaptador woo SOLO escribe en
+    // productos EN BORRADOR; cualquier escritura a un publicado se rechaza sin
+    // tocar Woo. Poner 'false' cuando se validen las operaciones masivas.
+    inventoryWooOnlyDrafts: process.env.NUXT_INVENTORY_WOO_ONLY_DRAFTS ?? 'true', // -> NUXT_INVENTORY_WOO_ONLY_DRAFTS (true | false)
     // Alerta por WhatsApp al encargado cuando un cliente pide atención humana
     // (plantilla aprobada en Meta). Sin destino no se envía; el correo es el respaldo.
     alertWhatsappTo: process.env.NUXT_ALERT_WHATSAPP_TO || '',                       // -> NUXT_ALERT_WHATSAPP_TO

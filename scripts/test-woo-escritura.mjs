@@ -1,5 +1,5 @@
 // Prueba de ESCRITURA en WooCommerce con la llave "Checkout Orders v2"
-// (WOO_ORDERS_CONSUMER_KEY / WOO_ORDERS_CONSUMER_SECRET en .env). Las llaves de
+// (WOO_WRITE_CONSUMER_KEY / WOO_WRITE_CONSUMER_SECRET en .env; respaldo WOO_ORDERS_*). Las llaves de
 // Woo no distinguen recursos: si crea órdenes, también puede editar productos.
 //
 // Qué hace (SOLO sobre un producto EN BORRADOR, nunca uno publicado):
@@ -25,10 +25,10 @@ function loadEnv() {
 }
 const env = loadEnv()
 const BASE = env.WOO_API_URL
-const KEY = env.WOO_ORDERS_CONSUMER_KEY || env.NUXT_WOO_ORDERS_CONSUMER_KEY
-const SECRET = env.WOO_ORDERS_CONSUMER_SECRET || env.NUXT_WOO_ORDERS_CONSUMER_SECRET
+const KEY = env.WOO_WRITE_CONSUMER_KEY || env.NUXT_WOO_WRITE_CONSUMER_KEY || env.WOO_ORDERS_CONSUMER_KEY || env.NUXT_WOO_ORDERS_CONSUMER_KEY
+const SECRET = env.WOO_WRITE_CONSUMER_SECRET || env.NUXT_WOO_WRITE_CONSUMER_SECRET || env.WOO_ORDERS_CONSUMER_SECRET || env.NUXT_WOO_ORDERS_CONSUMER_SECRET
 if (!BASE || !KEY || !SECRET) {
-  console.error('❌ Falta WOO_API_URL / WOO_ORDERS_CONSUMER_KEY / WOO_ORDERS_CONSUMER_SECRET en .env')
+  console.error('❌ Falta WOO_API_URL / WOO_WRITE_CONSUMER_KEY / WOO_WRITE_CONSUMER_SECRET en .env')
   process.exit(1)
 }
 const args = process.argv.slice(2)

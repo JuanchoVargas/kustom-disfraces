@@ -7,14 +7,9 @@ cambios en Postgres sin tocar Woo ni el sitio.
 
 ## 0. Antes de empezar
 
-- [ ] Llave de escritura ("Checkout Orders v2", Read/Write) en `.env` local como
-      `WOO_ORDERS_CONSUMER_KEY` / `WOO_ORDERS_CONSUMER_SECRET` (en Vercel ya
-      están como `NUXT_WOO_ORDERS_CONSUMER_KEY` / `_SECRET`).
-- [ ] Probar que escribe **sobre un borrador** (cambia y revierte un precio):
-      ```bash
-      node scripts/test-woo-escritura.mjs
-      ```
-      Debe terminar con "✅ La llave escribe".
+- [x] Llave de escritura ("Checkout Orders v2", Read/Write) verificada desde Vercel el 2026-09-06 (7/7 pasos OK sobre un borrador).
+- [ ] En Vercel crear `NUXT_WOO_WRITE_CONSUMER_KEY` / `NUXT_WOO_WRITE_CONSUMER_SECRET` con el mismo valor (nombre que refleja su uso real: órdenes + productos). Las antiguas `NUXT_WOO_ORDERS_*` se siguen leyendo como respaldo; retirarlas tras verificar un pago de prueba.
+- [ ] Probar el adaptador desde el panel: botón **Probar escritura en Woo** (solo borradores). Debe terminar en "Adaptador woo OK".
 
 ## 1. Activar la gestión de stock en Woo
 
@@ -47,6 +42,8 @@ Usa la contraseña del panel (`NUXT_INBOX_PASSWORD`) y el servidor de producció
 borran de `inventory_overrides`; las fallidas quedan y se listan.
 
 ## 4. Cambiar el adaptador
+
+- [ ] Validar las operaciones masivas sobre borradores y entonces poner `NUXT_INVENTORY_WOO_ONLY_DRAFTS=false` en Vercel (hasta ahí el adaptador rechaza cualquier escritura a un publicado).
 
 - [ ] En Vercel: `NUXT_INVENTORY_BACKEND=woo` y redeploy.
 - [ ] Abrir `/admin/inventario`: la etiqueta debe decir **"Woo en vivo"** y el

@@ -147,4 +147,8 @@ export interface InvStatus {
   origen: 'woo' | 'catalogo' | 'vacio'
   db: boolean
   stock_bajo_umbral: number
+  /** hay llave de escritura de Woo configurada (NUXT_WOO_WRITE_* o respaldo NUXT_WOO_ORDERS_*) */
+  woo_write: boolean
+  /** guarda activa: el adaptador woo solo escribe en borradores */
+  woo_only_drafts: boolean
 }

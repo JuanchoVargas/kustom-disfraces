@@ -1,7 +1,8 @@
 import type { InvListFilters, InvOpResult, InvOperation, InvPage, InvProduct, InvStatus, InventoryBackend } from '~~/shared/types/inventory'
 import { dbConfigured } from './db'
 import { createMockStore, countOverrides } from './inventoryMock'
-import { createWooStore } from './inventoryWoo'
+import { createWooStore, wooOnlyDrafts } from './inventoryWoo'
+import { wooWriteConfigured } from './wooWrite'
 import { loadInventory, snapshotStats } from './inventorySnapshot'
 import type { WriteContext } from './inventoryCommon'
 import { STOCK_BAJO_UMBRAL } from './inventoryCommon'
@@ -60,5 +61,7 @@ export async function inventoryStatus(): Promise<InvStatus> {
     origen: load.origen,
     db: dbConfigured(),
     stock_bajo_umbral: STOCK_BAJO_UMBRAL,
+    woo_write: wooWriteConfigured(),
+    woo_only_drafts: wooOnlyDrafts(),
   }
 }

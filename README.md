@@ -634,7 +634,7 @@ El panel solo habla con la interfaz `InventoryStore` (`listProducts`,
 | Adaptador | Lecturas | Escrituras | Cuándo |
 |---|---|---|---|
 | `mock` (default) | Snapshot de Woo (llave de lectura) + `inventory_overrides` encima | `inventory_overrides` (Postgres) — **NO toca Woo ni el sitio**; el panel muestra "Modo simulación" | Mientras no haya llave de escritura probada |
-| `woo` | Snapshot de Woo | REST API wc/v3 con la llave de escritura (`WOO_ORDERS_*`): PUT por variación o `variations/batch` de 100, agrupado por producto padre; write-through al snapshot | Tras el checklist `docs/inventario-activacion.md` |
+| `woo` | Snapshot de Woo | REST API wc/v3 con la llave de escritura (`NUXT_WOO_WRITE_*`, respaldo legado `NUXT_WOO_ORDERS_*`; guarda `NUXT_INVENTORY_WOO_ONLY_DRAFTS=true` = solo borradores hasta validar las masivas): PUT por variación o `variations/batch` de 100, agrupado por producto padre; write-through al snapshot | Tras el checklist `docs/inventario-activacion.md` |
 
 Ambos devuelven **el shape de Woo** (`shared/types/inventory.ts`: `sku`,
 `regular_price` como texto, `stock_quantity`, `stock_status`,
@@ -652,6 +652,7 @@ por campo cambiado (SKU, valor anterior, nuevo, origen, autor, fecha).
 - API (`server/api/inventario/`): `estado`, `productos` (+ `productos/<sku>`),
   `operaciones` (1 → update simple, N → bulk), `cambios`, `sincronizar`,
   `aplicar-woo` (vista previa "antes → después" y aplicación de overrides).
+- Prueba en vivo del adaptador woo (solo borradores): botón "Probar escritura en Woo" del panel → `POST /api/inventario/probar-woo` (escribe, relee, revierte, batch y guarda).
 - Scripts: `scripts/test-inventario.mjs` (suite completa contra el dev server,
   limpia al final), `scripts/test-woo-escritura.mjs` (prueba la llave de
   escritura cambiando y revirtiendo un precio en un **borrador**),

@@ -50,24 +50,25 @@ export interface CreateOrderBuyer {
   notas?: string
 }
 
-/** ¿Hay llave de escritura configurada? Sin ella no se crea orden (solo se registra). */
+/** ¿Hay llave de escritura configurada? Sin ella no se crea orden (solo se registra).
+ *  Lee NUXT_WOO_WRITE_* y, como respaldo, las antiguas NUXT_WOO_ORDERS_* (wooWrite.ts). */
 export function wooOrdersConfigured(): boolean {
-  const c = useRuntimeConfig()
-  return !!(c.wooBaseUrl && c.wooOrdersConsumerKey && c.wooOrdersConsumerSecret)
+  return wooWriteConfigured()
 }
 
 async function wooOrdersFetch<T>(
   path: string,
   opts: { method?: string, query?: Record<string, string | number>, body?: unknown } = {},
 ): Promise<T> {
-  const { wooBaseUrl, wooOrdersConsumerKey, wooOrdersConsumerSecret } = useRuntimeConfig()
-  return await $fetch<T>(`${wooBaseUrl}/wp-json/wc/v3${path}`, {
+  const cred = wooWriteCredentials()
+  if (!cred) throw new Error('WooCommerce sin llave de escritura')
+  return await $fetch<T>(`${cred.baseUrl}/wp-json/wc/v3${path}`, {
     method: opts.method as never,
     body: opts.body as never,
     query: {
       ...(opts.query ?? {}),
-      consumer_key: wooOrdersConsumerKey,
-      consumer_secret: wooOrdersConsumerSecret,
+      consumer_key: cred.key,
+      consumer_secret: cred.secret,
     },
     timeout: 15_000,
   })

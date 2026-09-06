@@ -89,6 +89,27 @@ async function sync(force = false) {
   catch (e: any) { onUnauthorized(e); syncMsg.value = 'No se pudo sincronizar.' }
   syncing.value = false
 }
+// ---------- prueba en vivo del adaptador woo (solo borradores) ----------
+interface ProbeResult { ok: boolean, conclusion: string, ms?: number, steps: { paso: string, ok: boolean, detalle?: unknown }[] }
+const probing = ref(false)
+const probeResult = ref<ProbeResult | null>(null)
+async function probarWoo() {
+  if (probing.value) return
+  probing.value = true
+  try {
+    probeResult.value = await $fetch<ProbeResult>('/api/inventario/probar-woo', { method: 'POST', body: {} })
+    await Promise.all([loadEstado(), refresh()])
+  }
+  catch (e: any) {
+    onUnauthorized(e)
+    probeResult.value = { ok: false, conclusion: 'No se pudo ejecutar la prueba', steps: [{ paso: 'error', ok: false, detalle: e?.data?.statusMessage ?? e?.message ?? String(e) }] }
+  }
+  probing.value = false
+}
+async function copyProbe() {
+  try { await navigator.clipboard.writeText(JSON.stringify(probeResult.value, null, 2)) } catch {}
+}
+
 async function boot() {
   await loadEstado()
   await refresh()
@@ -299,8 +320,9 @@ onMounted(checkSession)
           <span v-if="estado" class="pill" :class="estado.simulation ? 'pill--sim' : 'pill--live'">{{ estado.simulation ? 'simulación' : 'Woo en vivo' }}</span>
         </div>
         <div class="top__right">
-          <span v-if="estado" class="muted small">{{ estado.productos }} productos · {{ estado.variaciones }} tallas · Woo {{ snapshotAge }}</span>
+          <span v-if="estado" class="muted small" :title="estado.snapshot_age_s != null ? `Snapshot de Woo leído hace ${estado.snapshot_age_s} s` : 'Sin snapshot de Woo'">{{ estado.productos }} productos · {{ estado.variaciones }} tallas · <b :class="{ warn: (estado.snapshot_age_s ?? 0) > 600 }">Woo {{ snapshotAge }}</b></span>
           <button class="btn btn--ghost" type="button" :disabled="syncing" @click="sync(true)">{{ syncing ? 'Sincronizando…' : 'Sincronizar con Woo' }}</button>
+          <button v-if="estado?.woo_write" class="btn btn--ghost" type="button" :disabled="probing" :title="estado.woo_only_drafts ? 'Escribe, relee y revierte precios en un BORRADOR; nunca toca publicados' : 'Escribe, relee y revierte precios en un borrador'" @click="probarWoo">{{ probing ? 'Probando…' : 'Probar escritura en Woo' }}</button>
           <NuxtLink class="btn btn--ghost" to="/admin/chats">Bandeja</NuxtLink>
           <button class="btn btn--ghost" type="button" @click="logout">Salir</button>
         </div>
@@ -309,8 +331,27 @@ onMounted(checkSession)
       <div v-if="estado?.simulation" class="banner banner--sim">
         <strong>Modo simulación</strong> — los cambios no se reflejan en el sitio ni en WooCommerce. Quedan guardados aquí ({{ estado.overrides }} tallas con cambios pendientes) para aplicarlos cuando se active la escritura.
       </div>
+      <div v-if="estado && !estado.simulation && estado.woo_only_drafts" class="banner banner--info">
+        <strong>Woo en vivo, solo borradores</strong> — la guarda de validación rechaza cualquier escritura a un producto publicado hasta que se validen las operaciones masivas.
+      </div>
       <div v-if="estado && !estado.ok" class="banner banner--warn">{{ estado.detail }}</div>
       <div v-if="syncMsg" class="banner banner--info">{{ syncMsg }}</div>
+
+      <div v-if="probeResult" class="modal" @click.self="probeResult = null">
+        <div class="modal__box" role="dialog" aria-label="Resultado de la prueba de escritura">
+          <h3>{{ probeResult.ok ? '✅' : '❌' }} {{ probeResult.conclusion }} <span v-if="probeResult.ms" class="muted small">· {{ probeResult.ms }} ms</span></h3>
+          <ol class="steps">
+            <li v-for="(s, i) in probeResult.steps" :key="i" :class="s.ok ? 'ok' : 'err'">
+              <b>{{ s.ok ? '✓' : '✗' }} {{ s.paso }}</b>
+              <pre v-if="s.detalle !== undefined">{{ typeof s.detalle === 'string' ? s.detalle : JSON.stringify(s.detalle, null, 1) }}</pre>
+            </li>
+          </ol>
+          <div class="modal__row">
+            <button class="btn btn--ghost btn--sm" type="button" @click="copyProbe">Copiar JSON</button>
+            <button class="btn btn--sm" type="button" @click="probeResult = null">Cerrar</button>
+          </div>
+        </div>
+      </div>
 
       <!-- filtros -->
       <section class="filters">
@@ -560,6 +601,15 @@ onMounted(checkSession)
 .detail__hist ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; max-height: 320px; overflow-y: auto; }
 .detail__hist li { display: grid; gap: 1px; font-size: 13px; padding-bottom: 6px; border-bottom: 1px dashed var(--line); }
 
+.warn { color: #9A5B00; }
+.modal { position: fixed; inset: 0; z-index: 30; background: rgba(17,17,17,.45); display: flex; align-items: center; justify-content: center; padding: 20px; }
+.modal__box { background: #fff; border-radius: 16px; padding: 20px; width: min(760px, 100%); max-height: 90dvh; overflow-y: auto; display: grid; gap: 12px; }
+.modal__box h3 { margin: 0; font-size: 17px; }
+.modal__row { display: flex; justify-content: flex-end; gap: 8px; }
+.steps { margin: 0; padding-left: 20px; display: grid; gap: 8px; font-size: 14px; }
+.steps pre { margin: 4px 0 0; font-size: 12.5px; white-space: pre-wrap; background: var(--hueso); padding: 8px 10px; border-radius: 8px; color: var(--ink); }
+.steps li.err > b { color: #B00020; }
+.steps li.ok > b { color: #1B7F4B; }
 .pager { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .pager__nav { display: flex; align-items: center; gap: 10px; }
 

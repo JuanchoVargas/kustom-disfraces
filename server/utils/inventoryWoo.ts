@@ -6,6 +6,7 @@ import {
 } from './inventoryCommon'
 import { fetchWooVariations, loadInventory, loadProductBySku, snapshotUpsert } from './inventorySnapshot'
 import { sanitizeWooError, wooFetch } from './woo'
+import { wooWriteCredentials, wooWriteFetch } from './wooWrite'
 
 /**
  * ADAPTADOR WOO — escribe de verdad en WooCommerce (REST API wc/v3) con la llave
@@ -21,22 +22,23 @@ import { sanitizeWooError, wooFetch } from './woo'
 
 export const WOO_BATCH = 100
 
-export function wooWriteConfigured(): boolean {
-  const c = useRuntimeConfig()
-  return !!(c.wooBaseUrl && c.wooOrdersConsumerKey && c.wooOrdersConsumerSecret)
-}
+// Credenciales y cliente de escritura: server/utils/wooWrite.ts (compartido con
+// el checkout). Aquí solo alias para el resto del archivo.
+export { wooWriteConfigured } from './wooWrite'
+const wooWrite = wooWriteFetch
 
-export async function wooWrite<T>(path: string, opts: { method?: 'GET' | 'POST' | 'PUT' | 'DELETE', body?: unknown, query?: Record<string, string | number> } = {}): Promise<T> {
-  const { wooBaseUrl, wooOrdersConsumerKey, wooOrdersConsumerSecret } = useRuntimeConfig()
-  if (!wooBaseUrl || !wooOrdersConsumerKey || !wooOrdersConsumerSecret) {
-    throw new Error('WooCommerce sin llave de escritura (WOO_ORDERS_CONSUMER_KEY / WOO_ORDERS_CONSUMER_SECRET)')
-  }
-  return await $fetch<T>(`${wooBaseUrl}/wp-json/wc/v3${path}`, {
-    method: (opts.method ?? 'GET') as never,
-    body: opts.body as never,
-    query: { ...(opts.query ?? {}), consumer_key: wooOrdersConsumerKey, consumer_secret: wooOrdersConsumerSecret },
-    timeout: 20_000,
-  })
+/**
+ * GUARDA DE VALIDACIÓN (NUXT_INVENTORY_WOO_ONLY_DRAFTS, default true): mientras
+ * no se validen las operaciones masivas, el adaptador woo SOLO escribe en
+ * productos EN BORRADOR. Una escritura a un publicado se rechaza ANTES de
+ * llamar a Woo, con mensaje claro. Los 66 publicados no se tocan.
+ */
+export function wooOnlyDrafts(): boolean {
+  return String(useRuntimeConfig().inventoryWooOnlyDrafts ?? 'true') !== 'false'
+}
+const BLOQUEADO = 'bloqueado: el adaptador woo solo escribe en BORRADORES mientras se validan las operaciones masivas (NUXT_INVENTORY_WOO_ONLY_DRAFTS)'
+function guardDraft(product: InvProduct): string | null {
+  return wooOnlyDrafts() && product.status === 'publish' ? BLOQUEADO : null
 }
 
 interface WooVariationRaw {
@@ -121,6 +123,9 @@ export function createWooStore(): InventoryStore {
       const body = bodyFor(op)
       const r = await resolve(op.sku)
       if (!r) return { sku: op.sku, ok: false, error: 'SKU de variación inexistente en Woo' }
+      const blocked = guardDraft(r.product)
+      if (blocked) return { sku: op.sku, ok: false, error: blocked }
+      // ESCRITURA PRIMERO A WOO; el snapshot se actualiza solo si Woo aceptó.
       const raw = await wooWrite<WooVariationRaw>(`/products/${r.product.id}/variations/${r.variation.id}`, { method: 'PUT', body })
       const after = fromRaw(raw, op.sku)
       after.stock_status = stockStatusFor(after)
@@ -168,6 +173,8 @@ export function createWooStore(): InventoryStore {
           const body = bodyFor(op)
           const r = await resolve(op.sku)
           if (!r) { results.set(op.sku, { sku: op.sku, ok: false, error: 'SKU de variación inexistente en Woo' }); continue }
+          const blocked = guardDraft(r.product)
+          if (blocked) { results.set(op.sku, { sku: op.sku, ok: false, error: blocked }); continue }
           let g = groups.get(r.product.id)
           if (!g) { g = { product: r.product, updates: [] }; groups.set(r.product.id, g) }
           g.updates.push({ id: r.variation.id, before: r.variation, sku: op.sku, body })
@@ -206,10 +213,11 @@ export function createWooStore(): InventoryStore {
     },
 
     async ping() {
-      if (!wooWriteConfigured()) return { ok: false, detail: 'Woo: falta la llave de escritura (WOO_ORDERS_CONSUMER_KEY/SECRET)' }
+      const cred = wooWriteCredentials()
+      if (!cred) return { ok: false, detail: 'Woo: falta la llave de escritura (NUXT_WOO_WRITE_CONSUMER_KEY/SECRET)' }
       try {
         await wooWrite<unknown[]>('/products', { query: { per_page: 1 } })
-        return { ok: true, detail: 'Woo: llave de escritura responde' }
+        return { ok: true, detail: `Woo: llave de escritura responde (${cred.origen === 'write' ? 'NUXT_WOO_WRITE_*' : 'respaldo NUXT_WOO_ORDERS_*'})${wooOnlyDrafts() ? ' · solo borradores' : ''}` }
       }
       catch (err) {
         return { ok: false, detail: `Woo no responde con la llave de escritura: ${sanitizeWooError(err)}` }
