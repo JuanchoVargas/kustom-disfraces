@@ -10,6 +10,7 @@
  * devuelve el shape de Woo. En modo simulación (adaptador mock) muestra el
  * aviso "Modo simulación — los cambios no se reflejan en el sitio".
  */
+import { defineComponent, h } from 'vue'
 import type { InvChange, InvOpResult, InvProduct, InvStatus, InvVariation } from '~~/shared/types/inventory'
 import { tallaFromSku } from '~~/shared/utils/tallas'
 
@@ -244,6 +245,90 @@ function reset(v: InvVariation) {
   rowState.value[v.sku] = {}
 }
 
+// ---------- operación masiva / importación ----------
+interface PreviewRow { sku: string, producto: string, codigo: string, talla: string, status: string, antes: any, despues: any, ops: any[], cambia: boolean, error?: string }
+interface Preview { filas: PreviewRow[], con_cambios: number, sin_cambio: number, errores: number, ignoradas?: { fila: number, motivo: string }[] }
+const fileInput = ref<HTMLInputElement | null>(null)
+const bulk = reactive({
+  open: false, mode: 'bulk' as 'bulk' | 'import', target: 'selected' as 'selected' | 'filtered', busy: false, error: '',
+  tallas: '', precioModo: '', precioValor: '', ofertaModo: '', ofertaValor: '', stockModo: '', stockValor: '',
+  preview: null as Preview | null, soloCambios: true, result: null as { msg: string, fallidas: number } | null,
+})
+const previewRows = computed(() => {
+  const f = bulk.preview?.filas ?? []
+  return bulk.soloCambios ? f.filter(r => r.cambia || r.error) : f
+})
+function currentFilters() {
+  return { q: q.value, status: status.value, grupo: grupo.value, publico: publico.value, stock: stock.value }
+}
+function exportUrl(formato: 'xlsx' | 'csv') {
+  const p = new URLSearchParams({ ...currentFilters(), formato })
+  return `/api/inventario/exportar?${p.toString()}`
+}
+function openBulk() {
+  bulk.mode = 'bulk'; bulk.target = selected.value.size ? 'selected' : 'filtered'
+  bulk.preview = null; bulk.result = null; bulk.error = ''; bulk.open = true
+}
+function openImport() {
+  bulk.mode = 'import'; bulk.preview = null; bulk.result = null; bulk.error = ''; bulk.open = true
+}
+function closeBulk() { bulk.open = false }
+async function previewBulk() {
+  bulk.busy = true; bulk.error = ''
+  try {
+    const num = (v: string) => Number(String(v).replace(/[$.\s]/g, '').replace(',', '.'))
+    const spec: any = {
+      tallas: bulk.tallas.split(',').map(t => t.trim()).filter(Boolean),
+    }
+    if (bulk.target === 'selected' && selected.value.size) spec.skus = [...selected.value]
+    else spec.filtros = currentFilters()
+    if (bulk.precioModo) spec.precio = { modo: bulk.precioModo, valor: num(bulk.precioValor), redondeo: 100 }
+    if (bulk.ofertaModo) spec.oferta = { modo: bulk.ofertaModo, valor: bulk.ofertaModo === 'quitar' ? undefined : num(bulk.ofertaValor) }
+    if (bulk.stockModo) spec.stock = { modo: bulk.stockModo, valor: bulk.stockModo === 'agotar' ? undefined : num(bulk.stockValor) }
+    const r = await $fetch<Preview & { total: number }>('/api/inventario/masivo', { method: 'POST', body: spec })
+    bulk.preview = { ...r, sin_cambio: r.total - r.con_cambios - r.errores }
+  }
+  catch (e: any) { onUnauthorized(e); bulk.error = e?.data?.statusMessage ?? e?.message ?? 'No se pudo calcular la vista previa' }
+  bulk.busy = false
+}
+async function previewImport() {
+  const file = fileInput.value?.files?.[0]
+  if (!file) { bulk.error = 'Elige un archivo .xlsx o .csv'; return }
+  bulk.busy = true; bulk.error = ''
+  try {
+    const fd = new FormData()
+    fd.append('file', file, file.name)
+    const r = await $fetch<{ filas: PreviewRow[], resumen: { con_cambios: number, sin_cambio: number, errores: number }, ignoradas: { fila: number, motivo: string }[] }>('/api/inventario/importar', { method: 'POST', body: fd })
+    bulk.preview = { filas: r.filas, ignoradas: r.ignoradas, ...r.resumen }
+  }
+  catch (e: any) { onUnauthorized(e); bulk.error = e?.data?.statusMessage ?? e?.message ?? 'No se pudo leer el archivo' }
+  bulk.busy = false
+}
+async function applyPreview() {
+  if (!bulk.preview) return
+  const ops = bulk.preview.filas.filter(f => f.cambia && !f.error).flatMap(f => f.ops)
+  if (!ops.length) return
+  bulk.busy = true
+  try {
+    const r = await $fetch<{ ok: number, fallidas: number, resultados: InvOpResult[] }>('/api/inventario/operaciones', { method: 'POST', body: { operaciones: ops, origen: bulk.mode === 'import' ? 'importacion' : 'masivo' } })
+    const fallos = r.resultados.filter(x => !x.ok)
+    bulk.result = { fallidas: r.fallidas, msg: r.fallidas ? `${r.ok} aplicadas · ${r.fallidas} fallidas: ${fallos.slice(0, 5).map(x => `${x.sku} (${x.error})`).join(', ')}${fallos.length > 5 ? '…' : ''}` : `${r.ok} cambios aplicados.` }
+    await Promise.all([loadEstado(), refresh()])
+  }
+  catch (e: any) { onUnauthorized(e); bulk.result = { fallidas: 1, msg: e?.data?.statusMessage ?? 'No se pudieron aplicar los cambios' } }
+  bulk.busy = false
+}
+const stockText = (s: any) => (s.manage_stock ? String(s.stock_quantity ?? 0) : 'sin gestionar')
+/** "antes → después" en una celda; solo la flecha cuando cambia. */
+const Delta = defineComponent({
+  props: { a: { type: String, required: true }, b: { type: String, required: true } },
+  setup(props) {
+    return () => props.a === props.b
+      ? h('span', { class: 'muted' }, props.a)
+      : h('span', [h('s', { class: 'muted' }, props.a), ' → ', h('b', props.b)])
+  },
+})
+
 // ---------- presentación ----------
 const cop = (v: string | number | null | undefined) => (v === '' || v == null ? '—' : formatCOP(Number(v)))
 const talla = (v: InvVariation) => String(v.attributes.find(a => a.name === 'Talla')?.option ?? tallaFromSku(v.sku) ?? '?')
@@ -380,8 +465,112 @@ onMounted(checkSession)
 
       <div class="toolbar">
         <label class="check"><input type="checkbox" :checked="allOnPage" @change="toggleAll"> <span>Seleccionar página</span></label>
-        <span v-if="selected.size" class="muted small">{{ selected.size }} seleccionados · las operaciones masivas llegan en el siguiente entregable</span>
+        <span v-if="selected.size" class="muted small">{{ selected.size }} seleccionados <button class="linkbtn" type="button" @click="selected = new Set()">quitar</button></span>
+        <button class="btn btn--sm" type="button" :disabled="!selected.size && !total" @click="openBulk">Operación masiva ({{ selected.size || total }})</button>
+        <a class="btn btn--ghost btn--sm" :href="exportUrl('xlsx')">Exportar Excel</a>
+        <a class="btn btn--ghost btn--sm" :href="exportUrl('csv')">CSV</a>
+        <button class="btn btn--ghost btn--sm" type="button" @click="openImport">Importar</button>
         <span class="toolbar__count muted small">{{ total }} productos</span>
+      </div>
+
+      <!-- ===== operación masiva / importación ===== -->
+      <div v-if="bulk.open" class="modal" @click.self="closeBulk">
+        <div class="modal__box modal__box--wide" role="dialog" :aria-label="bulk.mode === 'import' ? 'Importar' : 'Operación masiva'">
+          <h3 v-if="bulk.mode === 'bulk'">Operación masiva sobre {{ bulk.target === 'selected' ? `${selected.size} seleccionados` : `los ${total} productos filtrados` }}</h3>
+          <h3 v-else>Importar precios y stock desde Excel o CSV</h3>
+
+          <template v-if="!bulk.preview">
+            <form v-if="bulk.mode === 'bulk'" class="bform" @submit.prevent="previewBulk">
+              <div v-if="selected.size && total" class="bform__row">
+                <label class="check"><input v-model="bulk.target" type="radio" value="selected"> <span>Solo los {{ selected.size }} seleccionados</span></label>
+                <label class="check"><input v-model="bulk.target" type="radio" value="filtered"> <span>Todos los {{ total }} filtrados</span></label>
+              </div>
+              <label class="bform__field">Solo estas tallas (opcional, separadas por coma)
+                <input v-model="bulk.tallas" class="input" placeholder="ej. 4, 6, Bebé">
+              </label>
+              <fieldset class="bform__group">
+                <legend>Precio normal</legend>
+                <select v-model="bulk.precioModo" class="input">
+                  <option value="">Sin cambio</option>
+                  <option value="fijar">Fijar en</option>
+                  <option value="porcentaje">Subir o bajar %</option>
+                  <option value="monto">Sumar o restar monto</option>
+                </select>
+                <input v-if="bulk.precioModo" v-model="bulk.precioValor" class="input" inputmode="numeric" :placeholder="bulk.precioModo === 'porcentaje' ? 'ej. 10 o -5' : 'pesos'">
+                <span v-if="bulk.precioModo === 'porcentaje'" class="muted small">redondea a $100</span>
+              </fieldset>
+              <fieldset class="bform__group">
+                <legend>Precio rebajado</legend>
+                <select v-model="bulk.ofertaModo" class="input">
+                  <option value="">Sin cambio</option>
+                  <option value="fijar">Fijar en</option>
+                  <option value="porcentaje">% de descuento sobre el normal</option>
+                  <option value="quitar">Quitar oferta</option>
+                </select>
+                <input v-if="bulk.ofertaModo && bulk.ofertaModo !== 'quitar'" v-model="bulk.ofertaValor" class="input" inputmode="numeric" :placeholder="bulk.ofertaModo === 'porcentaje' ? 'ej. 20' : 'pesos'">
+              </fieldset>
+              <fieldset class="bform__group">
+                <legend>Stock</legend>
+                <select v-model="bulk.stockModo" class="input">
+                  <option value="">Sin cambio</option>
+                  <option value="fijar">Fijar cantidad</option>
+                  <option value="sumar">Sumar o restar</option>
+                  <option value="gestionar">Activar gestión (con cantidad inicial)</option>
+                  <option value="agotar">Marcar agotado (0)</option>
+                </select>
+                <input v-if="bulk.stockModo && bulk.stockModo !== 'agotar'" v-model="bulk.stockValor" class="input" inputmode="numeric" placeholder="unidades">
+              </fieldset>
+              <p v-if="bulk.error" class="err small">{{ bulk.error }}</p>
+              <div class="modal__row">
+                <button class="btn btn--ghost btn--sm" type="button" @click="closeBulk">Cancelar</button>
+                <button class="btn btn--sm" type="submit" :disabled="bulk.busy || (!bulk.precioModo && !bulk.ofertaModo && !bulk.stockModo)">{{ bulk.busy ? 'Calculando…' : 'Previsualizar' }}</button>
+              </div>
+            </form>
+            <form v-else class="bform" @submit.prevent="previewImport">
+              <p class="muted small">Sube el archivo exportado (Excel o CSV) con las columnas <b>Precio normal</b>, <b>Precio rebajado</b> y <b>Stock</b> editadas. Solo se aplican las columnas presentes; celda vacía en precio o stock = no tocar; vacía en precio rebajado = quitar oferta.</p>
+              <input ref="fileInput" class="input" type="file" accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv">
+              <p v-if="bulk.error" class="err small">{{ bulk.error }}</p>
+              <div class="modal__row">
+                <button class="btn btn--ghost btn--sm" type="button" @click="closeBulk">Cancelar</button>
+                <button class="btn btn--sm" type="submit" :disabled="bulk.busy">{{ bulk.busy ? 'Leyendo…' : 'Previsualizar' }}</button>
+              </div>
+            </form>
+          </template>
+
+          <template v-else>
+            <div class="preview__summary">
+              <span class="pill pill--ok">{{ bulk.preview.con_cambios }} con cambios</span>
+              <span class="pill pill--draft">{{ bulk.preview.sin_cambio }} sin cambio</span>
+              <span v-if="bulk.preview.errores" class="pill pill--sim">{{ bulk.preview.errores }} con error (no se aplican)</span>
+              <span v-if="bulk.preview.ignoradas?.length" class="muted small">Filas ignoradas: {{ bulk.preview.ignoradas.map(i => `${i.fila} (${i.motivo})`).join(', ') }}</span>
+              <label class="check small"><input v-model="bulk.soloCambios" type="checkbox"> <span>Ver solo cambios y errores</span></label>
+            </div>
+            <div class="preview__wrap">
+              <table class="vars">
+                <thead><tr><th>Producto</th><th>Talla</th><th>SKU</th><th class="num">Precio</th><th class="num">Oferta</th><th class="num">Stock</th><th>Resultado</th></tr></thead>
+                <tbody>
+                  <tr v-for="f in previewRows" :key="f.sku" :class="{ 'is-dirty': f.cambia && !f.error, 'is-err': !!f.error }">
+                    <td>{{ f.producto }} <span v-if="f.status !== 'publish'" class="chip chip--soft">borrador</span></td>
+                    <td class="talla-cell">{{ f.talla }}</td>
+                    <td class="mono small">{{ f.sku }}</td>
+                    <td class="num"><Delta :a="cop(f.antes.regular_price)" :b="cop(f.despues.regular_price)" /></td>
+                    <td class="num"><Delta :a="f.antes.sale_price ? cop(f.antes.sale_price) : '—'" :b="f.despues.sale_price ? cop(f.despues.sale_price) : '—'" /></td>
+                    <td class="num"><Delta :a="stockText(f.antes)" :b="stockText(f.despues)" /></td>
+                    <td class="small"><span v-if="f.error" class="err">{{ f.error }}</span><span v-else-if="!f.cambia" class="muted">sin cambio</span><span v-else class="ok">se actualiza</span></td>
+                  </tr>
+                  <tr v-if="!previewRows.length"><td colspan="7" class="empty">Nada que mostrar.</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <p v-if="bulk.result" class="small" :class="bulk.result.fallidas ? 'err' : 'ok'">{{ bulk.result.msg }}</p>
+            <p v-if="estado?.simulation" class="muted small">Modo simulación: los cambios se guardan aquí, no llegan a Woo ni al sitio.</p>
+            <div class="modal__row">
+              <button class="btn btn--ghost btn--sm" type="button" @click="bulk.preview = null; bulk.result = null">Volver</button>
+              <button class="btn btn--ghost btn--sm" type="button" @click="closeBulk">Cerrar</button>
+              <button v-if="!bulk.result" class="btn btn--sm" type="button" :disabled="bulk.busy || !bulk.preview.con_cambios" @click="applyPreview">{{ bulk.busy ? 'Aplicando…' : `Aplicar ${bulk.preview.con_cambios} cambios` }}</button>
+            </div>
+          </template>
+        </div>
       </div>
 
       <p v-if="listError" class="banner banner--warn">{{ listError }}</p>
@@ -602,6 +791,18 @@ onMounted(checkSession)
 .detail__hist li { display: grid; gap: 1px; font-size: 13px; padding-bottom: 6px; border-bottom: 1px dashed var(--line); }
 
 .warn { color: #9A5B00; }
+.linkbtn { appearance: none; background: none; border: 0; padding: 0; font: inherit; color: var(--purple-d); text-decoration: underline; cursor: pointer; }
+.modal__box--wide { width: min(1080px, 100%); }
+.bform { display: grid; gap: 12px; }
+.bform__row { display: flex; gap: 16px; flex-wrap: wrap; }
+.bform__field { display: grid; gap: 4px; font-size: 13px; font-weight: 600; color: var(--mut); }
+.bform__group { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 0; }
+.bform__group legend { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--mut); font-weight: 700; padding: 0 4px; }
+.bform__group .input { width: auto; min-width: 160px; }
+.preview__summary { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.preview__wrap { max-height: 55dvh; overflow: auto; border: 1px solid var(--line); border-radius: 10px; }
+.preview__wrap .vars { border: 0; }
+.vars tr.is-err td { background: #FDE7E9; }
 .modal { position: fixed; inset: 0; z-index: 30; background: rgba(17,17,17,.45); display: flex; align-items: center; justify-content: center; padding: 20px; }
 .modal__box { background: #fff; border-radius: 16px; padding: 20px; width: min(760px, 100%); max-height: 90dvh; overflow-y: auto; display: grid; gap: 12px; }
 .modal__box h3 { margin: 0; font-size: 17px; }

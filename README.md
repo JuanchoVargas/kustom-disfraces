@@ -662,6 +662,28 @@ por campo cambiado (SKU, valor anterior, nuevo, origen, autor, fecha).
   `docs/inventario-reporte-woo.md` (estado de Woo: 43 borradores, SKUs que no
   coinciden, hallazgos).
 
-Pendiente (siguientes entregables): operaciones masivas + Excel (exportar /
-importar con previsualización), alertas de stock bajo, validación de stock en el
-checkout y lógica de agotado en sitio y bot.
+### Operaciones masivas y Excel
+
+- **Operación masiva** (botón de la barra, sobre los seleccionados o sobre
+  todos los filtrados, opcionalmente solo ciertas tallas): precio normal (fijar,
+  ±%, ±monto), precio rebajado (fijar, % sobre el normal, quitar) y stock (fijar,
+  sumar/restar, activar gestión con cantidad inicial, agotar). Siempre pasa por
+  la pantalla de confirmación **antes → después** por talla
+  (`POST /api/inventario/masivo`, no escribe); "Aplicar" envía las operaciones
+  con origen `masivo`. Las filas con error (p. ej. tallas sin precio) se listan
+  con el motivo y no se aplican.
+- **Exportar** Excel (.xlsx) o CSV con los filtros actuales
+  (`GET /api/inventario/exportar`): una fila por talla con SKU, código, producto,
+  talla, estado, línea, precio normal, precio rebajado, stock, gestionar stock y
+  estado de stock. El archivo es a la vez la **plantilla de importación**.
+- **Importar** (.xlsx o .csv, `POST /api/inventario/importar`): valida fila por
+  fila (SKU inexistente, precio inválido, oferta ≥ precio, stock negativo,
+  repetidos), muestra antes → después y aplica con origen `importacion`. Solo se
+  aplican las columnas presentes; celda vacía en precio/stock = no tocar, vacía
+  en precio rebajado = quitar oferta.
+- Sin dependencias: `server/utils/xlsxLite.ts` escribe y lee .xlsx (zip + XML
+  con zlib nativo) y CSV (UTF-8 con BOM, `;`). Formato acotado a texto y
+  números en una hoja, que es lo que necesita el inventario.
+
+Pendiente (siguientes entregables): alertas de stock bajo, validación de stock
+en el checkout y lógica de agotado en sitio y bot.

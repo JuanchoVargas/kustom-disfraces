@@ -170,6 +170,53 @@ const fila = prev.filas?.find(f => f.sku === V_BEBE)
 check('9. vista previa lista la sobreescritura Bebé con antes → después', prev.preview === true && fila && fila.antes.regular_price === before.regular_price && fila.despues.regular_price === '135000', fila ? `${fila.antes.regular_price} → ${fila.despues.regular_price}` : 'sin fila')
 check('9. la vista previa no escribió (overrides siguen)', (await api('/estado')).json.overrides >= 3)
 
+// ---------- 11. operación masiva (vista previa) ----------
+const { json: m1 } = await api('/masivo', { method: 'POST', body: { skus: [P_BEBE], precio: { modo: 'porcentaje', valor: 10, redondeo: 100 } } })
+check('11. masivo +10 % sobre un producto: una fila por talla, todas con cambio', m1.total === 4 && m1.con_cambios === 4 && m1.errores === 0, `${m1.total} filas · ${m1.con_cambios} cambios`)
+const fBebe = m1.filas?.find(f => f.sku === V_BEBE)
+check('11. 135.000 + 10 % redondeado a 100 = 148.500', fBebe?.despues.regular_price === '148500' && fBebe?.ops.length === 1, `${fBebe?.antes.regular_price} → ${fBebe?.despues.regular_price}`)
+const { json: m2 } = await api('/masivo', { method: 'POST', body: { skus: [P_BEBE], tallas: ['Bebé'], oferta: { modo: 'fijar', valor: 200000 } } })
+check('11. filtro por talla Bebé + oferta ≥ precio → 1 fila con error, no se aplica', m2.total === 1 && m2.errores === 1 && m2.filas[0].sku === V_BEBE && /menor/.test(m2.filas[0].error), m2.filas?.[0]?.error)
+const { json: m3 } = await api('/masivo', { method: 'POST', body: { skus: [P_BEBE], stock: { modo: 'gestionar', valor: 5 } } })
+const t0 = m3.filas?.find(f => f.sku === `${P_BEBE}-T0`)
+check('11. "activar gestión" con 5: talla sin gestionar pasa a 5, las ya gestionadas conservan su cantidad (T2=10, T4=0)', t0?.despues.manage_stock === true && t0?.despues.stock_quantity === 5 && m3.filas.find(f => f.sku === V_NUM2)?.despues.stock_quantity === 10 && m3.filas.find(f => f.sku === V_NUM)?.despues.stock_quantity === 0, JSON.stringify(t0?.despues))
+const { json: m4 } = await api('/masivo', { method: 'POST', body: { filtros: { grupo: 'peluche-plus', publico: 'bebes' }, oferta: { modo: 'porcentaje', valor: 20 } } })
+check('11. masivo sobre filtros (línea + público) alcanza varios productos', m4.productos >= 2 && m4.con_cambios >= 2, `${m4.productos} productos · ${m4.con_cambios} cambios`)
+const { status: m5 } = await api('/masivo', { method: 'POST', body: { skus: [P_BEBE] } })
+check('11. masivo sin operación → 400', m5 === 400)
+
+// ---------- 12. exportar (xlsx / csv) y reimportar sin cambios ----------
+const xres = await fetch(`${BASE}/api/inventario/exportar?q=gato`, { headers: { cookie } })
+const xbuf = Buffer.from(await xres.arrayBuffer())
+check('12. exportar .xlsx: content-type y firma zip', xres.status === 200 && /spreadsheetml/.test(xres.headers.get('content-type') ?? '') && xbuf[0] === 0x50 && xbuf[1] === 0x4B, `${xbuf.length} bytes · ${xres.headers.get('content-disposition')}`)
+const upload = async (buf, name, type) => {
+  const fd = new FormData()
+  fd.append('file', new Blob([buf], { type }), name)
+  const res = await fetch(`${BASE}/api/inventario/importar`, { method: 'POST', headers: { cookie }, body: fd })
+  return { status: res.status, json: await res.json().catch(() => ({})) }
+}
+const { json: rt } = await upload(xbuf, 'inventario.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+check('12. el .xlsx exportado se reimporta: 4 filas, 0 cambios, 0 errores (ida y vuelta exacta)', rt.resumen?.total === 4 && rt.resumen.con_cambios === 0 && rt.resumen.errores === 0 && rt.columnas?.sku && rt.columnas.precio && rt.columnas.stock, JSON.stringify(rt.resumen))
+const cres = await fetch(`${BASE}/api/inventario/exportar?q=gato&formato=csv`, { headers: { cookie } })
+const cbuf = Buffer.from(await cres.arrayBuffer())
+const ctext = cbuf.subarray(3).toString('utf8')
+check('12. exportar .csv: BOM + encabezado con ";"', cres.status === 200 && cbuf[0] === 0xEF && cbuf[1] === 0xBB && cbuf[2] === 0xBF && ctext.split(/\r?\n/)[0].startsWith('SKU;Código;Producto;Talla'), ctext.split(/\r?\n/)[0])
+const { json: rtc } = await upload(cbuf, 'inventario.csv', 'text/csv')
+check('12. el .csv exportado se reimporta sin cambios', rtc.resumen?.total === 4 && rtc.resumen.con_cambios === 0 && rtc.resumen.errores === 0, JSON.stringify(rtc.resumen))
+
+// ---------- 13. importar con cambios y errores, luego aplicar ----------
+const csv = ['SKU;Precio normal;Precio rebajado;Stock', `${V_BEBE};140000;;7`, 'NOEXISTE-T1;100;;', `${V_NUM};abc;;`, `${V_NUM};1;;`, `${V_NUM2};;;`].join('\r\n')
+const { json: imp } = await upload(Buffer.from(csv, 'utf8'), 'cambios.csv', 'text/csv')
+check('13. importación: 1 con cambio, 2 con error (SKU inexistente, precio inválido), 1 repetido ignorado, 1 sin cambio', imp.resumen?.con_cambios === 1 && imp.resumen.errores === 3 && imp.ignoradas?.length === 1 && imp.resumen.sin_cambio === 1, JSON.stringify(imp.resumen))
+const fi = imp.filas?.find(f => f.sku === V_BEBE)
+check('13. la fila Bebé propone precio 140.000, oferta quitada y stock 7', fi?.despues.regular_price === '140000' && fi.despues.sale_price === '' && fi.despues.stock_quantity === 7 && fi.ops.length === 2, JSON.stringify(fi?.despues))
+const opsImp = imp.filas.filter(f => f.cambia && !f.error).flatMap(f => f.ops)
+const ap = await ops(opsImp, 'importacion')
+check('13. aplicar la importación: 2 operaciones ok', ap.json.ok === 2 && ap.json.fallidas === 0, `ok=${ap.json.ok}`)
+const { json: postImp } = await api(`/productos/${encodeURIComponent(P_BEBE)}`)
+const vbi = postImp.product.variations.find(v => v.sku === V_BEBE)
+check('13. relectura: 140.000, sin oferta, stock 7, origen "importacion" en el registro', vbi.regular_price === '140000' && vbi.sale_price === '' && vbi.stock_quantity === 7 && postImp.cambios.some(c => c.origen === 'importacion'))
+
 if (!KEEP) await cleanup()
 else console.log('--keep: overrides de prueba conservados para revisar en /admin/inventario')
 console.log(fails ? `\n❌ ${fails} fallo(s)` : '\n✅ todo OK')
