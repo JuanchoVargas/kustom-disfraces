@@ -113,6 +113,43 @@ const MIGRATION = [
   `ALTER TABLE conversations ADD COLUMN IF NOT EXISTS username TEXT`,
   // Cuándo se archivó (estado='cerrado' = "Archivada" en la bandeja; nunca se borra).
   `ALTER TABLE conversations ADD COLUMN IF NOT EXISTS archivada_at TIMESTAMPTZ`,
+  // ===== MÓDULO DE INVENTARIO (server/utils/inventory*.ts) =====
+  // Snapshot de los productos de Woo (shape wc/v3 + variaciones completas) en
+  // JSONB, una fila por producto padre. Leer TODAS las variaciones de Woo tarda
+  // ~15 s (109 productos, 537 variaciones): se sincroniza por tandas y el
+  // panel lee de aquí. Lo comparten ambos adaptadores.
+  `CREATE TABLE IF NOT EXISTS inventory_snapshot (
+    sku        TEXT PRIMARY KEY,
+    product    JSONB NOT NULL,
+    fetched_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  )`,
+  // Sobreescrituras del adaptador MOCK (modo simulación): lo que el panel
+  // "escribe" mientras no hay credencial de escritura en Woo. Clave = SKU de
+  // variación ({codigo}-T{talla}). NULL en un campo = sin sobreescribir.
+  `CREATE TABLE IF NOT EXISTS inventory_overrides (
+    sku            TEXT PRIMARY KEY,
+    regular_price  TEXT,
+    sale_price     TEXT,
+    manage_stock   BOOLEAN,
+    stock_quantity INTEGER,
+    updated_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_by     TEXT
+  )`,
+  // Registro de cambios: TODA escritura (en ambos adaptadores) deja una fila por
+  // campo cambiado con valor anterior, nuevo, origen (panel|masivo|importacion|
+  // script|checkout|prueba) y autor.
+  `CREATE TABLE IF NOT EXISTS inventory_changes (
+    id         BIGSERIAL PRIMARY KEY,
+    backend    TEXT NOT NULL,
+    sku        TEXT NOT NULL,
+    campo      TEXT NOT NULL,
+    anterior   TEXT,
+    nuevo      TEXT,
+    origen     TEXT NOT NULL,
+    autor      TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  )`,
+  `CREATE INDEX IF NOT EXISTS inventory_changes_sku_idx ON inventory_changes (sku, id DESC)`,
   `CREATE INDEX IF NOT EXISTS messages_conversation_idx ON messages (conversation_id, id)`,
   `CREATE INDEX IF NOT EXISTS conversations_actividad_idx ON conversations (ultima_actividad DESC)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS messages_wamid_idx ON messages (wamid) WHERE wamid IS NOT NULL`,

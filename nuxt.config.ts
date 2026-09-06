@@ -114,6 +114,12 @@ export default defineNuxtConfig({
     // La cookie de sesión se firma con una clave derivada de ella. Sin valor, la
     // bandeja responde 503. Postgres se lee directo de POSTGRES_URL (Neon↔Vercel).
     inboxPassword: process.env.NUXT_INBOX_PASSWORD || '',    // -> NUXT_INBOX_PASSWORD
+    // MÓDULO DE INVENTARIO (/admin/inventario): qué adaptador ejecuta las escrituras.
+    //   mock (default) = simulación: lee productos reales de Woo (llave de lectura) y
+    //                    guarda los cambios en Postgres (inventory_overrides); NO toca Woo.
+    //   woo            = escribe de verdad en WooCommerce con la llave de escritura
+    //                    (wooOrders*). Cambiar SOLO tras el checklist docs/inventario-activacion.md.
+    inventoryBackend: process.env.NUXT_INVENTORY_BACKEND || 'mock', // -> NUXT_INVENTORY_BACKEND (mock | woo)
     // Alerta por WhatsApp al encargado cuando un cliente pide atención humana
     // (plantilla aprobada en Meta). Sin destino no se envía; el correo es el respaldo.
     alertWhatsappTo: process.env.NUXT_ALERT_WHATSAPP_TO || '',                       // -> NUXT_ALERT_WHATSAPP_TO

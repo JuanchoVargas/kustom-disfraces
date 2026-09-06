@@ -1,5 +1,6 @@
 import type { ProductoCatalogo } from '~~/shared/types/catalogo'
 import catalogoLocal from '~~/app/data/catalogo.json'
+import { normalizeTalla, sizeRank } from '~~/shared/utils/tallas'
 
 /**
  * Cliente de la REST API de WooCommerce (api.disfraceskustom.com) y adaptador
@@ -28,15 +29,12 @@ interface WooProduct {
   attributes?: { name: string, options: string[] }[]
 }
 
-// El mismo orden canónico de tallas del sitio (Woo las devuelve alfabéticas)
-const SIZE_ORDER = ['Bebé', 0, 2, 4, 6, 8, 10, 12, 14, 'XS', 'S', 'M', 'L', 'XL']
-const sizeRank = (s: number | string) => {
-  const i = SIZE_ORDER.findIndex(o => String(o) === String(s))
-  return i === -1 ? SIZE_ORDER.length : i
-}
-const normalizeTalla = (s: string): number | string => (/^\d+$/.test(s) ? Number(s) : s)
+// Orden canónico de tallas y normalización: shared/utils/tallas.ts (lo comparte
+// el módulo de inventario). Woo las devuelve alfabéticas.
 
-const wooFetch = async <T>(path: string, query: Record<string, string | number> = {}): Promise<T> => {
+/** GET a wc/v3 con la llave de SOLO LECTURA (catálogo e inventario). Exportado
+ *  para server/utils/inventorySnapshot.ts. */
+export const wooFetch = async <T>(path: string, query: Record<string, string | number> = {}): Promise<T> => {
   const { wooBaseUrl, wooConsumerKey, wooConsumerSecret } = useRuntimeConfig()
   if (!wooBaseUrl || !wooConsumerKey || !wooConsumerSecret) {
     throw new Error('WooCommerce sin configurar (WOO_API_URL / WOO_CONSUMER_KEY / WOO_CONSUMER_SECRET)')

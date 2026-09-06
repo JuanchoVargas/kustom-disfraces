@@ -615,3 +615,52 @@ departamento, ciudad, localidad/zona, barrio, dirección, celular y correo.
 > Se eligió metadata (no un store externo) porque no hay BD/KV persistente y así
 > el webhook **crea** la orden ya con todos los datos, sin órdenes "pending"
 > abandonadas. La validación de precios server-side sigue intacta.
+
+---
+
+## 📦 Módulo de inventario (Fase 1 — panel `/admin/inventario`)
+
+Panel para editar **precio (normal / rebajado) y stock por talla** de todo el
+catálogo, con tabla, filtros (estado, línea, público, stock), buscador sin
+tildes, orden, paginación, selección múltiple y registro de cambios. Misma
+contraseña y cookie que la bandeja (`NUXT_INBOX_PASSWORD`).
+
+### Capa de adaptador (`server/utils/inventoryStore.ts`)
+
+El panel solo habla con la interfaz `InventoryStore` (`listProducts`,
+`getProduct`, `updateVariationPrice`, `updateVariationStock`, `bulkUpdate`,
+`ping`). Quién la implementa lo decide **`NUXT_INVENTORY_BACKEND=mock|woo`**:
+
+| Adaptador | Lecturas | Escrituras | Cuándo |
+|---|---|---|---|
+| `mock` (default) | Snapshot de Woo (llave de lectura) + `inventory_overrides` encima | `inventory_overrides` (Postgres) — **NO toca Woo ni el sitio**; el panel muestra "Modo simulación" | Mientras no haya llave de escritura probada |
+| `woo` | Snapshot de Woo | REST API wc/v3 con la llave de escritura (`WOO_ORDERS_*`): PUT por variación o `variations/batch` de 100, agrupado por producto padre; write-through al snapshot | Tras el checklist `docs/inventario-activacion.md` |
+
+Ambos devuelven **el shape de Woo** (`shared/types/inventory.ts`: `sku`,
+`regular_price` como texto, `stock_quantity`, `stock_status`,
+`attributes[{name:'Talla', option}]`…) y dejan en `inventory_changes` una fila
+por campo cambiado (SKU, valor anterior, nuevo, origen, autor, fecha).
+
+- **Snapshot** (`server/utils/inventorySnapshot.ts`): leer las 537 variaciones de
+  Woo tarda ~15 s, inviable en una request serverless → se sincroniza **por
+  tandas** de 12 productos (`POST /api/inventario/sincronizar`, el panel repite
+  hasta `pendientes = 0`; auto al abrir si el snapshot tiene > 10 min) y se
+  guarda en `inventory_snapshot` (JSONB). Sin snapshot cae a `catalogo.json`.
+- SKU de variación (verificado en vivo): **`{codigo}-T{talla}`** —
+  `001010001-T4`, `001010002-P-T0`, `001010001-TBebé`. Orden canónico y parseo en
+  `shared/utils/tallas.ts` (Bebé < 0 < 2 … < XL).
+- API (`server/api/inventario/`): `estado`, `productos` (+ `productos/<sku>`),
+  `operaciones` (1 → update simple, N → bulk), `cambios`, `sincronizar`,
+  `aplicar-woo` (vista previa "antes → después" y aplicación de overrides).
+- Scripts: `scripts/test-inventario.mjs` (suite completa contra el dev server,
+  limpia al final), `scripts/test-woo-escritura.mjs` (prueba la llave de
+  escritura cambiando y revirtiendo un precio en un **borrador**),
+  `scripts/aplicar-overrides-woo.mjs` (vista previa / `--aplicar`).
+- Docs: `docs/inventario-activacion.md` (checklist del cambio de adaptador,
+  incluye apagar `NUXT_PUBLIC_SHOW_DISCOUNT` al usar `sale_price` real) y
+  `docs/inventario-reporte-woo.md` (estado de Woo: 43 borradores, SKUs que no
+  coinciden, hallazgos).
+
+Pendiente (siguientes entregables): operaciones masivas + Excel (exportar /
+importar con previsualización), alertas de stock bajo, validación de stock en el
+checkout y lógica de agotado en sitio y bot.
