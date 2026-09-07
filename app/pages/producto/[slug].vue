@@ -74,7 +74,14 @@ const currentImage = computed(() => product.value?.images?.[0])
 // ---------- galería multi-imagen ----------
 // currentImage (imagen [0]) sigue siendo la del carrito; la galería tiene su
 // propio índice para no tocar el carrito ni el resto de la PDP.
-const galleryImages = computed(() => product.value?.images ?? [])
+// Respaldo permanente por imagen (Fase B): si una URL de Woo falla al cargar, se
+// sustituye por la local de la misma posición sin recargar la página.
+const failedImgs = ref(new Set<number>())
+const galleryImages = computed(() => (product.value?.images ?? []).map((img, i) => (failedImgs.value.has(i) && product.value?.imagesFallback?.[i]) || img))
+function onGalleryError(i: number) {
+  if (!product.value?.imagesFallback?.[i] || failedImgs.value.has(i)) return
+  failedImgs.value = new Set([...failedImgs.value, i])
+}
 const activeIndex = ref(0)
 const activeImage = computed(() => galleryImages.value[activeIndex.value] ?? currentImage.value)
 const hasGallery = computed(() => galleryImages.value.length > 1)
@@ -198,6 +205,7 @@ const perks = [
               class="gallery__photo"
               :style="zoomStyle"
               width="800"
+              @error="onGalleryError(activeIndex)"
               height="800"
               fit="inside"
             />
@@ -216,7 +224,7 @@ const perks = [
               :aria-pressed="i === activeIndex"
               @click="activeIndex = i"
             >
-              <NuxtImg :src="img" alt="" class="thumb__img" width="120" height="120" fit="inside" />
+              <NuxtImg :src="img" alt="" class="thumb__img" width="120" height="120" fit="inside" @error="onGalleryError(i)" />
             </button>
           </li>
         </ul>

@@ -2,6 +2,9 @@
 import type { Product } from '~~/shared/types/woo'
 
 const props = defineProps<{ product: Product }>()
+// Respaldo permanente (Fase B): si la imagen de Woo falla, se muestra la local equivalente.
+const imgFailed = ref(false)
+function onImgError() { if (props.product.imagesFallback?.[0]) imgFailed.value = true }
 
 // Wishlist OCULTA por decisión aprobada: la UI era visual-only (este ref
 // local no persiste). Se reactiva con ENABLE_WISHLIST cuando exista el
@@ -50,7 +53,7 @@ const to = computed(() => `/producto/${props.product.slug}`)
       <NuxtLink :to="to" class="plink" :aria-label="product.name">
         <!-- pos top: las fotos no cuadradas (Gokú 201x624, Batman, Spider Gwen)
              se recortan desde arriba (cabeza visible); las 800x800 no se tocan -->
-        <NuxtImg v-if="product.images?.[0]" :src="product.images[0]" :alt="product.name" class="pphoto" width="400" height="400" :modifiers="{ pos: 'top' }" />
+        <NuxtImg v-if="product.images?.[0]" :src="imgFailed ? (product.imagesFallback?.[0] ?? product.images[0]) : product.images[0]" :alt="product.name" class="pphoto" width="400" height="400" :modifiers="{ pos: 'top' }" @error="onImgError" />
         <PhotoPlaceholder v-else :caption="`[ ${product.name} ]\nfoto 1:1`" />
       </NuxtLink>
     </div>

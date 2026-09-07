@@ -209,6 +209,7 @@ function toggleOpen(p: InvProduct) {
   open.value = s
   seedDrafts(p, false)
   if (!history.value[p.sku]) loadHistory(p.sku)
+  loadImages(p.sku)
 }
 async function loadHistory(sku: string) {
   try {
@@ -313,13 +314,17 @@ const vrows = computed<VRow[]>(() => {
   }
   return out
 })
+// ---------- densidad (compacto / cómodo), guardada en el navegador ----------
+const densidad = ref<'comodo' | 'compacto'>('comodo')
+onMounted(() => { try { const d = localStorage.getItem('kustom-inv-densidad'); if (d === 'compacto' || d === 'comodo') densidad.value = d } catch {} })
+watch(densidad, (d) => { try { localStorage.setItem('kustom-inv-densidad', d) } catch {} nextTick(() => virtualizer.value.measure()) })
+const ROW_H_BY = { comodo: 76, compacto: 56 }
 const scrollEl = ref<HTMLElement | null>(null)
-const ROW_H = 64
-const DETAIL_H = 330
+const DETAIL_H = 420
 const virtualizer = useVirtualizer(computed(() => ({
   count: vrows.value.length,
   getScrollElement: () => scrollEl.value,
-  estimateSize: (i: number) => (vrows.value[i]?.kind === 'detail' ? DETAIL_H : ROW_H),
+  estimateSize: (i: number) => (vrows.value[i]?.kind === 'detail' ? DETAIL_H : ROW_H_BY[densidad.value]),
   getItemKey: (i: number) => vrows.value[i]?.key ?? i,
   overscan: 6,
 })))
@@ -415,6 +420,156 @@ const Delta = defineComponent({
   },
 })
 
+// ---------- imágenes del producto (Fase A) ----------
+interface ImgInfo { id: number, src: string, name?: string, alt?: string }
+interface ImgState {
+  loading: boolean
+  images: ImgInfo[]
+  variaciones: { sku: string, id: number, talla: string, image: ImgInfo | null }[]
+  bloqueo: string | null
+  /** subidas en curso o terminadas, por archivo */
+  uploads: { name: string, size: number, pct: number, status: 'pendiente' | 'subiendo' | 'ok' | 'error', msg?: string }[]
+  busy: boolean
+  msg?: string
+  dragFrom: number | null
+  dragOver: boolean
+}
+const imgs = ref<Record<string, ImgState>>({})
+function imgState(sku: string): ImgState {
+  return (imgs.value[sku] ??= { loading: false, images: [], variaciones: [], bloqueo: null, uploads: [], busy: false, dragFrom: null, dragOver: false })
+}
+async function loadImages(sku: string) {
+  const s = imgState(sku)
+  s.loading = true
+  try {
+    const r = await $fetch<{ images: ImgInfo[], variaciones: ImgState['variaciones'], bloqueo: string | null }>(`/api/inventario/productos/${encodeURIComponent(sku)}/imagenes`)
+    s.images = r.images; s.variaciones = r.variaciones; s.bloqueo = r.bloqueo
+  }
+  catch (e: any) { onUnauthorized(e); s.bloqueo = e?.data?.statusMessage ?? 'No se pudieron cargar las imágenes' }
+  s.loading = false
+}
+/** Sube varios archivos, uno por uno, con progreso y error por archivo. */
+function uploadFiles(sku: string, files: FileList | File[]) {
+  const s = imgState(sku)
+  if (s.bloqueo) { s.msg = s.bloqueo; return }
+  const list = [...files].filter(f => f.type.startsWith('image/') || /\.(heic|heif)$/i.test(f.name))
+  if (!list.length) { s.msg = 'Elige archivos de imagen (JPG, PNG, WebP, HEIC).'; return }
+  for (const f of list) {
+    const entry: ImgState['uploads'][number] = { name: f.name, size: f.size, pct: 0, status: 'pendiente' }
+    s.uploads.push(entry)
+    if (f.size > 10 * 1024 * 1024) { entry.status = 'error'; entry.msg = `Pesa ${(f.size / 1048576).toFixed(1)} MB; el máximo es 10 MB.`; continue }
+  }
+  runUploads(sku)
+}
+async function runUploads(sku: string) {
+  const s = imgState(sku)
+  if (s.busy) return
+  s.busy = true
+  for (const u of s.uploads) {
+    if (u.status !== 'pendiente') continue
+    const file = pendingFiles.get(u)
+    if (!file) { u.status = 'error'; u.msg = 'archivo no disponible'; continue }
+    u.status = 'subiendo'
+    try {
+      const r = await uploadWithProgress(`/api/inventario/productos/${encodeURIComponent(sku)}/imagenes`, file, pct => { u.pct = pct })
+      u.status = 'ok'; u.pct = 100
+      u.msg = `${r.procesado.ancho}×${r.procesado.alto} · ${r.procesado.entrada_kb} KB → ${r.procesado.salida_kb} KB`
+      s.images = r.images
+    }
+    catch (e: any) {
+      u.status = 'error'; u.msg = e?.message ?? 'No se pudo subir'
+    }
+  }
+  s.busy = false
+  await refreshProduct(sku)
+}
+// Los File no se guardan en estado reactivo (pesan): se asocian por referencia a su entrada.
+const pendingFiles = new WeakMap<object, File>()
+function onFilesChosen(sku: string, ev: Event) {
+  const input = ev.target as HTMLInputElement
+  const files = [...(input.files ?? [])]
+  const s = imgState(sku)
+  const before = s.uploads.length
+  uploadFilesWithRefs(sku, files)
+  input.value = ''
+  void before
+}
+function onDrop(sku: string, ev: DragEvent) {
+  ev.preventDefault()
+  imgState(sku).dragOver = false
+  const files = [...(ev.dataTransfer?.files ?? [])]
+  if (files.length) uploadFilesWithRefs(sku, files)
+}
+function uploadFilesWithRefs(sku: string, files: File[]) {
+  const s = imgState(sku)
+  if (s.bloqueo) { s.msg = s.bloqueo; return }
+  const list = files.filter(f => f.type.startsWith('image/') || /\.(heic|heif)$/i.test(f.name))
+  if (!list.length) { s.msg = 'Elige archivos de imagen (JPG, PNG, WebP, HEIC).'; return }
+  s.msg = undefined
+  for (const f of list) {
+    const entry: ImgState['uploads'][number] = { name: f.name, size: f.size, pct: 0, status: 'pendiente' }
+    if (f.size > 10 * 1024 * 1024) { entry.status = 'error'; entry.msg = `Pesa ${(f.size / 1048576).toFixed(1)} MB; el máximo es 10 MB.` }
+    s.uploads.push(entry)
+    pendingFiles.set(s.uploads[s.uploads.length - 1]!, f)
+  }
+  runUploads(sku)
+}
+/** XHR para tener progreso real de subida (fetch no lo expone). */
+function uploadWithProgress(url: string, file: File, onPct: (pct: number) => void): Promise<any> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    xhr.open('POST', url)
+    xhr.upload.onprogress = (e) => { if (e.lengthComputable) onPct(Math.round((e.loaded / e.total) * 90)) }
+    xhr.onload = () => {
+      let json: any = {}
+      try { json = JSON.parse(xhr.responseText) } catch {}
+      if (xhr.status >= 200 && xhr.status < 300) resolve(json)
+      else reject(new Error(json?.statusMessage ?? json?.message ?? `HTTP ${xhr.status}`))
+    }
+    xhr.onerror = () => reject(new Error('Error de red al subir'))
+    const fd = new FormData()
+    fd.append('file', file, file.name)
+    xhr.send(fd)
+  })
+}
+async function imgAction(sku: string, body: Record<string, unknown>) {
+  const s = imgState(sku)
+  if (s.bloqueo) { s.msg = s.bloqueo; return }
+  s.busy = true; s.msg = undefined
+  try {
+    const r = await $fetch<{ images: ImgInfo[], variaciones: { sku: string, image: ImgInfo | null }[] }>(`/api/inventario/productos/${encodeURIComponent(sku)}/imagenes`, { method: 'PUT', body })
+    s.images = r.images
+    for (const v of s.variaciones) { const nv = r.variaciones.find(x => x.sku === v.sku); if (nv) v.image = nv.image }
+    await refreshProduct(sku)
+  }
+  catch (e: any) { onUnauthorized(e); s.msg = e?.data?.statusMessage ?? 'No se pudo aplicar el cambio' }
+  s.busy = false
+}
+const setMain = (sku: string, id: number) => imgAction(sku, { accion: 'principal', id })
+const removeImg = (sku: string, id: number) => imgAction(sku, { accion: 'quitar', id })
+const setVariationImg = (sku: string, skuTalla: string, id: number | null) => imgAction(sku, { accion: 'talla', sku_talla: skuTalla, id })
+// reordenar arrastrando miniaturas
+function imgDragStart(sku: string, i: number) { imgState(sku).dragFrom = i }
+function imgDropOn(sku: string, i: number) {
+  const s = imgState(sku)
+  const from = s.dragFrom
+  s.dragFrom = null
+  if (from === null || from === i) return
+  const ids = s.images.map(x => x.id)
+  const [moved] = ids.splice(from, 1)
+  ids.splice(i, 0, moved!)
+  imgAction(sku, { accion: 'orden', ids })
+}
+async function refreshProduct(sku: string) {
+  try {
+    const fresh = await $fetch<{ product: InvProduct }>(`/api/inventario/productos/${encodeURIComponent(sku)}`)
+    const i = items.value.findIndex(x => x.sku === sku)
+    if (i >= 0) items.value[i] = fresh.product
+  }
+  catch {}
+}
+const fmtKB = (n: number) => (n < 1048576 ? `${Math.round(n / 1024)} KB` : `${(n / 1048576).toFixed(1)} MB`)
+
 // ---------- presentación ----------
 const cop = (v: string | number | null | undefined) => (v === '' || v == null ? '—' : formatCOP(Number(v)))
 const talla = (v: InvVariation) => String(v.attributes.find(a => a.name === 'Talla')?.option ?? tallaFromSku(v.sku) ?? '?')
@@ -488,18 +643,54 @@ onMounted(() => {
 
     <!-- ===== panel ===== -->
     <div v-else class="inv__app">
-      <header class="top">
-        <div class="top__brand">
-          <span class="login__k login__k--sm">K</span>
-          <h1 class="top__title">Inventario</h1>
-          <span v-if="estado" class="pill" :class="estado.simulation ? 'pill--sim' : 'pill--live'">{{ estado.simulation ? 'simulación' : 'Woo en vivo' }}</span>
+      <!-- cabecera pegajosa: marca, totales, buscador y acciones siempre a mano -->
+      <header class="top" :class="{ 'top--compact': densidad === 'compacto' }">
+        <div class="top__row">
+          <div class="top__brand">
+            <span class="login__k login__k--sm">K</span>
+            <h1 class="top__title">Inventario</h1>
+            <span v-if="estado" class="pill" :class="estado.simulation ? 'pill--sim' : 'pill--live'">{{ estado.simulation ? 'simulación' : 'Woo en vivo' }}</span>
+          </div>
+          <div v-if="estado" class="top__totals" :title="estado.snapshot_age_s != null ? `Snapshot de Woo leído hace ${estado.snapshot_age_s} s` : 'Sin snapshot de Woo'">
+            <span><b>{{ estado.productos }}</b> productos</span>
+            <span><b>{{ estado.variaciones }}</b> tallas</span>
+            <span v-if="estado.agotadas" class="tot--err"><b>{{ estado.agotadas }}</b> agotadas</span>
+            <span v-if="estado.stock_bajo" class="tot--warn"><b>{{ estado.stock_bajo }}</b> bajas</span>
+            <span :class="{ 'tot--warn': (estado.snapshot_age_s ?? 0) > 600 }">Woo {{ snapshotAge }}</span>
+          </div>
+          <div class="top__right">
+            <button class="btn btn--ghost" type="button" :disabled="syncing" @click="sync(true)">{{ syncing ? 'Sincronizando…' : 'Sincronizar' }}</button>
+            <button v-if="estado?.woo_write" class="btn btn--ghost" type="button" :disabled="probing" :title="estado.woo_only_drafts ? 'Escribe, relee y revierte precios en un BORRADOR; nunca toca publicados' : 'Escribe, relee y revierte precios en un borrador'" @click="probarWoo">{{ probing ? 'Probando…' : 'Probar Woo' }}</button>
+            <NuxtLink class="btn btn--ghost" to="/admin/chats">Bandeja</NuxtLink>
+            <button class="btn btn--ghost" type="button" @click="logout">Salir</button>
+          </div>
         </div>
-        <div class="top__right">
-          <span v-if="estado" class="muted small" :title="estado.snapshot_age_s != null ? `Snapshot de Woo leído hace ${estado.snapshot_age_s} s` : 'Sin snapshot de Woo'">{{ estado.productos }} productos · {{ estado.variaciones }} tallas · <b :class="{ warn: (estado.snapshot_age_s ?? 0) > 600 }">Woo {{ snapshotAge }}</b></span>
-          <button class="btn btn--ghost" type="button" :disabled="syncing" @click="sync(true)">{{ syncing ? 'Sincronizando…' : 'Sincronizar con Woo' }}</button>
-          <button v-if="estado?.woo_write" class="btn btn--ghost" type="button" :disabled="probing" :title="estado.woo_only_drafts ? 'Escribe, relee y revierte precios en un BORRADOR; nunca toca publicados' : 'Escribe, relee y revierte precios en un borrador'" @click="probarWoo">{{ probing ? 'Probando…' : 'Probar escritura en Woo' }}</button>
-          <NuxtLink class="btn btn--ghost" to="/admin/chats">Bandeja</NuxtLink>
-          <button class="btn btn--ghost" type="button" @click="logout">Salir</button>
+        <div class="top__search">
+          <label class="search">
+            <span class="search__icon" aria-hidden="true">⌕</span>
+            <input v-model="q" class="search__input" type="search" placeholder="Buscar por nombre o SKU…" aria-label="Buscar">
+            <button v-if="q" class="search__clear" type="button" aria-label="Limpiar búsqueda" @click="q = ''">×</button>
+          </label>
+          <select v-model="status" class="input" aria-label="Estado">
+            <option value="any">Todos los estados</option>
+            <option value="publish">Publicados</option>
+            <option value="draft">Borradores</option>
+          </select>
+          <select v-model="grupo" class="input" aria-label="Línea">
+            <option value="">Todas las líneas</option>
+            <option v-for="(label, key) in GRUPOS" :key="key" :value="key">{{ label }}</option>
+          </select>
+          <select v-model="publico" class="input" aria-label="Público">
+            <option value="">Todos los públicos</option>
+            <option v-for="(label, key) in PUBLICOS" :key="key" :value="key">{{ label }}</option>
+          </select>
+          <select v-model="stock" class="input" aria-label="Stock">
+            <option value="any">Todo el stock</option>
+            <option value="bajo">Stock bajo o agotado</option>
+            <option value="agotado">Agotados</option>
+            <option value="sin_gestion">Sin gestionar</option>
+          </select>
+          <button v-if="q || status !== 'any' || grupo || publico || stock !== 'any'" class="btn btn--ghost" type="button" @click="clearFilters">Limpiar</button>
         </div>
       </header>
 
@@ -538,31 +729,6 @@ onMounted(() => {
         </div>
       </div>
 
-      <!-- filtros -->
-      <section class="filters">
-        <input v-model="q" class="input input--search" type="search" placeholder="Buscar por nombre o SKU…" aria-label="Buscar">
-        <select v-model="status" class="input" aria-label="Estado">
-          <option value="any">Todos los estados</option>
-          <option value="publish">Publicados</option>
-          <option value="draft">Borradores</option>
-        </select>
-        <select v-model="grupo" class="input" aria-label="Línea">
-          <option value="">Todas las líneas</option>
-          <option v-for="(label, key) in GRUPOS" :key="key" :value="key">{{ label }}</option>
-        </select>
-        <select v-model="publico" class="input" aria-label="Público">
-          <option value="">Todos los públicos</option>
-          <option v-for="(label, key) in PUBLICOS" :key="key" :value="key">{{ label }}</option>
-        </select>
-        <select v-model="stock" class="input" aria-label="Stock">
-          <option value="any">Todo el stock</option>
-          <option value="bajo">Stock bajo o agotado</option>
-          <option value="agotado">Agotados</option>
-          <option value="sin_gestion">Sin gestionar</option>
-        </select>
-        <button v-if="q || status !== 'any' || grupo || publico || stock !== 'any'" class="btn btn--ghost" type="button" @click="clearFilters">Limpiar</button>
-      </section>
-
       <div class="toolbar">
         <label class="check"><input type="checkbox" :checked="allOnPage" @change="toggleAll"> <span>Seleccionar página</span></label>
         <span v-if="selected.size" class="muted small">{{ selected.size }} seleccionados <button class="linkbtn" type="button" @click="selected = new Set()">quitar</button></span>
@@ -570,7 +736,13 @@ onMounted(() => {
         <a class="btn btn--ghost btn--sm" :href="exportUrl('xlsx')">Exportar Excel</a>
         <a class="btn btn--ghost btn--sm" :href="exportUrl('csv')">CSV</a>
         <button class="btn btn--ghost btn--sm" type="button" @click="openImport">Importar</button>
-        <span class="toolbar__count muted small">{{ total }} productos</span>
+        <span class="toolbar__right">
+          <span class="muted small">{{ total }} productos</span>
+          <span class="seg" role="group" aria-label="Densidad">
+            <button type="button" :class="{ 'is-on': densidad === 'comodo' }" @click="densidad = 'comodo'">Cómodo</button>
+            <button type="button" :class="{ 'is-on': densidad === 'compacto' }" @click="densidad = 'compacto'">Compacto</button>
+          </span>
+        </span>
       </div>
 
       <!-- ===== operación masiva / importación ===== -->
@@ -675,8 +847,8 @@ onMounted(() => {
 
       <p v-if="listError" class="banner banner--warn">{{ listError }}</p>
 
-      <!-- tabla virtualizada: cabecera fija + lista con solo las filas visibles -->
-      <div class="tbl-wrap">
+      <!-- lista virtualizada: cabecera de columnas + solo las filas visibles -->
+      <div class="tbl-wrap" :class="`tbl-wrap--${densidad}`">
         <div class="thead" role="row">
           <span class="col-check"></span>
           <span class="col-img"></span>
@@ -692,16 +864,24 @@ onMounted(() => {
         <!-- skeleton en la carga inicial -->
         <div v-if="firstLoad && loading" class="sk-list" aria-busy="true" aria-label="Cargando productos">
           <div v-for="i in 8" :key="i" class="row row--sk">
-            <span class="col-check"><Skeleton w="14px" h="14px" radius="3px" /></span>
-            <span class="col-img"><Skeleton w="44px" h="44px" radius="8px" /></span>
-            <span><Skeleton :w="`${120 + (i % 4) * 30}px`" h="14px" /><Skeleton w="140px" h="10px" radius="999px" /></span>
-            <span><Skeleton w="70px" h="12px" /></span>
-            <span><Skeleton w="72px" h="18px" radius="999px" /></span>
-            <span class="num"><Skeleton w="64px" h="14px" /></span>
-            <span><Skeleton w="180px" h="18px" /></span>
-            <span class="num"><Skeleton w="80px" h="14px" /></span>
+            <span class="col-check"><Skeleton w="16px" h="16px" radius="4px" /></span>
+            <span class="col-img"><Skeleton w="56px" h="56px" radius="12px" /></span>
+            <span><Skeleton :w="`${120 + (i % 4) * 30}px`" h="15px" /><Skeleton w="150px" h="11px" radius="999px" /></span>
+            <span><Skeleton w="72px" h="12px" /></span>
+            <span><Skeleton w="76px" h="20px" radius="999px" /></span>
+            <span class="num"><Skeleton w="82px" h="20px" /></span>
+            <span><Skeleton w="200px" h="22px" /></span>
+            <span class="num"><Skeleton w="70px" h="14px" /></span>
             <span class="col-exp"></span>
           </div>
+        </div>
+
+        <!-- estado vacío con ilustración (KO, la mascota) -->
+        <div v-else-if="!loading && !items.length" class="empty">
+          <img class="empty__ko" src="/images/ko/ko-caja.webp" alt="" width="120" height="120">
+          <h2 class="empty__title">Nada por aquí</h2>
+          <p class="empty__text">Ningún producto coincide con <b v-if="q">"{{ q }}"</b><span v-else>esos filtros</span>. Prueba otro nombre o quita algún filtro.</p>
+          <button class="btn btn--sm" type="button" @click="clearFilters">Quitar filtros</button>
         </div>
 
         <div v-else ref="scrollEl" class="vlist" :class="{ 'is-loading': loading }">
@@ -715,77 +895,141 @@ onMounted(() => {
                 class="vitem"
                 :style="{ transform: `translateY(${vi.start}px)` }"
               >
-                <!-- fila de producto -->
+                <!-- fila de producto (grilla en escritorio, tarjeta en celular) -->
                 <div
                   v-if="vrows[vi.index]!.kind === 'row'"
                   class="row"
-                  :class="{ 'is-open': open.has(vrows[vi.index]!.p.sku), 'is-sel': selected.has(vrows[vi.index]!.p.sku) }"
+                  :class="{ 'is-open': open.has(vrows[vi.index]!.p.sku), 'is-sel': selected.has(vrows[vi.index]!.p.sku), 'is-draft': vrows[vi.index]!.p.status !== 'publish' }"
                   role="row"
                   @click="toggleOpen(vrows[vi.index]!.p)"
                 >
                   <span class="col-check" @click.stop><input type="checkbox" :checked="selected.has(vrows[vi.index]!.p.sku)" :aria-label="`Seleccionar ${vrows[vi.index]!.p.name}`" @change="toggleSel(vrows[vi.index]!.p.sku)"></span>
-                  <span class="col-img"><img v-if="vrows[vi.index]!.p.kustom.imagen" :src="vrows[vi.index]!.p.kustom.imagen" alt="" loading="lazy" width="44" height="44"><span v-else class="noimg">sin foto</span></span>
+                  <span class="col-img">
+                    <img v-if="vrows[vi.index]!.p.kustom.imagen" class="thumb" :src="vrows[vi.index]!.p.kustom.imagen" alt="" decoding="async" width="56" height="56">
+                    <span v-else class="thumb thumb--none" aria-label="sin foto">✦</span>
+                  </span>
                   <span class="cell-name">
                     <span class="name">{{ vrows[vi.index]!.p.name }}</span>
                     <span class="sub">
+                      <span class="mono mono--m">{{ vrows[vi.index]!.p.sku }}</span>
                       <span v-if="vrows[vi.index]!.p.kustom.grupo" class="chip">{{ GRUPOS[vrows[vi.index]!.p.kustom.grupo!] ?? vrows[vi.index]!.p.kustom.grupo }}</span>
                       <span v-for="pu in vrows[vi.index]!.p.kustom.publicos" :key="pu" class="chip chip--soft">{{ PUBLICOS[pu] ?? pu }}</span>
                       <span v-if="vrows[vi.index]!.p.kustom.soloWoo" class="chip chip--warn">solo en Woo</span>
                     </span>
                   </span>
-                  <span class="mono">{{ vrows[vi.index]!.p.sku }}</span>
-                  <span><span class="pill" :class="vrows[vi.index]!.p.status === 'publish' ? 'pill--ok' : 'pill--draft'">{{ ESTADOS[vrows[vi.index]!.p.status] ?? vrows[vi.index]!.p.status }}</span></span>
-                  <span class="num">{{ priceRange(vrows[vi.index]!.p) }}<span v-if="vrows[vi.index]!.p.variations.some(v => v.sale_price)" class="sub muted">con oferta</span></span>
-                  <span>
+                  <span class="mono cell-sku">{{ vrows[vi.index]!.p.sku }}</span>
+                  <span class="cell-status"><span class="pill" :class="vrows[vi.index]!.p.status === 'publish' ? 'pill--ok' : 'pill--draft'">{{ ESTADOS[vrows[vi.index]!.p.status] ?? vrows[vi.index]!.p.status }}</span></span>
+                  <span class="num cell-price">
+                    <span class="price">{{ priceRange(vrows[vi.index]!.p) }}</span>
+                    <span v-if="vrows[vi.index]!.p.variations.some(v => v.sale_price)" class="price__tag">oferta</span>
+                  </span>
+                  <span class="cell-tallas">
                     <span class="tallas">
-                      <span v-for="v in vrows[vi.index]!.p.variations" :key="v.sku" class="talla" :class="`talla--${stockKind(v)}`" :title="`${v.sku} · ${stockLabel(v)}`">{{ talla(v) }}</span>
+                      <span v-for="v in vrows[vi.index]!.p.variations" :key="v.sku" class="talla" :class="[`talla--${stockKind(v)}`, { 'talla--edit': dirty(v), 'talla--saving': rowState[v.sku]?.saving, 'talla--saved': rowState[v.sku]?.flash, 'talla--err': rowState[v.sku]?.ok === false }]" :title="`${v.sku} · ${stockLabel(v)}`">{{ talla(v) }}</span>
                       <span v-if="!vrows[vi.index]!.p.variations.length" class="muted small">sin tallas</span>
                     </span>
                   </span>
-                  <span class="num"><span class="stock" :class="`stock--${productStock(vrows[vi.index]!.p).kind}`">{{ productStock(vrows[vi.index]!.p).text }}</span></span>
+                  <span class="num cell-stock"><span class="stock" :class="`stock--${productStock(vrows[vi.index]!.p).kind}`"><i class="dot"></i>{{ productStock(vrows[vi.index]!.p).text }}</span></span>
                   <span class="col-exp"><span class="caret" :class="{ 'is-open': open.has(vrows[vi.index]!.p.sku) }">›</span></span>
                 </div>
 
-                <!-- bloque de tallas (expandido): grid-template-rows anima el despliegue -->
+                <!-- bloque expandido: tallas + imágenes + historial -->
                 <div v-else class="detail is-open">
                   <div class="detail__clip">
                     <div class="detail__grid">
                       <div class="detail__vars">
-                        <table class="vars">
-                          <thead>
-                            <tr><th>Talla</th><th>SKU</th><th class="num">Precio normal</th><th class="num">Precio rebajado</th><th class="num">Stock</th><th>Estado</th><th></th></tr>
-                          </thead>
-                          <tbody>
-                            <tr v-for="v in vrows[vi.index]!.p.variations" :key="v.sku" :class="{ 'is-dirty': dirty(v), 'is-saving': rowState[v.sku]?.saving, 'is-flash': rowState[v.sku]?.flash, 'is-err': rowState[v.sku]?.ok === false }">
-                              <td class="talla-cell">{{ talla(v) }}</td>
-                              <td class="mono small">{{ v.sku }}</td>
-                              <td class="num">
-                                <input v-if="drafts[v.sku]" v-model="drafts[v.sku]!.regular_price" class="input input--num" inputmode="numeric" placeholder="—" :disabled="rowState[v.sku]?.saving" @keydown.enter.prevent="save(vrows[vi.index]!.p, v)">
-                              </td>
-                              <td class="num">
-                                <input v-if="drafts[v.sku]" v-model="drafts[v.sku]!.sale_price" class="input input--num" inputmode="numeric" placeholder="sin oferta" :disabled="rowState[v.sku]?.saving" @keydown.enter.prevent="save(vrows[vi.index]!.p, v)">
-                              </td>
-                              <td class="num">
-                                <input v-if="drafts[v.sku]" v-model="drafts[v.sku]!.stock_quantity" class="input input--num" inputmode="numeric" :placeholder="v.manage_stock ? '0' : 'sin gestionar'" :disabled="rowState[v.sku]?.saving" @keydown.enter.prevent="save(vrows[vi.index]!.p, v)">
-                              </td>
-                              <td><span class="stock" :class="`stock--${stockKind(v)}`">{{ stockLabel(v) }}</span></td>
-                              <td class="actions-cell">
-                                <div class="actions">
-                                  <span v-if="rowState[v.sku]?.saving" class="saving" aria-live="polite"><span class="saving__dot"></span> guardando</span>
-                                  <template v-else-if="dirty(v)">
-                                    <button class="btn btn--primary btn--sm" type="button" @click="save(vrows[vi.index]!.p, v)">Guardar</button>
-                                    <button class="btn btn--ghost btn--sm" type="button" @click="reset(v)">Deshacer</button>
-                                  </template>
-                                  <span v-if="rowState[v.sku]?.msg" class="small" :class="rowState[v.sku]?.ok ? 'ok' : 'err'">{{ rowState[v.sku]?.msg }}</span>
-                                </div>
-                              </td>
-                            </tr>
-                          </tbody>
-                        </table>
+                        <h3 class="detail__h">Precio y stock por talla</h3>
+                        <div class="vars-wrap">
+                          <table class="vars">
+                            <thead>
+                              <tr><th>Talla</th><th>SKU</th><th class="num">Precio normal</th><th class="num">Precio rebajado</th><th class="num">Stock</th><th>Estado</th><th></th></tr>
+                            </thead>
+                            <tbody>
+                              <tr v-for="v in vrows[vi.index]!.p.variations" :key="v.sku" :class="{ 'is-dirty': dirty(v), 'is-saving': rowState[v.sku]?.saving, 'is-flash': rowState[v.sku]?.flash, 'is-err': rowState[v.sku]?.ok === false }">
+                                <td class="talla-cell" data-label="Talla">{{ talla(v) }}</td>
+                                <td class="mono small" data-label="SKU">{{ v.sku }}</td>
+                                <td class="num" data-label="Precio normal">
+                                  <input v-if="drafts[v.sku]" v-model="drafts[v.sku]!.regular_price" class="input input--num" inputmode="numeric" placeholder="—" :disabled="rowState[v.sku]?.saving" @keydown.enter.prevent="save(vrows[vi.index]!.p, v)">
+                                </td>
+                                <td class="num" data-label="Precio rebajado">
+                                  <input v-if="drafts[v.sku]" v-model="drafts[v.sku]!.sale_price" class="input input--num" inputmode="numeric" placeholder="sin oferta" :disabled="rowState[v.sku]?.saving" @keydown.enter.prevent="save(vrows[vi.index]!.p, v)">
+                                </td>
+                                <td class="num" data-label="Stock">
+                                  <input v-if="drafts[v.sku]" v-model="drafts[v.sku]!.stock_quantity" class="input input--num" inputmode="numeric" :placeholder="v.manage_stock ? '0' : 'sin gestionar'" :disabled="rowState[v.sku]?.saving" @keydown.enter.prevent="save(vrows[vi.index]!.p, v)">
+                                </td>
+                                <td data-label="Estado"><span class="stock" :class="`stock--${stockKind(v)}`"><i class="dot"></i>{{ stockLabel(v) }}</span></td>
+                                <td class="actions-cell">
+                                  <div class="actions">
+                                    <span v-if="rowState[v.sku]?.saving" class="saving" aria-live="polite"><span class="saving__dot"></span> guardando</span>
+                                    <template v-else-if="dirty(v)">
+                                      <button class="btn btn--primary btn--sm" type="button" @click="save(vrows[vi.index]!.p, v)">Guardar</button>
+                                      <button class="btn btn--ghost btn--sm" type="button" @click="reset(v)">Deshacer</button>
+                                    </template>
+                                    <span v-if="rowState[v.sku]?.msg" class="small" :class="rowState[v.sku]?.ok ? 'ok' : 'err'">{{ rowState[v.sku]?.msg }}</span>
+                                  </div>
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
                         <p class="hint muted small">Precios en pesos, sin puntos. Escribe un stock para activar la gestión de esa talla; en 0 queda agotada. Enter guarda.</p>
+
+                        <!-- imágenes del producto (Fase A) -->
+                        <h3 class="detail__h">Imágenes</h3>
+                        <div class="imgs" :class="{ 'is-over': imgState(vrows[vi.index]!.p.sku).dragOver, 'is-blocked': !!imgState(vrows[vi.index]!.p.sku).bloqueo }" @dragover.prevent="imgState(vrows[vi.index]!.p.sku).dragOver = true" @dragleave="imgState(vrows[vi.index]!.p.sku).dragOver = false" @drop="onDrop(vrows[vi.index]!.p.sku, $event)">
+                          <p v-if="imgState(vrows[vi.index]!.p.sku).bloqueo" class="imgs__block">🔒 {{ imgState(vrows[vi.index]!.p.sku).bloqueo }}</p>
+                          <div v-if="imgState(vrows[vi.index]!.p.sku).loading" class="imgs__grid"><Skeleton w="96px" h="96px" radius="10px" /><Skeleton w="96px" h="96px" radius="10px" /></div>
+                          <div v-else class="imgs__grid">
+                            <figure
+                              v-for="(im, ii) in imgState(vrows[vi.index]!.p.sku).images"
+                              :key="im.id"
+                              class="imgs__item"
+                              :class="{ 'is-main': ii === 0 }"
+                              :draggable="!imgState(vrows[vi.index]!.p.sku).bloqueo"
+                              :title="im.name"
+                              @dragstart="imgDragStart(vrows[vi.index]!.p.sku, ii)"
+                              @dragover.prevent
+                              @drop.stop="imgDropOn(vrows[vi.index]!.p.sku, ii)"
+                            >
+                              <img :src="im.src" :alt="im.alt || ''" loading="lazy" width="96" height="96">
+                              <figcaption v-if="ii === 0" class="imgs__main">Principal</figcaption>
+                              <span v-if="!imgState(vrows[vi.index]!.p.sku).bloqueo" class="imgs__acts">
+                                <button v-if="ii !== 0" type="button" title="Hacer principal" @click.stop="setMain(vrows[vi.index]!.p.sku, im.id)">★</button>
+                                <button type="button" title="Quitar del producto (el archivo sigue en WordPress)" @click.stop="removeImg(vrows[vi.index]!.p.sku, im.id)">×</button>
+                              </span>
+                            </figure>
+                            <label v-if="!imgState(vrows[vi.index]!.p.sku).bloqueo" class="imgs__add" :class="{ 'is-busy': imgState(vrows[vi.index]!.p.sku).busy }">
+                              <input type="file" accept="image/*,.heic,.heif" multiple hidden @change="onFilesChosen(vrows[vi.index]!.p.sku, $event)">
+                              <span class="imgs__plus">+</span>
+                              <span>Subir o arrastrar</span>
+                              <small>≤ 10 MB · se convierten a WebP 1600 px</small>
+                            </label>
+                            <p v-if="!imgState(vrows[vi.index]!.p.sku).images.length && !imgState(vrows[vi.index]!.p.sku).bloqueo" class="muted small imgs__none">Sin imágenes en Woo. La web sigue mostrando la foto local.</p>
+                          </div>
+                          <ul v-if="imgState(vrows[vi.index]!.p.sku).uploads.length" class="uploads">
+                            <li v-for="(u, ui) in imgState(vrows[vi.index]!.p.sku).uploads" :key="ui" :class="`is-${u.status}`">
+                              <span class="uploads__name">{{ u.name }} <small class="muted">{{ fmtKB(u.size) }}</small></span>
+                              <span class="uploads__bar"><i :style="{ width: `${u.status === 'ok' ? 100 : u.pct}%` }"></i></span>
+                              <span class="uploads__msg">{{ u.status === 'ok' ? `✓ ${u.msg ?? 'subida'}` : u.status === 'error' ? `✗ ${u.msg}` : u.status === 'subiendo' ? `${u.pct}%` : 'en cola' }}</span>
+                            </li>
+                          </ul>
+                          <p v-if="imgState(vrows[vi.index]!.p.sku).msg" class="err small">{{ imgState(vrows[vi.index]!.p.sku).msg }}</p>
+                          <details v-if="imgState(vrows[vi.index]!.p.sku).images.length > 1 && imgState(vrows[vi.index]!.p.sku).variaciones.length" class="imgs__vars">
+                            <summary>Imagen por talla (opcional)</summary>
+                            <div class="imgs__vargrid">
+                              <label v-for="va in imgState(vrows[vi.index]!.p.sku).variaciones" :key="va.sku" class="imgs__var">
+                                <span class="talla-cell">{{ va.talla }}</span>
+                                <select class="input input--sm" :disabled="!!imgState(vrows[vi.index]!.p.sku).bloqueo" :value="va.image?.id ?? ''" @change="setVariationImg(vrows[vi.index]!.p.sku, va.sku, ($event.target as HTMLSelectElement).value ? Number(($event.target as HTMLSelectElement).value) : null)">
+                                  <option value="">Hereda la principal</option>
+                                  <option v-for="(im, ii) in imgState(vrows[vi.index]!.p.sku).images" :key="im.id" :value="im.id">{{ ii === 0 ? 'Principal' : `Imagen ${ii + 1}` }} · {{ im.name }}</option>
+                                </select>
+                              </label>
+                            </div>
+                          </details>
+                        </div>
                       </div>
                       <aside class="detail__hist">
-                        <h3>Últimos cambios</h3>
+                        <h3 class="detail__h">Últimos cambios</h3>
                         <ul v-if="history[vrows[vi.index]!.p.sku]?.length">
                           <li v-for="c in history[vrows[vi.index]!.p.sku]" :key="c.id">
                             <span class="mono small">{{ c.sku.replace(`${vrows[vi.index]!.p.sku}-T`, 'T ') }}</span>
@@ -802,7 +1046,6 @@ onMounted(() => {
               </div>
             </TransitionGroup>
           </div>
-          <div v-if="!loading && !items.length" class="empty">Ningún producto coincide.</div>
         </div>
       </div>
 
@@ -821,19 +1064,24 @@ onMounted(() => {
 </template>
 
 <style scoped>
+/* =====================================================================
+   Panel de inventario — identidad Kustom (morado, crema, Luckiest Guy)
+   Tokens de tokens.css; aquí solo composición del panel.
+   ===================================================================== */
 .inv { min-height: 100dvh; display: flex; flex-direction: column; }
 .inv__center { flex: 1; display: grid; place-items: center; padding: 24px; }
 .muted { color: var(--mut); }
 .small { font-size: 12.5px; }
-.mono { font-family: var(--ff-mono); font-size: 12.5px; }
+.mono { font-family: var(--ff-mono); font-size: 12.5px; letter-spacing: .01em; }
 .ok { color: #1B7F4B; }
 .err { color: #B00020; }
+.warn { color: #9A5B00; }
 
-/* login (mismo look que la bandeja) */
+/* ---------- login (mismo look que la bandeja) ---------- */
 .login { width: min(380px, 100%); background: #fff; border: 1px solid var(--line); border-radius: 20px; padding: 28px; box-shadow: var(--shadow-card); display: flex; flex-direction: column; gap: 10px; }
 .login__brand { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
 .login__k { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 12px; background: var(--purple); color: #fff; font-family: var(--ff-display); font-size: 26px; line-height: 1; }
-.login__k--sm { width: 28px; height: 28px; font-size: 17px; border-radius: 8px; }
+.login__k--sm { width: 30px; height: 30px; font-size: 18px; border-radius: 9px; }
 .login__title { font-family: var(--ff-display); font-size: 22px; letter-spacing: .5px; }
 .login__sub { font-size: 13px; color: var(--mut); }
 .login__label { font-size: 13px; font-weight: 600; color: var(--mut); }
@@ -842,20 +1090,36 @@ onMounted(() => {
 .login__error { color: #B00020; font-size: 13px; margin: 0; }
 .login__warn { background: #FFF1D6; color: #9A5B00; font-size: 13px; padding: 10px 12px; border-radius: 10px; margin: 0; }
 
-/* app */
-.inv__app { flex: 1; display: flex; flex-direction: column; gap: 12px; padding: 14px 18px 40px; max-width: 1400px; width: 100%; margin: 0 auto; }
-.top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
-.top__brand { display: flex; align-items: center; gap: 10px; }
-.top__title { font-family: var(--ff-display); font-size: 24px; letter-spacing: .5px; margin: 0; }
-.top__right { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+/* ---------- app ---------- */
+.inv__app { flex: 1; display: flex; flex-direction: column; gap: 14px; padding: 0 20px 48px; max-width: 1440px; width: 100%; margin: 0 auto; }
 
-.btn { appearance: none; font: inherit; font-size: 14px; font-weight: 600; padding: 8px 14px; border-radius: 10px; border: 1px solid var(--purple); background: var(--purple); color: #fff; cursor: pointer; text-decoration: none; }
+/* cabecera pegajosa */
+.top { position: sticky; top: 0; z-index: 20; margin: 0 -20px; padding: 12px 20px 12px; background: color-mix(in srgb, var(--hueso) 88%, transparent); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); display: grid; gap: 10px; }
+.top__row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; }
+.top__brand { display: flex; align-items: center; gap: 10px; }
+.top__title { font-family: var(--ff-display); font-size: 28px; letter-spacing: .5px; margin: 0; line-height: 1; padding-top: 3px; }
+.top__totals { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13.5px; color: var(--mut); font-variant-numeric: tabular-nums; }
+.top__totals b { color: var(--ink); font-weight: 700; }
+.tot--warn, .tot--warn b { color: #9A5B00; }
+.tot--err, .tot--err b { color: #B00020; }
+.top__right { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-left: auto; }
+.top__search { display: grid; grid-template-columns: minmax(240px, 2.2fr) repeat(4, minmax(140px, 1fr)) auto; gap: 8px; align-items: center; }
+.search { position: relative; display: flex; align-items: center; }
+.search__icon { position: absolute; left: 12px; font-size: 18px; color: var(--mut-2); pointer-events: none; }
+.search__input { width: 100%; font: inherit; font-size: 15px; padding: 10px 36px 10px 36px; border: 1px solid var(--line-2); border-radius: 12px; background: #fff; color: var(--ink); }
+.search__input:focus { outline: 2px solid var(--purple-line); border-color: var(--purple); }
+.search__input::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; }
+.search__clear { position: absolute; right: 8px; appearance: none; border: 0; background: var(--hueso); color: var(--mut); width: 24px; height: 24px; border-radius: 50%; cursor: pointer; font-size: 16px; line-height: 1; }
+.search__clear:hover { background: var(--purple-soft); color: var(--purple-d); }
+
+.btn { appearance: none; font: inherit; font-size: 14px; font-weight: 600; padding: 8px 14px; border-radius: 10px; border: 1px solid var(--purple); background: var(--purple); color: #fff; cursor: pointer; text-decoration: none; transition: filter .12s, background-color .12s; }
 .btn--ghost { background: #fff; color: var(--purple-d); border-color: var(--purple-line); }
-.btn--sm { padding: 5px 10px; font-size: 13px; border-radius: 8px; }
+.btn--sm { padding: 6px 11px; font-size: 13px; border-radius: 9px; }
 .btn:disabled { opacity: .5; cursor: default; }
 .btn:not(:disabled):hover { filter: brightness(1.05); }
+.btn:focus-visible { outline: 2px solid var(--purple); outline-offset: 2px; }
 
-.pill { font-size: 11.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; padding: 3px 8px; border-radius: 999px; white-space: nowrap; }
+.pill { font-size: 11px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
 .pill--sim { background: #FFF1D6; color: #9A5B00; }
 .pill--live { background: #DDF7E8; color: #1B7F4B; }
 .pill--ok { background: #DDF7E8; color: #1B7F4B; }
@@ -867,86 +1131,150 @@ onMounted(() => {
 .banner--info { background: var(--purple-soft); color: var(--purple-d); }
 .banner--alert { background: #FDE7E9; color: #8A1C2B; border: 1px solid #F3B1B8; }
 .banner--alert .linkbtn { color: inherit; font-weight: 700; }
-
-.filters { display: grid; grid-template-columns: minmax(200px, 2fr) repeat(4, minmax(140px, 1fr)) auto; gap: 8px; align-items: center; }
-.input { font: inherit; font-size: 14px; padding: 8px 10px; border: 1px solid var(--line-2); border-radius: 10px; background: #fff; color: var(--ink); min-width: 0; width: 100%; }
+.linkbtn { appearance: none; background: none; border: 0; padding: 0; font: inherit; color: var(--purple-d); text-decoration: underline; cursor: pointer; }
+.input { font: inherit; font-size: 14px; padding: 9px 10px; border: 1px solid var(--line-2); border-radius: 10px; background: #fff; color: var(--ink); min-width: 0; width: 100%; }
 .input:focus { outline: 2px solid var(--purple-line); border-color: var(--purple); }
-.input--num { width: 110px; text-align: right; font-variant-numeric: tabular-nums; }
-.input--sm { width: auto; padding: 4px 8px; }
-.toolbar { display: flex; align-items: center; gap: 14px; }
-.toolbar__count { margin-left: auto; }
+.input--num { width: 112px; text-align: right; font-variant-numeric: tabular-nums; }
+.input--sm { width: auto; padding: 5px 8px; font-size: 13px; }
+.toolbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.toolbar__right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
 .check { display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; }
+.seg { display: inline-flex; border: 1px solid var(--line-2); border-radius: 999px; padding: 2px; background: #fff; }
+.seg button { appearance: none; border: 0; background: transparent; font: inherit; font-size: 12.5px; font-weight: 600; color: var(--mut); padding: 4px 10px; border-radius: 999px; cursor: pointer; }
+.seg button.is-on { background: var(--purple); color: #fff; }
 
-/* ---------- tabla virtualizada ---------- */
-.tbl-wrap { background: #fff; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; display: flex; flex-direction: column; }
-/* misma rejilla en cabecera y filas: check · foto · producto · sku · estado · precio · tallas · stock · caret */
-.thead, .row { display: grid; grid-template-columns: 32px 56px minmax(180px, 1.6fr) 110px 100px 120px minmax(160px, 1.2fr) 120px 28px; align-items: center; column-gap: 12px; padding: 0 12px; }
-.thead { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--mut); background: var(--hueso); border-bottom: 1px solid var(--line); height: 40px; white-space: nowrap; }
+/* ---------- lista ---------- */
+.tbl-wrap { background: #fff; border: 1px solid var(--line); border-radius: 16px; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 1px 0 rgba(17,17,17,.03); }
+.thead, .row { display: grid; grid-template-columns: 32px 68px minmax(220px, 1.7fr) 110px 104px 150px minmax(190px, 1.2fr) 130px 28px; align-items: center; column-gap: 18px; padding: 0 16px; }
+.thead { font-size: 11.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--mut); background: var(--hueso); border-bottom: 1px solid var(--line); height: 42px; white-space: nowrap; }
 .thead > * { text-align: left; }
 .thead .num, .row .num { text-align: right; justify-self: end; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .th-btn { appearance: none; background: none; border: 0; font: inherit; color: inherit; cursor: pointer; padding: 0; text-transform: inherit; letter-spacing: inherit; }
 .th-btn i { font-style: normal; color: var(--purple); }
-/* altura fija (el virtualizador necesita un contenedor con scroll propio): lo que queda de la pantalla */
-.vlist { position: relative; overflow-y: auto; overflow-x: auto; height: clamp(360px, calc(100dvh - 330px), 1200px); contain: strict; }
+.vlist { position: relative; overflow-y: auto; overflow-x: auto; height: clamp(420px, calc(100dvh - 290px), 1400px); contain: strict; }
 .vlist.is-loading { opacity: .65; transition: opacity .15s; }
-.vlist__inner { position: relative; width: 100%; min-width: 980px; }
+.vlist__inner { position: relative; width: 100%; min-width: 1020px; }
 .vitem { position: absolute; top: 0; left: 0; width: 100%; will-change: transform; }
-.row { min-height: 64px; border-bottom: 1px solid var(--line); cursor: pointer; font-size: 14px; transition: background-color .12s; }
-.row:hover { background: #FBFAF7; }
-.row.is-open { background: var(--purple-soft); }
-.row.is-sel { box-shadow: inset 3px 0 0 var(--purple); }
+
+.row { min-height: 76px; border-bottom: 1px solid var(--line); cursor: pointer; font-size: 14.5px; transition: background-color .15s, box-shadow .15s; }
+.tbl-wrap--compacto .row { min-height: 56px; font-size: 13.5px; }
+.tbl-wrap--compacto .thumb { width: 40px; height: 40px; }
+.tbl-wrap--compacto .thead, .tbl-wrap--compacto .row { grid-template-columns: 32px 52px minmax(220px, 1.7fr) 110px 104px 140px minmax(190px, 1.2fr) 120px 28px; }
+.tbl-wrap--compacto .price { font-size: 17px; }
+.tbl-wrap--compacto .sub { display: none; }
+.row:hover { background: #FCFBF8; box-shadow: inset 4px 0 0 var(--purple-line); }
+.row.is-open { background: var(--purple-soft); box-shadow: inset 4px 0 0 var(--purple); }
+.row.is-sel { box-shadow: inset 4px 0 0 var(--purple); }
+.row.is-draft .name { color: var(--ink-2, #3A3835); }
 .row--sk { cursor: default; }
 .row--sk > span { display: grid; gap: 6px; }
 .col-check { width: 32px; }
-.col-img { width: 56px; }
-.col-img img { width: 44px; height: 44px; object-fit: cover; border-radius: 8px; background: #fff; border: 1px solid var(--line); display: block; }
-.noimg { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 8px; background: var(--hueso); color: var(--mut-2); font-size: 10px; text-align: center; }
+.col-check input { width: 16px; height: 16px; accent-color: var(--purple); }
+.col-img { width: 68px; }
+.thumb { display: block; width: 56px; height: 56px; object-fit: cover; border-radius: 12px; background: #fff; border: 1px solid var(--line); box-shadow: 0 2px 6px rgba(17,17,17,.06); image-rendering: auto; }
+.thumb--none { display: grid; place-items: center; color: var(--purple-line); background: var(--hueso); font-size: 18px; }
 .col-exp { width: 28px; }
-.cell-name { min-width: 0; display: grid; gap: 3px; }
-.name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sub { display: flex; flex-wrap: wrap; gap: 4px; font-size: 12px; }
-.chip { background: var(--purple-soft); color: var(--purple-d); border-radius: 999px; padding: 1px 7px; font-size: 11.5px; }
-.chip--soft { background: var(--hueso); color: var(--mut); }
+.cell-name { min-width: 0; display: grid; gap: 4px; }
+.name { font-weight: 700; font-size: 15.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; letter-spacing: -.005em; }
+.sub { display: flex; flex-wrap: wrap; gap: 4px; font-size: 12px; align-items: center; }
+.mono--m { display: none; }
+.chip { background: var(--purple-soft); color: var(--purple-d); border-radius: 999px; padding: 1px 8px; font-size: 11.5px; font-weight: 600; }
+.chip--soft { background: var(--hueso); color: var(--mut); font-weight: 500; }
 .chip--warn { background: #FFF1D6; color: #9A5B00; }
-.tallas { display: flex; flex-wrap: wrap; gap: 3px; }
-.talla { min-width: 26px; text-align: center; font-size: 12px; font-weight: 600; padding: 1px 5px; border-radius: 6px; border: 1px solid var(--line-2); background: #fff; }
-.talla--ok { border-color: #9BD7B5; background: #EAF8F0; }
-.talla--bajo { border-color: #F5D58F; background: #FFF6E0; }
-.talla--agotado { border-color: #F3B1B8; background: #FDE7E9; color: #8A1C2B; text-decoration: line-through; }
+.cell-price { display: grid; justify-items: end; gap: 2px; }
+.price { font-family: var(--ff-display); font-size: 21px; letter-spacing: .02em; color: var(--purple-d); line-height: 1; padding-top: 3px; }
+.price__tag { font-size: 10.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--fucsia, #FF4DA6); }
+.tallas { display: flex; flex-wrap: wrap; gap: 4px; }
+.talla { min-width: 28px; text-align: center; font-size: 12px; font-weight: 700; padding: 2px 6px; border-radius: 7px; border: 1px solid var(--line-2); background: #fff; color: var(--ink-2, #3A3835); transition: background-color .2s, border-color .2s, color .2s, transform .15s; }
+.talla--ok { border-color: #9BD7B5; background: #EAF8F0; color: #1B7F4B; }
+.talla--bajo { border-color: #F5D58F; background: #FFF6E0; color: #9A5B00; }
+.talla--agotado { border-color: var(--line-2); background: var(--hueso); color: var(--mut-2); text-decoration: line-through; }
 .talla--sin { color: var(--mut); }
-.stock { font-weight: 600; }
+.talla--edit { border-color: var(--purple); background: var(--purple-soft); color: var(--purple-d); border-style: dashed; }
+.talla--saving { border-color: var(--purple); background: #fff; color: var(--purple-d); animation: talla-pulse 1s ease-in-out infinite; }
+.talla--saved { border-color: #1B7F4B; background: #BFEFD3; color: #0E5C33; transform: scale(1.06); }
+.talla--err { border-color: #B00020; background: #FDE7E9; color: #8A1C2B; }
+@keyframes talla-pulse { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
+.stock { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.stock .dot { width: 9px; height: 9px; border-radius: 50%; background: currentColor; flex: none; opacity: .9; }
 .stock--ok { color: #1B7F4B; }
-.stock--bajo { color: #9A5B00; }
+.stock--bajo { color: #C27700; }
 .stock--agotado { color: #B00020; }
 .stock--sin { color: var(--mut); font-weight: 500; }
-.caret { display: inline-block; transition: transform .18s var(--ease-out, ease); color: var(--mut); font-size: 20px; }
-.caret.is-open { transform: rotate(90deg); }
-.empty { text-align: center; color: var(--mut); padding: 32px; }
+.stock--sin .dot { opacity: .35; }
+.caret { display: inline-block; transition: transform .18s var(--ease-out, ease); color: var(--mut); font-size: 22px; }
+.caret.is-open { transform: rotate(90deg); color: var(--purple); }
 
-/* expandir / contraer: grid-template-rows 0fr → 1fr (CSS puro) */
-.detail { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .2s var(--ease-out, ease); background: #FBFAF7; border-bottom: 1px solid var(--line); }
+/* estado vacío */
+.empty { display: grid; place-items: center; text-align: center; padding: 48px 24px 56px; gap: 8px; }
+.empty__ko { width: 120px; height: 120px; object-fit: contain; opacity: .95; }
+.empty__title { font-family: var(--ff-display); font-size: 28px; margin: 6px 0 0; color: var(--purple-d); letter-spacing: .5px; }
+.empty__text { margin: 0 0 10px; color: var(--mut); max-width: 44ch; }
+
+/* ---------- detalle expandido ---------- */
+.detail { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .22s var(--ease-out, ease); background: #FBFAF7; border-bottom: 1px solid var(--line); box-shadow: inset 4px 0 0 var(--purple); }
 .detail.is-open { grid-template-rows: 1fr; }
 .detail__clip { min-height: 0; overflow: hidden; }
-.detail__grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(240px, 320px); gap: 18px; padding: 14px 16px 16px; }
-.vars { width: 100%; border-collapse: collapse; font-size: 13.5px; background: #fff; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
-.vars th { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--mut); padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: left; }
-.vars td { padding: 6px 10px; border-bottom: 1px solid var(--line); transition: background-color .25s; }
+.detail__grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(240px, 320px); gap: 22px; padding: 18px 20px 22px; }
+.detail__h { font-size: 11.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--purple-d); margin: 0 0 8px; font-weight: 700; }
+.detail__h + .detail__h { margin-top: 0; }
+.detail__vars .detail__h:not(:first-child) { margin-top: 18px; }
+.vars-wrap { overflow-x: auto; }
+.vars { width: 100%; border-collapse: collapse; font-size: 13.5px; background: #fff; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.vars th { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--mut); padding: 9px 10px; border-bottom: 1px solid var(--line); text-align: left; background: var(--hueso); }
+.vars td { padding: 7px 10px; border-bottom: 1px solid var(--line); transition: background-color .25s; }
+.vars tr:last-child td { border-bottom: 0; }
 .vars tr.is-dirty td { background: #FFFBEE; }
 .vars tr.is-saving td { background: #F5F2FB; }
 .vars tr.is-err td { background: #FDE7E9; }
-/* destello verde breve al confirmar el guardado */
 .vars tr.is-flash td { animation: flash-ok .9s var(--ease-out, ease) 1; }
 @keyframes flash-ok { 0% { background: #BFEFD3; } 100% { background: transparent; } }
-.talla-cell { font-weight: 700; }
+.talla-cell { font-weight: 800; font-size: 14px; }
 .actions-cell { width: 1%; }
 .actions { display: flex; align-items: center; gap: 6px; white-space: nowrap; min-width: 170px; min-height: 28px; }
 .saving { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--purple-d); }
 .saving__dot { width: 8px; height: 8px; border-radius: 50%; background: var(--purple); animation: pulse .9s ease-in-out infinite; }
 @keyframes pulse { 0%, 100% { opacity: .35; transform: scale(.8); } 50% { opacity: 1; transform: scale(1); } }
 .hint { margin: 8px 2px 0; }
-.detail__hist h3 { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--mut); margin: 0 0 8px; }
-.detail__hist ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; max-height: 320px; overflow-y: auto; }
+.detail__hist ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; max-height: 360px; overflow-y: auto; }
 .detail__hist li { display: grid; gap: 1px; font-size: 13px; padding-bottom: 6px; border-bottom: 1px dashed var(--line); }
+
+/* imágenes */
+.imgs { border: 1.5px dashed var(--line-2); border-radius: 12px; padding: 12px; background: #fff; transition: border-color .15s, background-color .15s; }
+.imgs.is-over { border-color: var(--purple); background: var(--purple-soft); }
+.imgs.is-blocked { background: var(--hueso); }
+.imgs__block { margin: 0 0 8px; font-size: 13px; color: #7A4A00; background: #FFF1D6; padding: 8px 10px; border-radius: 8px; }
+.imgs__grid { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-start; }
+.imgs__item { position: relative; margin: 0; width: 96px; border-radius: 10px; overflow: hidden; border: 1px solid var(--line); background: #fff; cursor: grab; transition: box-shadow .15s, transform .15s; }
+.imgs__item:hover { box-shadow: var(--shadow-card); transform: translateY(-1px); }
+.imgs__item img { display: block; width: 96px; height: 96px; object-fit: cover; }
+.imgs__item.is-main { border-color: var(--purple); box-shadow: 0 0 0 2px var(--purple-line); }
+.imgs__main { position: absolute; left: 0; right: 0; bottom: 0; font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; text-align: center; padding: 3px 0; background: var(--purple); color: #fff; }
+.imgs__acts { position: absolute; top: 4px; right: 4px; display: flex; gap: 3px; opacity: 0; transition: opacity .15s; }
+.imgs__item:hover .imgs__acts, .imgs__item:focus-within .imgs__acts { opacity: 1; }
+.imgs__acts button { appearance: none; border: 0; width: 22px; height: 22px; border-radius: 6px; background: rgba(17,17,17,.75); color: #fff; font-size: 13px; line-height: 1; cursor: pointer; }
+.imgs__acts button:hover { background: var(--purple); }
+.imgs__add { width: 96px; height: 96px; border: 1.5px dashed var(--purple-line); border-radius: 10px; display: grid; place-items: center; align-content: center; gap: 2px; text-align: center; font-size: 11.5px; font-weight: 600; color: var(--purple-d); cursor: pointer; background: var(--purple-soft); padding: 6px; transition: background-color .15s; }
+.imgs__add:hover { background: #E4DBF5; }
+.imgs__add.is-busy { opacity: .6; pointer-events: none; }
+.imgs__add small { font-weight: 400; color: var(--mut); font-size: 9.5px; line-height: 1.2; }
+.imgs__plus { font-family: var(--ff-display); font-size: 22px; line-height: 1; }
+.imgs__none { width: 100%; margin: 4px 0 0; }
+.uploads { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 6px; }
+.uploads li { display: grid; grid-template-columns: minmax(0, 1fr) 160px minmax(0, 1.2fr); gap: 10px; align-items: center; font-size: 12.5px; }
+.uploads__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.uploads__bar { height: 6px; border-radius: 999px; background: var(--line); overflow: hidden; }
+.uploads__bar i { display: block; height: 100%; background: var(--purple); border-radius: 999px; transition: width .2s; }
+.uploads li.is-ok .uploads__bar i { background: #1B7F4B; }
+.uploads li.is-error .uploads__bar i { background: #B00020; width: 100% !important; }
+.uploads li.is-ok .uploads__msg { color: #1B7F4B; }
+.uploads li.is-error .uploads__msg { color: #B00020; }
+.uploads__msg { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.imgs__vars { margin-top: 10px; font-size: 13px; }
+.imgs__vars summary { cursor: pointer; color: var(--purple-d); font-weight: 600; }
+.imgs__vargrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; margin-top: 8px; }
+.imgs__var { display: flex; align-items: center; gap: 8px; }
+.imgs__var .input { flex: 1; }
 
 /* filas entrando / saliendo al filtrar */
 .vrow-enter-active { transition: opacity .18s var(--ease-out, ease), transform .18s var(--ease-out, ease); }
@@ -954,15 +1282,69 @@ onMounted(() => {
 .vrow-enter-from { opacity: 0; transform: translateY(6px); }
 .vrow-leave-to { opacity: 0; transform: translateY(-6px); }
 
+/* ---------- celular: tarjetas apiladas ---------- */
+@media (max-width: 900px) {
+  .inv__app { padding: 0 12px 32px; }
+  .top { margin: 0 -12px; padding: 8px 12px; gap: 8px; }
+  .top__row { gap: 8px; }
+  .top__title { font-size: 24px; }
+  .top__totals { display: none; }
+  .top__search { grid-template-columns: 1fr 1fr; gap: 6px; }
+  .search { grid-column: 1 / -1; }
+  .search__input { padding: 8px 32px; font-size: 14px; }
+  .top__search .input { padding: 7px 8px; font-size: 13px; }
+  .top__right { margin-left: auto; gap: 6px; }
+  .top__right .btn { padding: 6px 9px; font-size: 12.5px; }
+  .banner { font-size: 13px; padding: 8px 12px; }
+  .toolbar { gap: 8px; }
+  .thead { display: none; }
+  .vlist { height: clamp(360px, calc(100dvh - 260px), 1400px); }
+  .vlist__inner { min-width: 0; }
+  .row, .tbl-wrap--compacto .row {
+    display: grid; grid-template-columns: 28px 64px minmax(0, 1fr) 28px; grid-template-areas:
+      "check img name exp"
+      "check img price exp"
+      "check img tallas exp";
+    row-gap: 6px; padding: 12px 12px; min-height: 0;
+  }
+  .col-check { grid-area: check; align-self: start; padding-top: 4px; }
+  .col-img { grid-area: img; align-self: start; }
+  .cell-name { grid-area: name; }
+  .cell-sku, .cell-status { display: none; }
+  .mono--m { display: inline; }
+  .cell-price { grid-area: price; justify-items: start; display: flex; align-items: baseline; gap: 10px; }
+  .cell-tallas { grid-area: tallas; }
+  .cell-stock { display: none; }
+  .col-exp { grid-area: exp; align-self: center; }
+  .thead .num, .row .num { justify-self: start; text-align: left; }
+  .detail__grid { grid-template-columns: 1fr; padding: 14px 12px 18px; }
+  .detail__hist ul { max-height: 220px; }
+  /* tabla de tallas → filas apiladas */
+  .vars thead { display: none; }
+  .vars, .vars tbody, .vars tr, .vars td { display: block; }
+  .vars tr { padding: 10px 12px; border-bottom: 1px solid var(--line); display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; }
+  .vars td { padding: 0; border: 0; }
+  .vars td.talla-cell { grid-column: 1 / -1; font-size: 15px; }
+  .vars td[data-label]:not(.talla-cell)::before { content: attr(data-label); display: block; font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--mut); margin-bottom: 2px; }
+  .vars td.num { text-align: left; }
+  .input--num { width: 100%; text-align: left; }
+  .actions-cell { grid-column: 1 / -1; }
+  .actions { min-width: 0; flex-wrap: wrap; }
+  .uploads li { grid-template-columns: 1fr; gap: 3px; }
+  .toolbar .btn { font-size: 12.5px; }
+  .toolbar__right { width: 100%; justify-content: space-between; margin-left: 0; }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .detail, .caret, .row, .vars td, .vrow-enter-active, .vrow-leave-active, .vlist.is-loading { transition: none; }
+  .detail, .caret, .row, .vars td, .talla, .btn, .imgs, .imgs__item, .uploads__bar i, .vrow-enter-active, .vrow-leave-active, .vlist.is-loading { transition: none; }
   .vars tr.is-flash td { animation: none; background: #BFEFD3; }
-  .saving__dot { animation: none; opacity: 1; }
+  .saving__dot, .talla--saving { animation: none; opacity: 1; }
+  .talla--saved { transform: none; }
   .vrow-enter-from, .vrow-leave-to { opacity: 1; transform: none; }
 }
 
-.warn { color: #9A5B00; }
-.linkbtn { appearance: none; background: none; border: 0; padding: 0; font: inherit; color: var(--purple-d); text-decoration: underline; cursor: pointer; }
+
+/* ---------- modales (operación masiva, importación, prueba Woo) ---------- */
 .modal__box--wide { width: min(1080px, 100%); }
 .bform { display: grid; gap: 12px; }
 .bform__row { display: flex; gap: 16px; flex-wrap: wrap; }
@@ -981,19 +1363,4 @@ onMounted(() => {
 .steps pre { margin: 4px 0 0; font-size: 12.5px; white-space: pre-wrap; background: var(--hueso); padding: 8px 10px; border-radius: 8px; color: var(--ink); }
 .steps li.err > b { color: #B00020; }
 .steps li.ok > b { color: #1B7F4B; }
-
-.pager { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-.pager__nav { display: flex; align-items: center; gap: 10px; }
-
-@media (max-width: 900px) {
-  .filters { grid-template-columns: 1fr 1fr; }
-  .input--search { grid-column: 1 / -1; }
-  .detail__grid { grid-template-columns: 1fr; }
-  .vlist { height: clamp(320px, calc(100dvh - 380px), 1200px); }
-}
-@media (max-width: 600px) {
-  .inv__app { padding: 10px 10px 32px; }
-  .input--num { width: 84px; }
-  .actions { min-width: 0; flex-wrap: wrap; }
-}
 </style>

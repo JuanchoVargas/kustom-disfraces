@@ -685,6 +685,40 @@ por campo cambiado (SKU, valor anterior, nuevo, origen, autor, fecha).
   con zlib nativo) y CSV (UTF-8 con BOM, `;`). Formato acotado a texto y
   números en una hoja, que es lo que necesita el inventario.
 
+### Imágenes de producto (Fase A: panel · Fase B: web, construida y NO activada)
+
+**De dónde salen hoy las fotos de la web:** de `catalogo.json` → archivos del repo en
+`/images/products` (189 WebP). Woo tiene una sola foto por producto; la web tiene
+galerías de 3 en 61 productos. Decisión (2026-09-07): opción 1 en dos fases, con
+respaldo local **permanente**.
+
+- **Fase A — subir desde el panel.** Al expandir un producto: principal y galería,
+  subir una o varias (arrastrar o elegir), hacer principal (★), reordenar
+  arrastrando, quitar la asociación (×; el archivo sigue en WordPress) e imagen
+  por talla (Woo lo permite: `variations/<id>.image`). Procesamiento en el
+  servidor con `sharp`: lado mayor ≤ 1600 px, WebP calidad 85, nombre
+  `<SKU>.webp`, `<SKU>-2.webp`…; archivos > 10 MB se rechazan antes de procesar.
+  Autenticación: REST API de WordPress (`wp/v2/media`) con **contraseña de
+  aplicación** — `NUXT_WP_APP_USER` + `NUXT_WP_APP_PASSWORD` (la API de Woo no sube
+  medios). Guardas: en simulación no sube nada y lo dice; con
+  `NUXT_INVENTORY_WOO_ONLY_DRAFTS` solo borradores. Progreso y error **por
+  archivo** (XHR). Cada cambio queda en `inventory_changes` (`image_add`,
+  `image_main`, `image_order`, `image_remove`, `image_variation`).
+  Endpoints: `GET/POST/PUT /api/inventario/productos/<sku>/imagenes`
+  (`server/utils/inventoryImages.ts`, `server/utils/wpMedia.ts`).
+- **Migración de las 189 fotos locales a Woo**: `scripts/migrar-imagenes-woo.mjs`
+  (principal + galería en el orden de `catalogo.json`; vista previa por defecto,
+  `--sku` para uno, `--aplicar` escribe; copia de seguridad JSON de las imágenes
+  actuales de Woo; idempotente: reutiliza lo que ya esté en la biblioteca).
+  **No se ejecuta sin el usuario.**
+- **Fase B — la web lee de Woo**: `NUXT_PUBLIC_IMAGES_SOURCE=local|woo` (default
+  **local**). El proxy del catálogo añade `imagenesWoo` **sin pisar** `imagenes`
+  (repo). Con `woo`, `useProducts` usa las de Woo y cae a las locales si el
+  producto no tiene ninguna; además cada `<NuxtImg>` de card y PDP cae a la local
+  de la misma posición si la URL de Woo falla al cargar (`imagesFallback`).
+  NuxtImg tiene `api.disfraceskustom.com` en `image.domains`. **No activar sin la
+  medición de `docs/imagenes-woo-medicion.md`** (temporada alta).
+
 ### Alertas de stock bajo
 
 - Umbral por talla `NUXT_INVENTORY_STOCK_BAJO` (default 5). El panel muestra la

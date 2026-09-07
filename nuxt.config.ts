@@ -17,6 +17,13 @@ export default defineNuxtConfig({
     { path: '~/components', pathPrefix: false },
   ],
 
+  // NuxtImg (IPX): además de /images/* del propio sitio, se permite el dominio de
+  // WordPress para la Fase B (imágenes de Woo optimizadas y cacheadas por el mismo
+  // pipeline; sin esto, una URL externa se serviría tal cual, sin optimizar).
+  image: {
+    domains: ['api.disfraceskustom.com'],
+  },
+
   // Design system global (tokens.css es la fuente de verdad del diseño)
   css: [
     '~/assets/css/tokens.css',
@@ -144,6 +151,11 @@ export default defineNuxtConfig({
     inventoryPublicStock: process.env.NUXT_INVENTORY_PUBLIC_STOCK || 'auto', // -> NUXT_INVENTORY_PUBLIC_STOCK (auto | on | off)
     // Umbral de "stock bajo" (alertas y semáforo del panel), en unidades por talla.
     inventoryStockBajo: process.env.NUXT_INVENTORY_STOCK_BAJO || '5', // -> NUXT_INVENTORY_STOCK_BAJO
+    // IMÁGENES de producto desde el panel: la API de Woo no sube medios; se usa la
+    // REST API de WordPress (wp/v2/media) con una CONTRASEÑA DE APLICACIÓN
+    // (WordPress → Usuarios → perfil → Contraseñas de aplicación). Solo servidor.
+    wpAppUser: process.env.NUXT_WP_APP_USER || '',         // -> NUXT_WP_APP_USER (usuario de WordPress)
+    wpAppPassword: process.env.NUXT_WP_APP_PASSWORD || '', // -> NUXT_WP_APP_PASSWORD (contraseña de aplicación, con o sin espacios)
     // Alerta por WhatsApp al encargado cuando un cliente pide atención humana
     // (plantilla aprobada en Meta). Sin destino no se envía; el correo es el respaldo.
     alertWhatsappTo: process.env.NUXT_ALERT_WHATSAPP_TO || '',                       // -> NUXT_ALERT_WHATSAPP_TO
@@ -163,6 +175,13 @@ export default defineNuxtConfig({
       // se apaga sin deploy con NUXT_PUBLIC_SHOW_DISCOUNT=false en Vercel.
       showDiscount: (process.env.NUXT_PUBLIC_SHOW_DISCOUNT ?? 'true') === 'true', // -> NUXT_PUBLIC_SHOW_DISCOUNT
       fakeDiscountPct: Number(process.env.NUXT_PUBLIC_FAKE_DISCOUNT_PCT) || 20,   // -> NUXT_PUBLIC_FAKE_DISCOUNT_PCT
+      // ORIGEN DE LAS IMÁGENES de producto en la web (Fase B, construido y NO activado):
+      //   local (default) = archivos del repo en /images/products (como siempre).
+      //   woo             = la imagen principal y la galería que tenga WooCommerce;
+      //                     si Woo no responde o al producto le falta imagen, cae
+      //                     automáticamente a la local. El respaldo local es PERMANENTE.
+      // Cambiar SOLO con la medición de docs/imagenes-woo-medicion.md en la mano.
+      imagesSource: process.env.NUXT_PUBLIC_IMAGES_SOURCE || 'local', // -> NUXT_PUBLIC_IMAGES_SOURCE (local | woo)
     },
   },
 })

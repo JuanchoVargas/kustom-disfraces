@@ -8,7 +8,15 @@ import type { ProductoCatalogo } from '../types/catalogo'
  * re-une nada — solo alimenta el enlace cruzado discreto de la PDP
  * ("¿Buscas la versión económica?" ↔ acabado premium).
  */
-export const catalogoToProducts = (catalogo: ProductoCatalogo[]): Product[] => {
+/**
+ * Imágenes que muestra la web para un ítem. Con `source === 'woo'` usa las de
+ * WooCommerce y cae a las locales si el producto no tiene ninguna en Woo; con
+ * 'local' (default) siempre las del repo. El respaldo local es permanente.
+ */
+export const imagenesPara = (item: ProductoCatalogo, source: 'local' | 'woo'): string[] =>
+  (source === 'woo' && item.imagenesWoo?.length ? item.imagenesWoo : item.imagenes)
+
+export const catalogoToProducts = (catalogo: ProductoCatalogo[], imagesSource: 'local' | 'woo' = 'local'): Product[] => {
   const visibles = catalogo.filter(i => i.disponibleWeb)
   const byCodigo = new Map(visibles.map(i => [i.codigo, i]))
   const ecoDeSuper = new Map(visibles.filter(i => i.parejaDe).map(i => [i.parejaDe as string, i]))
@@ -26,7 +34,10 @@ export const catalogoToProducts = (catalogo: ProductoCatalogo[]): Product[] => {
         price: item.precio as number,
         sizes: item.tallas,
         includes: item.incluye,
-        images: item.imagenes,
+        images: imagenesPara(item, imagesSource),
+        // Respaldo por imagen: si una URL de Woo falla al cargar, el componente
+        // puede caer a la local equivalente (misma posición) sin recargar.
+        imagesFallback: imagesSource === 'woo' && item.imagenesWoo?.length ? item.imagenes : undefined,
         categorySlug: item.publicos[0] as string,
         categorySlugs: item.publicos,
         description: item.descripcion,

@@ -13,6 +13,14 @@ export type InvStockStatus = 'instock' | 'outofstock' | 'onbackorder'
 export type InvProductStatus = 'publish' | 'draft' | 'pending' | 'private'
 export type InventoryBackend = 'mock' | 'woo'
 
+/** Imagen de Woo (shape wc/v3 products[].images[] / variations[].image) */
+export interface InvImage {
+  id: number
+  src: string
+  name?: string
+  alt?: string
+}
+
 export interface InvAttributeOption {
   id?: number
   name: string
@@ -45,6 +53,8 @@ export interface InvVariation {
   stock_status: InvStockStatus
   attributes: InvAttributeOption[]
   date_modified?: string
+  /** Imagen propia de la variación (Woo la hereda del padre si es null) */
+  image?: InvImage | null
 }
 
 /** Producto padre — shape wc/v3 products (+ variations completas + kustom) */
@@ -64,6 +74,8 @@ export interface InvProduct {
   featured?: boolean
   attributes: InvAttribute[]
   date_modified?: string
+  /** images[0] = principal; el resto, galería (orden = orden en Woo) */
+  images: InvImage[]
   variations: InvVariation[]
   /** Taxonomía web local (catalogo.json). No existe en Woo: bloque aditivo. */
   kustom: {

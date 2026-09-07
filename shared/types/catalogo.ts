@@ -44,8 +44,11 @@ export interface ProductoCatalogo {
   /** Precio COP de la lista oficial del cliente (jul 2026, ver README). null =
    *  grupo sin precio oficial (SEMI, Súper Adulto, vestidos dama, chaquetas). */
   precio: number | null
-  /** Vacío = fotos pendientes del cliente */
+  /** Vacío = fotos pendientes del cliente. SIEMPRE las locales (/images/products): respaldo permanente. */
   imagenes: string[]
+  /** Imágenes que tiene WooCommerce (principal + galería, URLs absolutas). Solo las
+   *  usa la web con NUXT_PUBLIC_IMAGES_SOURCE=woo; si faltan, se usan `imagenes`. */
+  imagenesWoo?: string[]
   /** true = la foto es de figura ÚNICA (extraída del PDF, sin frente+espalda);
    *  los recortes "solo frontal" de la Home no le aplican */
   fotoIndividual?: boolean

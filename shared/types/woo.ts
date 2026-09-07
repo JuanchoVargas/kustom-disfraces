@@ -37,6 +37,8 @@ export interface Product {
   badges?: ProductBadge[]
   /** URLs de imagen (vacío -> placeholder hasta Fase D) */
   images: string[]
+  /** Locales equivalentes (misma posición) cuando `images` viene de Woo: respaldo si una URL falla */
+  imagesFallback?: string[]
   /** Slug de la categoría principal a la que pertenece */
   categorySlug: string
   /** Todas las categorías (los unisex aparecen en ninos Y ninas) */

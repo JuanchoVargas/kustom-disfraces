@@ -27,6 +27,7 @@ interface WooProduct {
   price: string
   featured: boolean
   attributes?: { name: string, options: string[] }[]
+  images?: { id: number, src: string }[]
 }
 
 // Orden canónico de tallas y normalización: shared/utils/tallas.ts (lo comparte
@@ -97,6 +98,9 @@ const buildCatalogoFromWoo = async (): Promise<ProductoCatalogo[]> => {
     const precio = prices.has(woo.sku)
       ? prices.get(woo.sku) as number | null
       : Number(woo.price)
+    // Imágenes de Woo aparte de las locales: `imagenes` (repo) NUNCA se pisa —
+    // es el respaldo permanente. La web decide con NUXT_PUBLIC_IMAGES_SOURCE.
+    const imagenesWoo = (woo.images ?? []).map(i => i.src).filter(s => s.startsWith('https://') || s.startsWith('http://'))
     return {
       ...item,
       disponibleWeb: true,
@@ -104,6 +108,7 @@ const buildCatalogoFromWoo = async (): Promise<ProductoCatalogo[]> => {
       precio,
       tallas,
       destacado: woo.featured,
+      ...(imagenesWoo.length ? { imagenesWoo } : {}),
     }
   })
 }

@@ -53,6 +53,7 @@ interface WooVariationRaw {
   stock_status: string
   date_modified?: string
   attributes?: { id?: number, name: string, slug?: string, option: string }[]
+  image?: { id: number, src: string, name?: string, alt?: string } | null
 }
 
 const fromRaw = (v: WooVariationRaw, fallbackSku: string): InvVariation => ({
@@ -67,6 +68,7 @@ const fromRaw = (v: WooVariationRaw, fallbackSku: string): InvVariation => ({
   stock_status: v.stock_status === 'outofstock' || v.stock_status === 'onbackorder' ? v.stock_status : 'instock',
   attributes: (v.attributes ?? []).map(a => ({ id: a.id, name: a.name, slug: a.slug, option: a.option })),
   date_modified: v.date_modified,
+  image: v.image?.id ? { id: v.image.id, src: v.image.src, name: v.image.name, alt: v.image.alt } : null,
 })
 
 const pick = (v: InvVariation): Partial<InvVariation> => ({

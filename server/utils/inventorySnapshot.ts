@@ -43,6 +43,7 @@ interface WooProductRaw {
   date_modified?: string
   attributes?: InvAttribute[]
   variations?: number[]
+  images?: { id: number, src: string, name?: string, alt?: string }[]
 }
 interface WooVariationRaw {
   id: number
@@ -56,6 +57,7 @@ interface WooVariationRaw {
   stock_status: string
   date_modified?: string
   attributes?: { id?: number, name: string, slug?: string, option: string }[]
+  image?: { id: number, src: string, name?: string, alt?: string } | null
 }
 
 // ---------- catálogo local (taxonomía web) ----------
@@ -118,6 +120,7 @@ function fromWoo(raw: WooProductRaw, variations: WooVariationRaw[] | null, fetch
         stock_status: asStockStatus(v.stock_status),
         attributes: (v.attributes ?? []).map(a => ({ id: a.id, name: a.name, slug: a.slug, option: a.option })),
         date_modified: v.date_modified,
+        image: v.image?.id ? { id: v.image.id, src: v.image.src, name: v.image.name, alt: v.image.alt } : null,
       }))
     : derivedVariations(raw.sku, raw.price ?? '', raw.regular_price ?? '', raw.sale_price ?? '', tallas)
   return {
@@ -136,6 +139,7 @@ function fromWoo(raw: WooProductRaw, variations: WooVariationRaw[] | null, fetch
     featured: !!raw.featured,
     attributes: raw.attributes ?? [],
     date_modified: raw.date_modified,
+    images: (raw.images ?? []).map(i => ({ id: i.id, src: i.src, name: i.name, alt: i.alt })),
     variations: sortVariations(vs),
     kustom: kustomBlock(raw.sku),
     origen: 'woo',
@@ -162,6 +166,7 @@ function fromCatalogo(l: ProductoCatalogo, fetchedAt: string): InvProduct {
     stock_status: 'instock',
     featured: !!l.destacado,
     attributes: [{ name: 'Talla', slug: 'pa_talla', variation: true, options: tallas }],
+    images: [],
     variations: sortVariations(derivedVariations(l.codigo, price, price, '', tallas)),
     kustom: kustomBlock(l.codigo),
     origen: 'catalogo',

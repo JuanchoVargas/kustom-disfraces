@@ -41,16 +41,20 @@ function applyStock(products: Product[], stock: StockAgotado | null): Product[] 
 // cambia el array de origen (local <-> remoto hidratado) o el estado de stock
 let memoSource: ProductoCatalogo[] | null = null
 let memoStock: StockAgotado | null | undefined
+let memoImagesSource: 'local' | 'woo' | undefined
 let memoProducts: Product[] = []
 
 export const useProducts = () => {
   const remoto = useState<ProductoCatalogo[] | null>('catalogo-remoto', () => null)
   const stock = useState<StockAgotado | null>('stock-agotado', () => null)
   const source = remoto.value ?? CATALOGO_LOCAL
-  if (source !== memoSource || stock.value !== memoStock) {
+  // Origen de las imágenes (Fase B): 'woo' solo con NUXT_PUBLIC_IMAGES_SOURCE=woo; default local.
+  const imagesSource = useRuntimeConfig().public.imagesSource === 'woo' ? 'woo' : 'local'
+  if (source !== memoSource || stock.value !== memoStock || imagesSource !== memoImagesSource) {
     memoSource = source
     memoStock = stock.value
-    memoProducts = applyStock(catalogoToProducts(source), stock.value)
+    memoImagesSource = imagesSource
+    memoProducts = applyStock(catalogoToProducts(source, imagesSource), stock.value)
   }
   const products = memoProducts
   const categories = categoriesData as Category[]
