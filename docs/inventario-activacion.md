@@ -193,8 +193,9 @@ estén verificados.
 La subida de imágenes desde el panel **no depende** de `NUXT_INVENTORY_BACKEND`:
 funciona en mock o woo porque va directo a WordPress/Woo, y mientras
 `NUXT_PUBLIC_IMAGES_SOURCE` siga en `local` (o sin definir) **la web no cambia**.
-Tiene guarda propia: `NUXT_IMAGES_ONLY_DRAFTS=true` limita a borradores sin abrir
-precios/stock (esos siguen bajo `NUXT_INVENTORY_WOO_ONLY_DRAFTS`). Default `false`.
+Tiene guarda propia: `NUXT_IMAGES_ONLY_DRAFTS`, default `true` (solo borradores, mismo
+criterio que `NUXT_INVENTORY_WOO_ONLY_DRAFTS`). Ponerla en `false` es el opt-in
+explícito para imágenes de publicados, sin abrir precios/stock.
 
 - [ ] **[JD]** Ejecutar `https://www.disfraceskustom.com/api/admin/test-wp-medios`
       con la sesión del panel y pasar el JSON. Si todo es `ok: true`, se borra el

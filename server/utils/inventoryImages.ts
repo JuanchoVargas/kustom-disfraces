@@ -17,7 +17,7 @@ import { mediaFilename, processImage, uploadMedia, wpMediaConfigured } from './w
  * mock o woo. Las imágenes van directo a WordPress/Woo y, mientras la Fase B siga
  * apagada (NUXT_PUBLIC_IMAGES_SOURCE=local), la web sigue mostrando las fotos
  * locales: subir NO afecta al sitio público. Guarda propia:
- * NUXT_IMAGES_ONLY_DRAFTS=true limita a borradores (default false).
+ * NUXT_IMAGES_ONLY_DRAFTS, default true = solo borradores; 'false' explícito abre publicados.
  * Cada cambio deja fila en inventory_changes (campo image_*). Escritura primero
  * a Woo; el snapshot se actualiza solo si Woo aceptó.
  */
@@ -27,7 +27,7 @@ export class ImgError extends Error {
 }
 
 export function imagesOnlyDrafts(): boolean {
-  return String(useRuntimeConfig().imagesOnlyDrafts ?? 'false') === 'true'
+  return String(useRuntimeConfig().imagesOnlyDrafts ?? 'true') !== 'false'
 }
 
 export function imagesBlockReason(p: InvProduct): string | null {

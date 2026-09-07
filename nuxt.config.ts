@@ -156,10 +156,10 @@ export default defineNuxtConfig({
     // (WordPress → Usuarios → perfil → Contraseñas de aplicación). Solo servidor.
     wpAppUser: process.env.NUXT_WP_APP_USER || '',         // -> NUXT_WP_APP_USER (usuario de WordPress)
     wpAppPassword: process.env.NUXT_WP_APP_PASSWORD || '', // -> NUXT_WP_APP_PASSWORD (contraseña de aplicación, con o sin espacios)
-    // Guarda PROPIA de imágenes (independiente de la de precios/stock): 'true' = solo
-    // se cambian imágenes de productos en BORRADOR. Default false: la web lee fotos
-    // locales (Fase B apagada), así que subir a Woo no afecta al sitio público.
-    imagesOnlyDrafts: process.env.NUXT_IMAGES_ONLY_DRAFTS ?? 'false', // -> NUXT_IMAGES_ONLY_DRAFTS (true | false)
+    // Guarda PROPIA de imágenes (independiente de la de precios/stock). Default true:
+    // solo se cambian imágenes de productos en BORRADOR (mismo criterio que
+    // NUXT_INVENTORY_WOO_ONLY_DRAFTS). Poner 'false' explícitamente para abrir a publicados.
+    imagesOnlyDrafts: process.env.NUXT_IMAGES_ONLY_DRAFTS ?? 'true', // -> NUXT_IMAGES_ONLY_DRAFTS (true | false)
     // Alerta por WhatsApp al encargado cuando un cliente pide atención humana
     // (plantilla aprobada en Meta). Sin destino no se envía; el correo es el respaldo.
     alertWhatsappTo: process.env.NUXT_ALERT_WHATSAPP_TO || '',                       // -> NUXT_ALERT_WHATSAPP_TO
