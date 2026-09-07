@@ -752,9 +752,14 @@ además producción corrió el bot anterior a las preguntas informativas hasta e
   empieza por 3, con o sin +57/espacios) se guarda en `conversations.telefono_lead`,
   la conversación queda no leída, se avisa a ventas@ y al encargado por WhatsApp,
   y la bandeja lo muestra con botón de copiar. El bot no se apaga.
-- **Ventana de 24 h por vencer**: `/api/cron/ventana-24h` (cada hora) manda a
-  ventas@ la lista de chats de WhatsApp en atención humana con 20–24 h sin
-  respuesta de agente, con enlace a cada uno; avisa una vez por ventana.
+- **Ventana de 24 h por vencer**: manda a ventas@ la lista de chats de WhatsApp
+  en atención humana con 20–24 h sin respuesta de agente, con enlace a cada uno;
+  avisa una vez por ventana (`server/utils/ventana24h.ts`). Se dispara desde la
+  bandeja (≤ 1 vez / 30 min mientras el panel esté abierto) y por el cron DIARIO
+  `/api/cron/ventana-24h` (13:00 UTC = 8:00 Bogotá). **Vercel Hobby rechaza el
+  deploy entero con crons de más de una vez al día** ("Hobby accounts are limited
+  to daily cron jobs"): el `0 * * * *` del 2026-09-06 dejó master sin desplegar
+  20 h. No volver a poner crons horarios.
 - Evidencia con casos reales: `node scripts/test-bot-conversion.mjs` (27
   comprobaciones); `scripts/probar-bot.mjs msg|wa "frase" "@boton"` para probar a mano.
 

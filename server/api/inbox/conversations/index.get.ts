@@ -1,4 +1,5 @@
 import type { ListFilter } from '../../../utils/inbox'
+import { avisarVentanaSiToca } from '../../../utils/ventana24h'
 
 /**
  * Lista de conversaciones (más recientes arriba). NUNCA se ocultan por antigüedad
@@ -20,6 +21,8 @@ export default defineEventHandler(async (event) => {
     return Number.isNaN(d.getTime()) ? null : d.toISOString()
   }
   const rows = await listConversations({ q, filter, desde: iso(query.desde), hasta: iso(query.hasta) })
+  // Aviso de ventana de 24 h por vencer: se revisa desde aquí (≤ 1 vez / 30 min) porque el cron solo puede ser diario en Hobby.
+  await avisarVentanaSiToca()
   return {
     conversations: rows.map(c => ({
       id: c.id,
