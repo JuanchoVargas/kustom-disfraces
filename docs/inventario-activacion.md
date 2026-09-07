@@ -82,20 +82,33 @@ verificación del anterior.
       `NUXT_INVENTORY_PUBLIC_STOCK=off` en Vercel y redeploy devuelve la web,
       el bot y el checkout a "todo disponible" en minutos, sin tocar Woo.
 
-### B3. Escribir en Woo (primera escritura real)
+### B3. Escribir en Woo: primero UN producto, luego el resto
 
-- [ ] **[JD]** Ejecutar la aplicación real:
+- [ ] **[JD]** Copia de seguridad fechada del catálogo completo. El script la
+      hace sola con `--aplicar` (descarga el Excel de las 537 tallas con los
+      valores actuales en `backups/inventario-<fecha>.xlsx` y no escribe nada
+      si la descarga falla). Guardar ese archivo fuera del repo (Drive). Para
+      revertir cualquier cosa: Importar ese Excel en el panel → Previsualizar →
+      Aplicar → volver a correr el script.
+- [ ] **[JD]** Primera ejecución real sobre **un solo producto en borrador**
+      (por ejemplo SPIDERMAN CLASICO SEMI, `001003001`):
       ```
-      node scripts/aplicar-overrides-woo.mjs https://www.disfraceskustom.com --aplicar
+      node scripts/aplicar-overrides-woo.mjs https://www.disfraceskustom.com --sku 001003001
+      node scripts/aplicar-overrides-woo.mjs https://www.disfraceskustom.com --sku 001003001 --aplicar
       ```
-      Escribe precio y stock en Woo por lotes de 100, registra cada cambio en
-      `inventory_changes` con origen `script` y borra las sobreescrituras
-      aplicadas. Verificación: "fallidas: 0" y "pendientes: 0". Si falla alguna,
-      queda listada con su motivo y se repite el comando solo para las que
-      faltan.
-- [ ] **[JD]** Verificar en WordPress dos o tres productos al azar: en
-      Variaciones, la talla cargada muestra "¿Gestionar inventario?" activo y
-      la cantidad correcta.
+      La primera línea muestra solo las tallas de ese producto; la segunda las
+      escribe. Verificación: "fallidas: 0"; en WordPress → Productos → ese
+      producto → Variaciones, cada talla cargada tiene "¿Gestionar inventario?"
+      activo y la cantidad correcta.
+- [ ] **[JD]** Si quedó bien, el resto de borradores y después los publicados:
+      ```
+      node scripts/aplicar-overrides-woo.mjs https://www.disfraceskustom.com --estado draft --aplicar
+      node scripts/aplicar-overrides-woo.mjs https://www.disfraceskustom.com --estado publish --aplicar
+      ```
+      Cada ejecución hace su propia copia de seguridad. Verificación:
+      "fallidas: 0" y "pendientes en total: 0". Si falla alguna, queda listada
+      con su motivo y se repite el comando: solo reintenta las que faltan.
+- [ ] **[JD]** Verificar en WordPress dos o tres productos publicados al azar.
 
 ### B4. Encender el adaptador real
 
@@ -167,7 +180,9 @@ estén verificados.
 |---|---|
 | Llave de escritura desde Vercel (PUT, relectura, reversión, batch) | Probado el 2026-09-06 sobre borradores |
 | Adaptador woo por el camino real del módulo + guarda de borradores | Probado el 2026-09-06 en el preview |
-| `aplicar-overrides-woo.mjs`, vista previa antes → después | Probado el 2026-09-07 con dos sobreescrituras reales en un borrador (precio y stock); tabla correcta y sin escribir |
+| `aplicar-overrides-woo.mjs`, vista previa antes → después | Probado el 2026-09-07 con sobreescrituras reales; tabla correcta y sin escribir |
+| Subconjunto `--sku` (producto o talla), `--estado`, `--limite` | Probado el 2026-09-07 con 4 sobreescrituras en 3 productos (2 borradores, 1 publicado): cada filtro selecciona lo esperado y reporta las omitidas |
+| Copia de seguridad automática antes de `--aplicar` | Probado el 2026-09-07: el Excel descargado (537 filas) se reimporta con 0 cambios y 0 errores |
 | `aplicar-overrides-woo.mjs --aplicar` | **No probado aún**: usa el mismo `bulkUpdate` del adaptador que sí está probado, pero la primera ejecución real es el paso B3 |
 | Lógica de agotado en web, bot y checkout | Probada en local con stock simulado (60 comprobaciones) |
 | Descuento de inventario al confirmarse un pago | **Pendiente**: paso B7 |
