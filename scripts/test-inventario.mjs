@@ -279,7 +279,7 @@ else {
   const plp = await fetch(`${BASE}/categoria/bebes`).then(r => r.text())
   check('14c. la PLP de bebés ya no lista el producto', !plp.includes(`/producto/${SLUG}"`))
   const botOut = await botReply('gato con botas')
-  check('14c. bot: producto agotado → "No encontré ese disfraz"', /No encontré ese disfraz/.test(botOut), botOut.split('\n')[0])
+  check('14c. bot: producto agotado → no lo ofrece ("No tengo … en el catálogo")', /No encontré ese disfraz|No tengo \*/.test(botOut), botOut.split('\n')[0])
   const { json: est2 } = await api('/estado')
   check('14c. estado del panel: 4 tallas agotadas en alertas', est2.agotadas >= 4 && est2.public_stock === true, `agotadas=${est2.agotadas} bajo=${est2.stock_bajo}`)
 
