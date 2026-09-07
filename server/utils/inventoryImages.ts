@@ -1,7 +1,5 @@
 import type { InvImage, InvProduct } from '~~/shared/types/inventory'
 import { dbConfigured, ensureSchema, sql } from './db'
-import { getInventoryStore } from './inventoryStore'
-import { wooOnlyDrafts } from './inventoryWoo'
 import { loadProductBySku, snapshotUpsert } from './inventorySnapshot'
 import { recomputeProduct } from './inventoryCommon'
 import { sanitizeWooWriteError, wooWriteConfigured, wooWriteFetch } from './wooWrite'
@@ -15,8 +13,11 @@ import { mediaFilename, processImage, uploadMedia, wpMediaConfigured } from './w
  *   remove   → quita la ASOCIACIÓN (el archivo sigue en la biblioteca de WordPress).
  *   variation→ imagen propia de una talla (Woo: variations/<id>.image); null = hereda.
  *
- * GUARDAS (mismas que precios/stock): en simulación (adaptador mock) no se sube
- * nada y se avisa; con NUXT_INVENTORY_WOO_ONLY_DRAFTS solo se tocan borradores.
+* DESACOPLADO del adaptador de inventario: funciona con NUXT_INVENTORY_BACKEND en
+ * mock o woo. Las imágenes van directo a WordPress/Woo y, mientras la Fase B siga
+ * apagada (NUXT_PUBLIC_IMAGES_SOURCE=local), la web sigue mostrando las fotos
+ * locales: subir NO afecta al sitio público. Guarda propia:
+ * NUXT_IMAGES_ONLY_DRAFTS=true limita a borradores (default false).
  * Cada cambio deja fila en inventory_changes (campo image_*). Escritura primero
  * a Woo; el snapshot se actualiza solo si Woo aceptó.
  */
@@ -25,12 +26,14 @@ export class ImgError extends Error {
   constructor(message: string, public status = 400) { super(message) }
 }
 
+export function imagesOnlyDrafts(): boolean {
+  return String(useRuntimeConfig().imagesOnlyDrafts ?? 'false') === 'true'
+}
+
 export function imagesBlockReason(p: InvProduct): string | null {
-  const store = getInventoryStore()
-  if (store.simulation) return 'Modo simulación: las imágenes se suben directo a WordPress y eso no se simula. Activa el adaptador woo (NUXT_INVENTORY_BACKEND=woo) para gestionarlas.'
   if (!wpMediaConfigured()) return 'Faltan las credenciales de WordPress para medios (NUXT_WP_APP_USER / NUXT_WP_APP_PASSWORD).'
   if (!wooWriteConfigured()) return 'Falta la llave de escritura de WooCommerce.'
-  if (wooOnlyDrafts() && p.status === 'publish') return 'Bloqueado: mientras se validan las operaciones, solo se pueden cambiar imágenes de productos en BORRADOR (NUXT_INVENTORY_WOO_ONLY_DRAFTS).'
+  if (imagesOnlyDrafts() && p.status === 'publish') return 'Bloqueado: por ahora solo se pueden cambiar imágenes de productos en BORRADOR (NUXT_IMAGES_ONLY_DRAFTS).'
   if (p.id <= 0) return 'El producto aún no tiene id de Woo en el snapshot: pulsa "Sincronizar con Woo".'
   return null
 }

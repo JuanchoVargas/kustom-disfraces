@@ -700,9 +700,14 @@ respaldo local **permanente**.
   `<SKU>.webp`, `<SKU>-2.webp`…; archivos > 10 MB se rechazan antes de procesar.
   Autenticación: REST API de WordPress (`wp/v2/media`) con **contraseña de
   aplicación** — `NUXT_WP_APP_USER` + `NUXT_WP_APP_PASSWORD` (la API de Woo no sube
-  medios). Guardas: en simulación no sube nada y lo dice; con
-  `NUXT_INVENTORY_WOO_ONLY_DRAFTS` solo borradores. Progreso y error **por
-  archivo** (XHR). Cada cambio queda en `inventory_changes` (`image_add`,
+  medios). **Desacoplado del adaptador de inventario**: funciona con
+  `NUXT_INVENTORY_BACKEND` en mock o woo (las fotos van directo a WordPress y,
+  mientras la Fase B siga apagada, la web no cambia). Guarda propia:
+  `NUXT_IMAGES_ONLY_DRAFTS=true` limita a borradores (default false; NO abre
+  precios/stock, que siguen bajo `NUXT_INVENTORY_WOO_ONLY_DRAFTS`). El panel lo
+  dice en una línea: "Las imágenes se guardan en WordPress. La web seguirá
+  mostrando las fotos actuales hasta que activemos el cambio de origen".
+  Progreso y error **por archivo** (XHR). Cada cambio queda en `inventory_changes` (`image_add`,
   `image_main`, `image_order`, `image_remove`, `image_variation`).
   Endpoints: `GET/POST/PUT /api/inventario/productos/<sku>/imagenes`
   (`server/utils/inventoryImages.ts`, `server/utils/wpMedia.ts`).

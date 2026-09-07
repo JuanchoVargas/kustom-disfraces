@@ -1,4 +1,3 @@
-import sharp from 'sharp'
 
 /**
  * MEDIOS DE WORDPRESS (wp/v2/media) para las imágenes de producto del panel de
@@ -72,8 +71,12 @@ export async function wpMediaPing(): Promise<{ ok: boolean, detail: string }> {
 
 export interface Processed { data: Buffer, width: number, height: number, bytes: number, mime: 'image/webp' }
 
+/** sharp se carga solo cuando hay que procesar una imagen (no en el arranque de cada función). */
+const loadSharp = async () => (await import('sharp')).default
+
 /** Redimensiona (lado mayor ≤ 1600, sin agrandar) y convierte a WebP 85. Lanza si no es imagen. */
 export async function processImage(input: Buffer, mime: string): Promise<Processed> {
+  const sharp = await loadSharp()
   if (input.length > MAX_UPLOAD_BYTES) throw new Error(`archivo de ${(input.length / 1048576).toFixed(1)} MB: el máximo es 10 MB`)
   if (mime && !ACCEPTED.has(mime.toLowerCase().split(';')[0]!.trim())) throw new Error(`tipo no admitido (${mime}): usa JPG, PNG, WebP, GIF o HEIC`)
   let img = sharp(input, { failOn: 'error', animated: false }).rotate() // respeta la orientación EXIF

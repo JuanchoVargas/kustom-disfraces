@@ -977,6 +977,7 @@ onMounted(() => {
                         <!-- imágenes del producto (Fase A) -->
                         <h3 class="detail__h">Imágenes</h3>
                         <div class="imgs" :class="{ 'is-over': imgState(vrows[vi.index]!.p.sku).dragOver, 'is-blocked': !!imgState(vrows[vi.index]!.p.sku).bloqueo }" @dragover.prevent="imgState(vrows[vi.index]!.p.sku).dragOver = true" @dragleave="imgState(vrows[vi.index]!.p.sku).dragOver = false" @drop="onDrop(vrows[vi.index]!.p.sku, $event)">
+                          <p class="imgs__note">Las imágenes se guardan en WordPress. La web seguirá mostrando las fotos actuales hasta que activemos el cambio de origen.</p>
                           <p v-if="imgState(vrows[vi.index]!.p.sku).bloqueo" class="imgs__block">🔒 {{ imgState(vrows[vi.index]!.p.sku).bloqueo }}</p>
                           <div v-if="imgState(vrows[vi.index]!.p.sku).loading" class="imgs__grid"><Skeleton w="96px" h="96px" radius="10px" /><Skeleton w="96px" h="96px" radius="10px" /></div>
                           <div v-else class="imgs__grid">
@@ -1243,6 +1244,7 @@ onMounted(() => {
 .imgs { border: 1.5px dashed var(--line-2); border-radius: 12px; padding: 12px; background: #fff; transition: border-color .15s, background-color .15s; }
 .imgs.is-over { border-color: var(--purple); background: var(--purple-soft); }
 .imgs.is-blocked { background: var(--hueso); }
+.imgs__note { margin: 0 0 10px; font-size: 12.5px; color: var(--mut); }
 .imgs__block { margin: 0 0 8px; font-size: 13px; color: #7A4A00; background: #FFF1D6; padding: 8px 10px; border-radius: 8px; }
 .imgs__grid { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-start; }
 .imgs__item { position: relative; margin: 0; width: 96px; border-radius: 10px; overflow: hidden; border: 1px solid var(--line); background: #fff; cursor: grab; transition: box-shadow .15s, transform .15s; }
