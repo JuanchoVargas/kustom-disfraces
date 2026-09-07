@@ -15,7 +15,11 @@ export interface WriteContext {
   autor?: string
 }
 
-export const STOCK_BAJO_UMBRAL = 5
+/** Umbral de "stock bajo" por talla (NUXT_INVENTORY_STOCK_BAJO, default 5). */
+export function stockBajoUmbral(): number {
+  const n = Number(useRuntimeConfig().inventoryStockBajo)
+  return Number.isFinite(n) && n >= 0 ? n : 5
+}
 
 // ---------- validación de valores (compartida) ----------
 export class InvValidationError extends Error {}
@@ -64,7 +68,7 @@ function variationStockKind(v: InvVariation): 'sin_gestion' | 'agotado' | 'bajo'
   if (!v.manage_stock) return v.stock_status === 'outofstock' ? 'agotado' : 'sin_gestion'
   const q = v.stock_quantity ?? 0
   if (q <= 0) return 'agotado'
-  if (q <= STOCK_BAJO_UMBRAL) return 'bajo'
+  if (q <= stockBajoUmbral()) return 'bajo'
   return 'ok'
 }
 

@@ -71,6 +71,8 @@ async function handleIncoming(incoming: WaIncoming): Promise<number> {
   // Capa de intención omnicanal (slots, saludos, typos, sin-resultados, tips) sobre
   // el cerebro base. El formato de salida (chunking de botones / fallback numerado)
   // no cambia: se aplica igual sobre los mensajes resultantes, más abajo.
+  // Stock del inventario (productos/tallas agotados) para búsquedas y fichas.
+  await refreshBotStock()
   const { replies, patch } = buildReplies(incoming, session.state)
 
   // Enviar cada respuesta del árbol (en orden). Si WhatsApp no está configurado,

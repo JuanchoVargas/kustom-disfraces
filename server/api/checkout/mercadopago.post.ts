@@ -159,6 +159,24 @@ export default defineEventHandler(async (event) => {
     }
   })
 
+  // ---------- STOCK (módulo de inventario): validación contra el adaptador ----------
+  // Una talla con gestión de stock activa y existencias insuficientes bloquea el
+  // pago con 409 sin_stock (el front muestra qué ajustar). Tallas sin gestionar o
+  // stock no aplicable al sitio (NUXT_INVENTORY_PUBLIC_STOCK) → pasa como antes.
+  const stockProblems = await checkStockFor(rawItems.map(raw => ({
+    sku: String(raw?.sku ?? '').trim(),
+    size: raw?.size === undefined || raw?.size === null ? null : String(raw.size).trim(),
+    quantity: Math.trunc(Number(raw?.quantity)) || 0,
+  })))
+  if (stockProblems.length) {
+    console.warn('[mercadopago] sin stock:', JSON.stringify(stockProblems))
+    throw createError({
+      statusCode: 409,
+      message: 'Algunas tallas ya no tienen existencias',
+      data: { code: 'sin_stock', items: stockProblems },
+    })
+  }
+
   // Origen real de la petición (local, preview o prod) para back_urls / notification_url.
   const origin = getRequestURL(event, { xForwardedHost: true }).origin
   const isLocal = /localhost|127\.0\.0\.1/.test(origin)

@@ -132,6 +132,13 @@ export default defineNuxtConfig({
     // productos EN BORRADOR; cualquier escritura a un publicado se rechaza sin
     // tocar Woo. Poner 'false' cuando se validen las operaciones masivas.
     inventoryWooOnlyDrafts: process.env.NUXT_INVENTORY_WOO_ONLY_DRAFTS ?? 'true', // -> NUXT_INVENTORY_WOO_ONLY_DRAFTS (true | false)
+    // ¿El stock del adaptador se aplica al SITIO, al BOT y al CHECKOUT? (lógica de
+    // agotado: talla en 0 no seleccionable, producto en 0 fuera del catálogo).
+    //   auto (default) = solo cuando el adaptador es woo (el mock es simulación).
+    //   on  = también con mock (para probar en local / preview).   off = nunca.
+    inventoryPublicStock: process.env.NUXT_INVENTORY_PUBLIC_STOCK || 'auto', // -> NUXT_INVENTORY_PUBLIC_STOCK (auto | on | off)
+    // Umbral de "stock bajo" (alertas y semáforo del panel), en unidades por talla.
+    inventoryStockBajo: process.env.NUXT_INVENTORY_STOCK_BAJO || '5', // -> NUXT_INVENTORY_STOCK_BAJO
     // Alerta por WhatsApp al encargado cuando un cliente pide atención humana
     // (plantilla aprobada en Meta). Sin destino no se envía; el correo es el respaldo.
     alertWhatsappTo: process.env.NUXT_ALERT_WHATSAPP_TO || '',                       // -> NUXT_ALERT_WHATSAPP_TO

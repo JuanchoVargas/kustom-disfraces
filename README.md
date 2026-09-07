@@ -685,5 +685,39 @@ por campo cambiado (SKU, valor anterior, nuevo, origen, autor, fecha).
   con zlib nativo) y CSV (UTF-8 con BOM, `;`). Formato acotado a texto y
   números en una hoja, que es lo que necesita el inventario.
 
-Pendiente (siguientes entregables): alertas de stock bajo, validación de stock
-en el checkout y lógica de agotado en sitio y bot.
+### Alertas de stock bajo
+
+- Umbral por talla `NUXT_INVENTORY_STOCK_BAJO` (default 5). El panel muestra la
+  franja "⚠ Alertas de stock" con tallas agotadas y con stock bajo (solo productos
+  publicados) y enlaza al filtro; el semáforo por talla ya venía de la Fase 1.
+- Correo a ventas@ (`NUXT_VENTAS_TO`): al instante cuando una escritura del panel
+  deja una talla en bajo/agotado que antes no lo estaba (sin repetir mientras siga
+  baja) y un **resumen diario** (`/api/cron/stock-alertas`, cron de Vercel 12:30
+  UTC). **En modo simulación no se envía correo** (solo log y panel).
+
+### Lógica de agotado (sitio, bot y checkout)
+
+- Fuente: `server/utils/stockState.ts` (estado de stock del adaptador, cacheado
+  2 min e invalidado tras cada escritura del panel). Regla: talla agotada = gestión
+  activa y cantidad ≤ 0; producto agotado = todas sus tallas agotadas; talla sin
+  gestionar = disponible (igual que Woo).
+- **¿Aplica?** `NUXT_INVENTORY_PUBLIC_STOCK`: `auto` (default) = solo con adaptador
+  woo, porque el mock es simulación y el panel promete que no toca el sitio;
+  `on` = también con mock (local/preview; el panel lo avisa); `off` = nunca.
+- **Sitio**: `GET /api/stock` (público, solo códigos y tallas) → plugin
+  `app/plugins/stock.ts` lo hidrata en SSR → `useProducts` saca del catálogo los
+  productos agotados (PLP/PDP/home; la PDP responde 404) y marca las tallas
+  agotadas como `soldOutSizes` (el SizeSelector las deshabilita).
+- **Bot**: los webhooks refrescan `server/utils/botStock.ts` antes de responder;
+  la búsqueda excluye productos agotados, las fichas listan solo tallas con
+  existencias y "talla N" agotada responde ⚠️ no disponible. Los conteos de los
+  menús ("N disfraces") tampoco cuentan agotados.
+- **Checkout**: `/api/checkout/mercadopago` valida cada ítem (SKU + talla +
+  cantidad) contra el adaptador y responde **409 `sin_stock`** con el detalle;
+  `useMercadoPago` muestra qué talla ajustar. Tallas sin gestionar pasan.
+- Todo probado en `scripts/test-inventario.mjs` (sección 14, con el dev server
+  arrancado con `NUXT_INVENTORY_PUBLIC_STOCK=on`).
+
+Pendiente: merge a master (tras `feature/bandeja-v2`) y, con la gestión de stock
+activa en Woo, verificar el descuento de inventario al confirmarse un pago
+(checklist `docs/inventario-activacion.md`).

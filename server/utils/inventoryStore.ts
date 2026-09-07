@@ -5,10 +5,11 @@ import { createWooStore, wooOnlyDrafts } from './inventoryWoo'
 import { wooWriteConfigured } from './wooWrite'
 import { loadInventory, snapshotStats } from './inventorySnapshot'
 import type { WriteContext } from './inventoryCommon'
-import { STOCK_BAJO_UMBRAL } from './inventoryCommon'
+import { stockBajoUmbral } from './inventoryCommon'
+import { getStockState, publicStockEnabled } from './stockState'
 
 export type { WriteContext } from './inventoryCommon'
-export { STOCK_BAJO_UMBRAL, listChanges, logChanges, normalizePrice, normalizeStock, InvValidationError } from './inventoryCommon'
+export { stockBajoUmbral, listChanges, logChanges, normalizePrice, normalizeStock, InvValidationError } from './inventoryCommon'
 
 /**
  * CAPA DE ADAPTADOR del inventario. El panel (/admin/inventario) y el resto del
@@ -45,7 +46,7 @@ export function getInventoryStore(): InventoryStore {
 // ---------- estado para el panel ----------
 export async function inventoryStatus(): Promise<InvStatus> {
   const s = getInventoryStore()
-  const [ping, load, snap, overrides] = await Promise.all([s.ping(), loadInventory(), snapshotStats(), countOverrides()])
+  const [ping, load, snap, overrides, stock] = await Promise.all([s.ping(), loadInventory(), snapshotStats(), countOverrides(), getStockState()])
   const products = load.products
   return {
     backend: s.backend,
@@ -60,7 +61,10 @@ export async function inventoryStatus(): Promise<InvStatus> {
     snapshot_age_s: snap.newest ? Math.round((Date.now() - new Date(snap.newest).getTime()) / 1000) : null,
     origen: load.origen,
     db: dbConfigured(),
-    stock_bajo_umbral: STOCK_BAJO_UMBRAL,
+    stock_bajo_umbral: stockBajoUmbral(),
+    stock_bajo: stock.bajo.length,
+    agotadas: stock.agotadas.length,
+    public_stock: publicStockEnabled(),
     woo_write: wooWriteConfigured(),
     woo_only_drafts: wooOnlyDrafts(),
   }

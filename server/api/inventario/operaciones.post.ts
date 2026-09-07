@@ -44,5 +44,8 @@ export default defineEventHandler(async (event) => {
     resultados = operaciones.length ? await store.bulkUpdate(operaciones, ctx) : []
   }
   const all = [...resultados, ...invalid.map(i => ({ sku: i.sku, ok: false, error: i.error }))]
-  return { backend: store.backend, simulation: store.simulation, ok: all.filter(r => r.ok).length, fallidas: all.filter(r => !r.ok).length, resultados: all }
+  // Lógica de agotado + alertas: recalcular el estado de stock y avisar de lo que
+  // acaba de quedar bajo/agotado (best-effort; nunca falla la escritura por esto).
+  const alerta = await alertarTrasEscritura(resultados, ctx.origen).catch(err => ({ avisadas: 0, enviado: false, error: String((err as Error)?.message ?? err) }))
+  return { backend: store.backend, simulation: store.simulation, ok: all.filter(r => r.ok).length, fallidas: all.filter(r => !r.ok).length, resultados: all, alerta }
 })

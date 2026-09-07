@@ -151,4 +151,10 @@ export interface InvStatus {
   woo_write: boolean
   /** guarda activa: el adaptador woo solo escribe en borradores */
   woo_only_drafts: boolean
+  /** tallas (de publicados) con 0 < cantidad ≤ umbral */
+  stock_bajo: number
+  /** tallas (de publicados) agotadas */
+  agotadas: number
+  /** el stock del adaptador se aplica al sitio, bot y checkout (NUXT_INVENTORY_PUBLIC_STOCK) */
+  public_stock: boolean
 }

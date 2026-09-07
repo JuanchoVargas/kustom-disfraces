@@ -41,10 +41,22 @@ export function useMercadoPago() {
     }
     catch (err: unknown) {
       // El servidor rechaza si detecta precios manipulados o un producto no disponible.
-      const code = (err as { data?: { code?: string } })?.data?.code
-      error.value = (code === 'price_mismatch' || code === 'sku_not_found')
-        ? 'Los precios cambiaron. Recarga la página y vuelve a intentar.'
-        : 'No se pudo iniciar el pago. Intenta de nuevo o finaliza por WhatsApp.'
+      const data = (err as { data?: { code?: string, items?: { sku: string, size: string, pedido: number, disponible: number }[] } })?.data
+      const code = data?.code
+      if (code === 'sin_stock') {
+        // Validación de stock del inventario (409): se nombra qué talla ajustar.
+        const detalle = (data?.items ?? []).map((it) => {
+          const item = cart.items.find(c => c.sku === it.sku)
+          const nombre = item?.name ?? it.sku
+          return it.disponible > 0 ? `${nombre} talla ${it.size}: quedan ${it.disponible}` : `${nombre} talla ${it.size}: agotada`
+        }).join(' · ')
+        error.value = `Algunas tallas ya no tienen existencias (${detalle}). Ajusta las cantidades del carrito.`
+      }
+      else {
+        error.value = (code === 'price_mismatch' || code === 'sku_not_found')
+          ? 'Los precios cambiaron. Recarga la página y vuelve a intentar.'
+          : 'No se pudo iniciar el pago. Intenta de nuevo o finaliza por WhatsApp.'
+      }
       console.error('[mercadopago] no se pudo iniciar el pago:', err)
       loading.value = false // en éxito no se resetea: la página está redirigiendo
     }

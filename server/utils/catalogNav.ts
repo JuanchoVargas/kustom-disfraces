@@ -1,5 +1,6 @@
 import navegacionData from '~~/app/data/navegacion.json'
 import catalogoData from '~~/app/data/catalogo.json'
+import { productoAgotado } from './botStock'
 
 /**
  * Árbol de navegación (públicos → subcategorías) para el servidor, calculado como
@@ -12,7 +13,7 @@ import catalogoData from '~~/app/data/catalogo.json'
 
 interface RawSub { slug: string, nombre: string, placeholder?: boolean }
 interface RawPublico { slug: string, nombre: string, placeholder?: boolean, subcategorias: RawSub[] }
-interface RawCatalogoItem { publicos?: string[], subcategoriaNav?: string | null, disponibleWeb?: boolean }
+interface RawCatalogoItem { codigo: string, publicos?: string[], subcategoriaNav?: string | null, disponibleWeb?: boolean }
 
 export interface NavSub { slug: string, nombre: string, count: number }
 export interface NavPublico { slug: string, nombre: string, count: number, subcategorias: NavSub[] }
@@ -21,7 +22,8 @@ const nav = navegacionData as { publicos: RawPublico[] }
 const catalogo = catalogoData as unknown as RawCatalogoItem[]
 
 export function getPublicos(): NavPublico[] {
-  const products = catalogo.filter(p => p.disponibleWeb === true)
+  // Los productos totalmente agotados no cuentan (lógica de agotado del inventario).
+  const products = catalogo.filter(p => p.disponibleWeb === true && !productoAgotado(p.codigo))
   return nav.publicos
     .map((pub) => {
       const prods = products.filter(p => p.publicos?.includes(pub.slug))

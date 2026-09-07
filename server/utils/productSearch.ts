@@ -1,4 +1,5 @@
 import catalogoData from '~~/app/data/catalogo.json'
+import { productoAgotado, tallasDisponibles } from './botStock'
 
 /**
  * Búsqueda de productos por texto libre para el bot de WhatsApp. Los clientes que
@@ -76,7 +77,13 @@ function parseSize(rawNorm: string): { size: string | null, cleaned: string } {
 
 /** ¿El producto ofrece la talla pedida? Compara números y letras (S/M/L/XL/Bebé). */
 export function hasSize(p: FoundProduct, size: string): boolean {
-  return p.tallas.some(t => String(t).toLowerCase() === size.toLowerCase())
+  // Solo las tallas con existencias (lógica de agotado del inventario; ver botStock.ts).
+  return tallasDisponibles(p.codigo, p.tallas).some(t => String(t).toLowerCase() === size.toLowerCase())
+}
+
+/** Copia del producto con solo las tallas disponibles (lo que el bot muestra en fichas y listas). */
+function conStock(p: FoundProduct): FoundProduct {
+  return { ...p, tallas: tallasDisponibles(p.codigo, p.tallas) }
 }
 
 // ---------- tabla de alias (sinónimos → familia de slugs) ----------
@@ -145,7 +152,7 @@ function buildIndex(): IndexEntry[] {
     }
     const phrases = [nameNorm, ...aliasTerms.map(normalize)].filter(x => x.includes(' '))
     return {
-      p: { nombre: p.nombre, slug: p.slug, precio: p.precio, tallas: p.tallas, grupo: p.grupo },
+      p: { codigo: p.codigo, nombre: p.nombre, slug: p.slug, precio: p.precio, tallas: p.tallas, grupo: p.grupo },
       nameNorm,
       tokens: tokenSet,
       phrases,
@@ -173,7 +180,8 @@ export function searchProducts(query: string, limit = 8): SearchResult | null {
   const tokens = tokenize(cleaned)
   if (!tokens.length) return null
 
-  const scored = buildIndex().map((e) => {
+  // Un producto totalmente agotado queda FUERA del bot (lógica de agotado del inventario).
+  const scored = buildIndex().filter(e => !productoAgotado(e.p.codigo)).map((e) => {
     const phraseScore = e.phrases.filter(ph => rawNorm.includes(ph)).length
     // Nombre completo mencionado (p. ej. "batman") = señal fuerte.
     const nameHit = rawNorm.includes(e.nameNorm) ? 1 : 0
@@ -187,7 +195,7 @@ export function searchProducts(query: string, limit = 8): SearchResult | null {
 
   scored.sort((a, b) => b.score - a.score || a.e.p.precio - b.e.p.precio)
 
-  return { matches: scored.slice(0, limit).map(x => x.e.p), requestedSize: size }
+  return { matches: scored.slice(0, limit).map(x => conStock(x.e.p)), requestedSize: size }
 }
 
 /** Rango de precios del catálogo visible (para la respuesta general de "¿precios?"). */
@@ -199,7 +207,8 @@ export function priceRange(): { min: number, max: number } {
 
 /** Lookup directo por slug (no búsqueda difusa). undefined si no existe/visible. */
 export function getProductBySlug(slug: string): FoundProduct | undefined {
-  return buildIndex().find(e => e.p.slug === slug)?.p
+  const hit = buildIndex().find(e => e.p.slug === slug)?.p
+  return hit ? conStock(hit) : undefined
 }
 
 /**

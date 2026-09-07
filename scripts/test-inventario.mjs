@@ -217,6 +217,87 @@ const { json: postImp } = await api(`/productos/${encodeURIComponent(P_BEBE)}`)
 const vbi = postImp.product.variations.find(v => v.sku === V_BEBE)
 check('13. relectura: 140.000, sin oferta, stock 7, origen "importacion" en el registro', vbi.regular_price === '140000' && vbi.sale_price === '' && vbi.stock_quantity === 7 && postImp.cambios.some(c => c.origen === 'importacion'))
 
+// ---------- 14. lógica de agotado: sitio, bot y checkout (requiere NUXT_INVENTORY_PUBLIC_STOCK=on en el dev server) ----------
+const { json: stock0 } = await api('/estado')
+if (!stock0.public_stock) {
+  console.log('⏭️  14. stock público desactivado (NUXT_INVENTORY_PUBLIC_STOCK≠on): se omite la lógica de agotado')
+}
+else {
+  const SLUG = 'gato-con-botas'
+  const WA_FROM = '570000000014'
+  const waHook = text => ({
+    object: 'whatsapp_business_account',
+    entry: [{ id: '0', changes: [{ field: 'messages', value: {
+      messaging_product: 'whatsapp',
+      contacts: [{ profile: { name: 'Prueba Stock' }, wa_id: WA_FROM }],
+      messages: [{ from: WA_FROM, id: `test.stock.${Date.now()}`, timestamp: String(Date.now() / 1000 | 0), type: 'text', text: { body: text } }],
+    } }] }],
+  })
+  const botReply = async (text) => {
+    await fetch(`${BASE}/api/whatsapp`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(waHook(text)) })
+    if (!sql) return ''
+    const rows = await sql.query(`SELECT m.texto FROM messages m JOIN conversations c ON c.id = m.conversation_id WHERE c.canal = 'wa' AND c.external_id = $1 AND m.direccion = 'out' ORDER BY m.id DESC LIMIT 1`, [WA_FROM])
+    return rows[0]?.texto ?? ''
+  }
+  const checkout = async (size, quantity) => {
+    const res = await fetch(`${BASE}/api/checkout/mercadopago`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({
+      items: [{ sku: P_BEBE, quantity, size }],
+      buyer: { nombre: 'Prueba Stock', email: 'prueba@example.com', telefono: '3000000000', pais: 'Colombia', departamento: 'Bogotá', ciudad: 'Bogotá', localidad: 'Kennedy', barrio: 'Centro', direccion: 'Calle 1 # 2-3' },
+    }) })
+    return { status: res.status, json: await res.json().catch(() => ({})) }
+  }
+
+  // a) talla 4 agotada (stock 0), las demás sin gestionar
+  await ops([{ op: 'stock', sku: V_NUM, stock_quantity: 0 }])
+  const { json: st1 } = await fetch(`${BASE}/api/stock`).then(r => r.json()).then(json => ({ json }))
+  check('14a. /api/stock: talla 4 agotada, producto NO agotado', st1.enabled && !st1.agotados.includes(P_BEBE) && JSON.stringify(st1.tallas[P_BEBE]) === '["4"]', JSON.stringify(st1.tallas[P_BEBE]))
+  const pdp = await fetch(`${BASE}/producto/${SLUG}`).then(r => r.text())
+  // SSR: el SizeSelector pinta la talla 4 deshabilitada (clase "dis" + atributo disabled) y las demás no.
+  const btn4 = pdp.match(/<button[^>]*>\s*4\s*<\/button>/)?.[0] ?? ''
+  const btn2 = pdp.match(/<button[^>]*>\s*2\s*<\/button>/)?.[0] ?? ''
+  check('14a. PDP: la talla 4 sale deshabilitada y la 2 no', pdp.includes('stock-agotado') && /\bdis\b/.test(btn4) && /disabled/.test(btn4) && !/disabled/.test(btn2), btn4.slice(0, 120))
+  const bot4 = await botReply('gato con botas talla 4')
+  check('14a. bot: "talla 4" del gato → ⚠️ no disponible (tallas restantes Bebé, 0, 2)', /Talla \*4\* no disponible/.test(bot4) && /Bebé, 0, 2/.test(bot4), bot4.split('\n').slice(0, 4).join(' | '))
+  const co1 = await checkout('4', 1)
+  check('14a. checkout: talla 4 agotada → 409 sin_stock', co1.status === 409 && co1.json?.data?.code === 'sin_stock' && co1.json.data.items?.[0]?.disponible === 0, `${co1.status} ${JSON.stringify(co1.json?.data)}`)
+  const co2 = await checkout('2', 1)
+  check('14a. checkout: talla 2 sin gestionar → pasa la validación de stock (no es 409)', co2.status !== 409, `status ${co2.status} (${co2.json?.data?.code ?? co2.json?.message ?? 'ok'})`)
+
+  // b) talla 2 con 3 unidades: pedir 5 → 409 con disponible 3; pedir 2 → pasa
+  await ops([{ op: 'stock', sku: V_NUM2, stock_quantity: 3 }])
+  const co3 = await checkout('2', 5)
+  check('14b. checkout: pedir 5 con 3 disponibles → 409 (disponible 3)', co3.status === 409 && co3.json?.data?.items?.[0]?.disponible === 3, `${co3.status}`)
+  const co4 = await checkout('2', 2)
+  check('14b. checkout: pedir 2 con 3 disponibles → pasa', co4.status !== 409, `status ${co4.status}`)
+
+  // c) producto TOTALMENTE agotado: fuera del sitio y del bot
+  await ops([{ op: 'stock', sku: V_BEBE, stock_quantity: 0 }, { op: 'stock', sku: `${P_BEBE}-T0`, stock_quantity: 0 }, { op: 'stock', sku: V_NUM2, stock_quantity: 0 }])
+  const st2 = await fetch(`${BASE}/api/stock`).then(r => r.json())
+  check('14c. /api/stock: producto agotado (4 tallas en 0)', st2.agotados.includes(P_BEBE) && st2.tallas[P_BEBE].length === 4)
+  const pdp2 = await fetch(`${BASE}/producto/${SLUG}`)
+  check('14c. la PDP del producto agotado responde 404 (fuera del catálogo)', pdp2.status === 404, `status ${pdp2.status}`)
+  const plp = await fetch(`${BASE}/categoria/bebes`).then(r => r.text())
+  check('14c. la PLP de bebés ya no lista el producto', !plp.includes(`/producto/${SLUG}"`))
+  const botOut = await botReply('gato con botas')
+  check('14c. bot: producto agotado → "No encontré ese disfraz"', /No encontré ese disfraz/.test(botOut), botOut.split('\n')[0])
+  const { json: est2 } = await api('/estado')
+  check('14c. estado del panel: 4 tallas agotadas en alertas', est2.agotadas >= 4 && est2.public_stock === true, `agotadas=${est2.agotadas} bajo=${est2.stock_bajo}`)
+
+  // d) vuelve a haber stock → todo reaparece (invalidación inmediata tras la escritura)
+  await ops([{ op: 'stock', sku: V_BEBE, stock_quantity: 8 }])
+  const st3 = await fetch(`${BASE}/api/stock`).then(r => r.json())
+  check('14d. con stock en Bebé el producto sale de agotados', !st3.agotados.includes(P_BEBE) && st3.tallas[P_BEBE].length === 3)
+  const botBack = await botReply('gato con botas')
+  check('14d. bot: vuelve a encontrarlo y solo lista la talla Bebé', /Gato con Botas/.test(botBack) && /Tallas: Bebé(\r?\n|$)/.test(botBack) && !/Tallas: Bebé, 0/.test(botBack), botBack.split('\n').slice(0, 3).join(' | '))
+
+  // e) alerta al cruzar el umbral: 8 → 2 (≤ 5) genera aviso; 2 → 1 no repite
+  const a1 = await ops([{ op: 'stock', sku: V_BEBE, stock_quantity: 2 }])
+  check('14e. bajar de 8 a 2 dispara la alerta de stock bajo (1 talla)', a1.json.alerta?.avisadas === 1, JSON.stringify(a1.json.alerta))
+  const a2 = await ops([{ op: 'stock', sku: V_BEBE, stock_quantity: 1 }])
+  check('14e. bajar de 2 a 1 no repite la alerta', a2.json.alerta?.avisadas === 0, JSON.stringify(a2.json.alerta))
+  if (sql) await sql.query(`DELETE FROM conversations WHERE canal = 'wa' AND external_id = $1`, [WA_FROM])
+}
+
 if (!KEEP) await cleanup()
 else console.log('--keep: overrides de prueba conservados para revisar en /admin/inventario')
 console.log(fails ? `\n❌ ${fails} fallo(s)` : '\n✅ todo OK')

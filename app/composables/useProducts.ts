@@ -17,17 +17,40 @@ import categoriesData from '~/data/categories.json'
 
 const CATALOGO_LOCAL = catalogoData as unknown as ProductoCatalogo[]
 
+interface StockAgotado { enabled: boolean, agotados: string[], tallas: Record<string, string[]> }
+
+/**
+ * LÓGICA DE AGOTADO (módulo de inventario, hidratada por app/plugins/stock.ts):
+ * producto totalmente agotado → fuera del catálogo; talla agotada → soldOutSizes
+ * (la PDP la muestra deshabilitada). Sin stock aplicable, no cambia nada.
+ */
+function applyStock(products: Product[], stock: StockAgotado | null): Product[] {
+  if (!stock?.enabled) return products
+  const agotados = new Set(stock.agotados)
+  return products
+    .filter(p => !p.code || !agotados.has(p.code))
+    .map((p) => {
+      const outs = p.code ? stock.tallas[p.code] : undefined
+      if (!outs?.length) return p
+      const soldOut = p.sizes.filter(s => outs.some(o => String(o) === String(s)))
+      return soldOut.length ? { ...p, soldOutSizes: soldOut } : p
+    })
+}
+
 // memo por identidad de la fuente: la proyección solo se recalcula cuando
-// cambia el array de origen (local <-> remoto hidratado)
+// cambia el array de origen (local <-> remoto hidratado) o el estado de stock
 let memoSource: ProductoCatalogo[] | null = null
+let memoStock: StockAgotado | null | undefined
 let memoProducts: Product[] = []
 
 export const useProducts = () => {
   const remoto = useState<ProductoCatalogo[] | null>('catalogo-remoto', () => null)
+  const stock = useState<StockAgotado | null>('stock-agotado', () => null)
   const source = remoto.value ?? CATALOGO_LOCAL
-  if (source !== memoSource) {
+  if (source !== memoSource || stock.value !== memoStock) {
     memoSource = source
-    memoProducts = catalogoToProducts(source)
+    memoStock = stock.value
+    memoProducts = applyStock(catalogoToProducts(source), stock.value)
   }
   const products = memoProducts
   const categories = categoriesData as Category[]

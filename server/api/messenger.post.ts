@@ -42,6 +42,7 @@ export default defineEventHandler(async (event) => {
       if (session.silenced) continue
 
       // Capa de intención omnicanal: slots + lenguaje natural, reusando el cerebro base.
+      await refreshBotStock() // productos/tallas agotados del inventario
       const { replies, patch } = buildReplies(incoming, session.state)
 
       // Adaptar la salida del bot a Messenger (quick replies, texto con URL, etc.).

@@ -419,6 +419,16 @@ onMounted(checkSession)
       <div v-if="estado && !estado.simulation && estado.woo_only_drafts" class="banner banner--info">
         <strong>Woo en vivo, solo borradores</strong> — la guarda de validación rechaza cualquier escritura a un producto publicado hasta que se validen las operaciones masivas.
       </div>
+      <div v-if="estado && (estado.stock_bajo || estado.agotadas)" class="banner banner--alert">
+        <strong>⚠ Alertas de stock:</strong>
+        <button v-if="estado.agotadas" class="linkbtn" type="button" @click="stock = 'agotado'">{{ estado.agotadas }} {{ estado.agotadas === 1 ? 'talla agotada' : 'tallas agotadas' }}</button>
+        <span v-if="estado.agotadas && estado.stock_bajo"> · </span>
+        <button v-if="estado.stock_bajo" class="linkbtn" type="button" @click="stock = 'bajo'">{{ estado.stock_bajo }} con stock bajo (≤ {{ estado.stock_bajo_umbral }})</button>
+        <span class="muted small"> · en productos publicados · aviso por correo a ventas al cruzar el umbral y resumen diario</span>
+      </div>
+      <div v-if="estado && estado.simulation && estado.public_stock" class="banner banner--warn">
+        <strong>Ojo:</strong> el stock simulado SÍ se está aplicando al sitio, al bot y al checkout (NUXT_INVENTORY_PUBLIC_STOCK=on). Úsalo solo en local o preview.
+      </div>
       <div v-if="estado && !estado.ok" class="banner banner--warn">{{ estado.detail }}</div>
       <div v-if="syncMsg" class="banner banner--info">{{ syncMsg }}</div>
 
@@ -730,6 +740,8 @@ onMounted(checkSession)
 .banner--sim { background: #FFF1D6; color: #7A4A00; border: 1px solid #F5D58F; }
 .banner--warn { background: #FDE7E9; color: #8A1C2B; }
 .banner--info { background: var(--purple-soft); color: var(--purple-d); }
+.banner--alert { background: #FDE7E9; color: #8A1C2B; border: 1px solid #F3B1B8; }
+.banner--alert .linkbtn { color: inherit; font-weight: 700; }
 
 .filters { display: grid; grid-template-columns: minmax(200px, 2fr) repeat(4, minmax(140px, 1fr)) auto; gap: 8px; align-items: center; }
 .input { font: inherit; font-size: 14px; padding: 8px 10px; border: 1px solid var(--line-2); border-radius: 10px; background: #fff; color: var(--ink); min-width: 0; width: 100%; }

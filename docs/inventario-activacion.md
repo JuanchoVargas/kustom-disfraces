@@ -8,8 +8,8 @@ cambios en Postgres sin tocar Woo ni el sitio.
 ## 0. Antes de empezar
 
 - [x] Llave de escritura ("Checkout Orders v2", Read/Write) verificada desde Vercel el 2026-09-06 (7/7 pasos OK sobre un borrador).
-- [ ] En Vercel crear `NUXT_WOO_WRITE_CONSUMER_KEY` / `NUXT_WOO_WRITE_CONSUMER_SECRET` con el mismo valor (nombre que refleja su uso real: órdenes + productos). Las antiguas `NUXT_WOO_ORDERS_*` se siguen leyendo como respaldo; retirarlas tras verificar un pago de prueba.
-- [ ] Probar el adaptador desde el panel: botón **Probar escritura en Woo** (solo borradores). Debe terminar en "Adaptador woo OK".
+- [x] Adaptador woo probado desde el preview de Vercel el 2026-09-06 (botón **Probar escritura en Woo**): escritura, relectura, reversión, batch y guarda OK sobre borradores.
+- [ ] **Llave con nombre propio (pendiente de WordPress).** El código ya lee `NUXT_WOO_WRITE_CONSUMER_KEY` / `_SECRET` y cae al respaldo `NUXT_WOO_ORDERS_*`. NO se puede crear la nueva copiando la actual: en Vercel el secreto es *write-only* y la cuenta de WordPress está bloqueada para generar llaves. Queda con el respaldo hasta recuperar el acceso a WordPress; entonces generar una llave **dedicada de inventario** (Read/Write), cargarla como `NUXT_WOO_WRITE_*` en Vercel y, tras verificar un pago de prueba y una escritura del panel, retirar `NUXT_WOO_ORDERS_*`.
 
 ## 1. Activar la gestión de stock en Woo
 
@@ -62,14 +62,18 @@ se duplicaría el descuento (tachado ficticio sobre un precio ya rebajado).
 - [ ] Con `manage_stock` activo en una talla, hacer un pago de prueba (Mercado
       Pago sandbox) y confirmar que la orden creada en Woo descuenta esa talla.
 - [ ] Revisar que `/admin/inventario` refleja el nuevo stock tras "Sincronizar".
-- [ ] La validación de stock en el checkout (contra el adaptador) es un
-      entregable posterior; hasta entonces el sitio no bloquea compras sin stock.
+- [x] La validación de stock en el checkout (409 `sin_stock`) y la lógica de
+      agotado en sitio y bot ya están; se activan solas con el adaptador woo
+      (`NUXT_INVENTORY_PUBLIC_STOCK=auto`). Revisar que la PDP deshabilite una
+      talla en 0 y que el bot no la ofrezca.
 
 ## 7. Después
 
 - [ ] El proxy del catálogo público (`server/utils/woo.ts`) sigue leyendo precio y
-      tallas de Woo cada 2 minutos; la lógica de agotado (talla en 0 no
-      seleccionable, producto en 0 fuera del catálogo y del bot) llega en un
-      entregable posterior.
+      tallas de Woo cada 2 minutos; el stock lo aporta `/api/stock` (2 min de
+      caché, invalidado tras cada escritura del panel).
+- [ ] Alertas: con el adaptador woo el correo a ventas@ se activa solo (al cruzar
+      el umbral y resumen diario 12:30 UTC). Ajustar `NUXT_INVENTORY_STOCK_BAJO`
+      si 5 unidades por talla no es el umbral que quiere el cliente.
 - [ ] Mantener `scripts/test-inventario.mjs` en verde contra un dev server con
       `NUXT_INVENTORY_BACKEND=mock` (contra `woo` escribiría de verdad).

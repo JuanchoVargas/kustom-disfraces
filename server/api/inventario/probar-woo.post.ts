@@ -43,19 +43,22 @@ export default defineEventHandler(async (event) => {
   const plus = (s: string) => String((Number(s) || 1000) + 1)
   steps.push({ paso: 'borrador de prueba', ok: true, detalle: { sku: draft.sku, nombre: draft.name, status: draft.status, tallas: [v0.sku, v1.sku], precios: [orig0, orig1] } })
 
-  const readWoo = async (variationId: number) => (await wooWriteFetch<{ regular_price: string }>(`/products/${draft!.id}/variations/${variationId}`)).regular_price
+  // Lee la variación DIRECTO en Woo (llave de escritura), con el id del padre
+  // correcto: sirve tanto para el borrador de prueba como para el publicado
+  // del paso 5 (antes usaba siempre el id del borrador y el publicado daba "?").
+  const readWoo = async (productId: number, variationId: number) => (await wooWriteFetch<{ regular_price: string }>(`/products/${productId}/variations/${variationId}`)).regular_price
 
   try {
     // 1. escritura simple por el adaptador
     const r1 = await store.updateVariationPrice(v0.sku, plus(orig0), v0.sale_price || null, ctx)
     steps.push({ paso: '1. updateVariationPrice(+1) por el adaptador', ok: r1.ok && r1.after?.regular_price === plus(orig0), detalle: r1.error ?? { antes: r1.before?.regular_price, despues: r1.after?.regular_price } })
     // 2. Woo y snapshot coinciden
-    const enWoo = await readWoo(v0.id)
+    const enWoo = await readWoo(draft.id, v0.id)
     const enSnap = (await loadProductBySku(v0.sku))?.variations.find(v => v.sku === v0.sku)?.regular_price
     steps.push({ paso: '2. Woo y snapshot muestran el valor nuevo', ok: enWoo === plus(orig0) && enSnap === plus(orig0), detalle: { woo: enWoo, snapshot: enSnap } })
     // 3. revertir
     const r3 = await store.updateVariationPrice(v0.sku, orig0 || null, v0.sale_price || null, ctx)
-    const back = await readWoo(v0.id)
+    const back = await readWoo(draft.id, v0.id)
     steps.push({ paso: '3. revertir al original (adaptador) y confirmar en Woo', ok: r3.ok && back === orig0, detalle: r3.error ?? { woo: back, esperado: orig0 } })
     // 4. batch
     const r4 = await store.bulkUpdate([
@@ -67,14 +70,14 @@ export default defineEventHandler(async (event) => {
       { op: 'price', sku: v0.sku, regular_price: orig0 || null, sale_price: v0.sale_price || null },
       { op: 'price', sku: v1.sku, regular_price: orig1 || null, sale_price: v1.sale_price || null },
     ], ctx)
-    const [w0, w1] = await Promise.all([readWoo(v0.id), readWoo(v1.id)])
+    const [w0, w1] = await Promise.all([readWoo(draft.id, v0.id), readWoo(draft.id, v1.id)])
     steps.push({ paso: '4b. revertir en batch y confirmar en Woo', ok: r4b.every(r => r.ok) && w0 === orig0 && w1 === orig1, detalle: { woo: [w0, w1], esperado: [orig0, orig1] } })
     // 5. guarda sobre un publicado
     const pub = products.find(p => p.status === 'publish' && p.variations.length && p.variations[0]!.id > 0)
     if (pub) {
       const pv = pub.variations[0]!
       const r5 = await store.updateVariationPrice(pv.sku, plus(pv.regular_price), pv.sale_price || null, ctx)
-      const stillWoo = await readWoo(pv.id).catch(() => '?')
+      const stillWoo = await readWoo(pub.id, pv.id).catch(err => `error al leer: ${sanitizeWooWriteError(err)}`)
       const expectBlock = wooOnlyDrafts()
       steps.push({
         paso: expectBlock ? '5. guarda: escribir en un PUBLICADO se bloquea sin tocar Woo' : '5. guarda desactivada (NUXT_INVENTORY_WOO_ONLY_DRAFTS=false): no se prueba publicados',
