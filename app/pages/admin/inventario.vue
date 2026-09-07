@@ -11,6 +11,7 @@
  * aviso "Modo simulación — los cambios no se reflejan en el sitio".
  */
 import { defineComponent, h } from 'vue'
+import { useVirtualizer } from '@tanstack/vue-virtual'
 import type { InvChange, InvOpResult, InvProduct, InvStatus, InvVariation } from '~~/shared/types/inventory'
 import { tallaFromSku } from '~~/shared/utils/tallas'
 
@@ -133,9 +134,12 @@ const items = ref<InvProduct[]>([])
 const total = ref(0)
 const totalPages = ref(1)
 const loading = ref(false)
+/** true solo hasta la primera respuesta: skeleton en vez de spinner */
+const firstLoad = ref(true)
 const listError = ref('')
 let searchTimer: ReturnType<typeof setTimeout> | undefined
-watch(q, () => { clearTimeout(searchTimer); searchTimer = setTimeout(() => { page.value = 1; refresh() }, 250) })
+// Debounce de 300 ms en el buscador; los filtros de select aplican de inmediato.
+watch(q, () => { clearTimeout(searchTimer); searchTimer = setTimeout(() => { page.value = 1; refresh() }, 300) })
 watch([status, grupo, publico, stock, orderby, order, perPage], () => { page.value = 1; refresh() })
 watch(page, () => refresh())
 
@@ -150,8 +154,9 @@ async function refresh() {
     total.value = r.total
     totalPages.value = r.total_pages
     if (r.page !== page.value) page.value = r.page
-    // Re-sembrar borradores de edición de los productos abiertos.
-    for (const p of r.items) if (open.value.has(p.sku)) seedDrafts(p)
+    // Re-sembrar borradores de edición de los productos abiertos (sin pisar lo que se está editando).
+    for (const p of r.items) if (open.value.has(p.sku)) seedDrafts(p, false)
+    if (firstLoad.value) { firstLoad.value = false; performance.mark?.('inventario:filas') }
   }
   catch (e: any) { onUnauthorized(e); listError.value = 'No se pudo cargar la lista.' }
   loading.value = false
@@ -183,21 +188,27 @@ function toggleAll() {
 const open = ref(new Set<string>())
 interface Draft { regular_price: string, sale_price: string, stock_quantity: string, manage_stock: boolean }
 const drafts = ref<Record<string, Draft>>({})
-const rowState = ref<Record<string, { saving?: boolean, msg?: string, ok?: boolean }>>({})
+/** Estado por talla: guardando (indicador sutil), destello de éxito, error con mensaje. */
+const rowState = ref<Record<string, { saving?: boolean, msg?: string, ok?: boolean, flash?: boolean }>>({})
 const history = ref<Record<string, InvChange[]>>({})
 
-function seedDrafts(p: InvProduct) {
+function draftOf(v: InvVariation): Draft {
+  return { regular_price: v.regular_price, sale_price: v.sale_price, stock_quantity: v.manage_stock ? String(v.stock_quantity ?? 0) : '', manage_stock: v.manage_stock }
+}
+/** Siembra los borradores; con overwrite=false respeta los que ya están sucios (edición en curso). */
+function seedDrafts(p: InvProduct, overwrite = true) {
   for (const v of p.variations) {
-    drafts.value[v.sku] = { regular_price: v.regular_price, sale_price: v.sale_price, stock_quantity: v.manage_stock ? String(v.stock_quantity ?? 0) : '', manage_stock: v.manage_stock }
+    if (!overwrite && drafts.value[v.sku] && dirty(v)) continue
+    drafts.value[v.sku] = draftOf(v)
   }
 }
-async function toggleOpen(p: InvProduct) {
+function toggleOpen(p: InvProduct) {
   const s = new Set(open.value)
   if (s.has(p.sku)) { s.delete(p.sku); open.value = s; return }
   s.add(p.sku)
   open.value = s
-  seedDrafts(p)
-  loadHistory(p.sku)
+  seedDrafts(p, false)
+  if (!history.value[p.sku]) loadHistory(p.sku)
 }
 async function loadHistory(sku: string) {
   try {
@@ -212,7 +223,32 @@ function dirty(v: InvVariation): boolean {
   const stockNow = v.manage_stock ? String(v.stock_quantity ?? 0) : ''
   return d.regular_price !== v.regular_price || d.sale_price !== v.sale_price || d.stock_quantity !== stockNow
 }
-/** Guarda una variación: manda solo lo que cambió (precio y/o stock). */
+/** Copia optimista de la variación con el borrador aplicado (lo que se verá al instante). */
+function optimistic(v: InvVariation, d: Draft): InvVariation {
+  const regular = d.regular_price.trim(), sale = d.sale_price.trim()
+  const manage = d.stock_quantity !== '' ? true : v.manage_stock
+  const qty = d.stock_quantity !== '' ? Number(d.stock_quantity) : v.stock_quantity
+  const next: InvVariation = { ...v, regular_price: regular, sale_price: sale, price: sale || regular, manage_stock: manage, stock_quantity: Number.isFinite(qty as number) ? qty : v.stock_quantity }
+  next.stock_status = !manage ? next.stock_status : ((next.stock_quantity ?? 0) > 0 ? 'instock' : 'outofstock')
+  return next
+}
+function replaceVariation(p: InvProduct, v: InvVariation) {
+  const i = items.value.findIndex(x => x.sku === p.sku)
+  if (i < 0) return
+  const prod = items.value[i]!
+  const vi = prod.variations.findIndex(x => x.sku === v.sku)
+  if (vi < 0) return
+  const variations = prod.variations.slice()
+  variations[vi] = v
+  const prices = variations.map(x => Number(x.price)).filter(n => n > 0)
+  const anyIn = variations.some(x => x.stock_status === 'instock')
+  items.value[i] = { ...prod, variations, price: prices.length ? String(Math.min(...prices)) : prod.price, stock_status: anyIn ? 'instock' : 'outofstock' }
+}
+/**
+ * Guarda una variación con ACTUALIZACIÓN OPTIMISTA: la fila cambia al instante,
+ * se manda solo lo que cambió y, si el servidor rechaza, se revierte al valor
+ * anterior con el mensaje de error visible en la fila.
+ */
 async function save(p: InvProduct, v: InvVariation) {
   const d = drafts.value[v.sku]
   if (!d || !dirty(v)) return
@@ -221,29 +257,79 @@ async function save(p: InvProduct, v: InvVariation) {
   const stockNow = v.manage_stock ? String(v.stock_quantity ?? 0) : ''
   if (d.stock_quantity !== stockNow && d.stock_quantity !== '') ops.push({ op: 'stock', sku: v.sku, stock_quantity: Number(d.stock_quantity) })
   if (!ops.length) return
+  const before = v
+  const guess = optimistic(v, d)
+  replaceVariation(p, guess)
+  drafts.value[v.sku] = draftOf(guess)
   rowState.value[v.sku] = { saving: true }
   try {
     const r = await $fetch<{ resultados: InvOpResult[] }>('/api/inventario/operaciones', { method: 'POST', body: { operaciones: ops, origen: 'panel' } })
     const bad = r.resultados.filter(x => !x.ok)
-    if (bad.length) rowState.value[v.sku] = { ok: false, msg: bad.map(b => b.error).join(' · ') }
-    else rowState.value[v.sku] = { ok: true, msg: 'Guardado' }
-    // Refrescar el producto desde el servidor (precio del padre, estado de stock).
-    const fresh = await $fetch<{ product: InvProduct, cambios: InvChange[] }>(`/api/inventario/productos/${encodeURIComponent(p.sku)}`)
-    const i = items.value.findIndex(x => x.sku === p.sku)
-    if (i >= 0) items.value[i] = fresh.product
-    history.value[p.sku] = fresh.cambios
-    if (!bad.length) seedDrafts(fresh.product)
-    setTimeout(() => { if (rowState.value[v.sku]?.ok) rowState.value[v.sku] = {} }, 2500)
+    if (bad.length) {
+      // Revertir al valor anterior y dejar el borrador con lo que el usuario había escrito.
+      replaceVariation(p, before)
+      drafts.value[v.sku] = d
+      rowState.value[v.sku] = { ok: false, msg: bad.map(b => b.error).join(' · ') }
+      return
+    }
+    // Confirmado por el servidor: sustituir la conjetura por el valor real (después) y destello verde.
+    const real = r.resultados.reduce((acc, res) => ({ ...acc, ...(res.after ?? {}) }), guess) as InvVariation
+    replaceVariation(p, real)
+    drafts.value[v.sku] = draftOf(real)
+    rowState.value[v.sku] = { ok: true, flash: true }
+    setTimeout(() => { if (rowState.value[v.sku]?.ok) rowState.value[v.sku] = {} }, 1200)
+    // Historial y cabecera del producto, en segundo plano (no bloquea la edición).
+    $fetch<{ product: InvProduct, cambios: InvChange[] }>(`/api/inventario/productos/${encodeURIComponent(p.sku)}`)
+      .then((fresh) => {
+        history.value[p.sku] = fresh.cambios
+        const i = items.value.findIndex(x => x.sku === p.sku)
+        if (i >= 0) { items.value[i] = fresh.product; seedDrafts(fresh.product, false) }
+      })
+      .catch(() => {})
+    loadEstado()
   }
   catch (e: any) {
     onUnauthorized(e)
-    rowState.value[v.sku] = { ok: false, msg: e?.data?.statusMessage ?? 'No se pudo guardar' }
+    replaceVariation(p, before)
+    drafts.value[v.sku] = d
+    rowState.value[v.sku] = { ok: false, msg: e?.data?.statusMessage ?? 'No se pudo guardar; se revirtió el valor' }
   }
 }
 function reset(v: InvVariation) {
-  drafts.value[v.sku] = { regular_price: v.regular_price, sale_price: v.sale_price, stock_quantity: v.manage_stock ? String(v.stock_quantity ?? 0) : '', manage_stock: v.manage_stock }
+  drafts.value[v.sku] = draftOf(v)
   rowState.value[v.sku] = {}
 }
+
+// ---------- virtualización (@tanstack/vue-virtual) ----------
+// Una lista plana de "filas virtuales": cada producto aporta su fila de cabecera y,
+// si está abierto, su bloque de tallas. Así SOLO se pintan las filas visibles aunque
+// los 100 productos estén expandidos. Las alturas son dinámicas (measureElement).
+type VRow = { key: string, kind: 'row', p: InvProduct } | { key: string, kind: 'detail', p: InvProduct }
+const vrows = computed<VRow[]>(() => {
+  const out: VRow[] = []
+  for (const p of items.value) {
+    out.push({ key: `r:${p.sku}`, kind: 'row', p })
+    if (open.value.has(p.sku)) out.push({ key: `d:${p.sku}`, kind: 'detail', p })
+  }
+  return out
+})
+const scrollEl = ref<HTMLElement | null>(null)
+const ROW_H = 64
+const DETAIL_H = 330
+const virtualizer = useVirtualizer(computed(() => ({
+  count: vrows.value.length,
+  getScrollElement: () => scrollEl.value,
+  estimateSize: (i: number) => (vrows.value[i]?.kind === 'detail' ? DETAIL_H : ROW_H),
+  getItemKey: (i: number) => vrows.value[i]?.key ?? i,
+  overscan: 6,
+})))
+const virtualItems = computed(() => virtualizer.value.getVirtualItems())
+const totalSize = computed(() => virtualizer.value.getTotalSize())
+function measure(el: Element | null) {
+  if (el) virtualizer.value.measureElement(el)
+}
+// Al cambiar el conjunto de filas (filtro/página) se vuelve arriba.
+watch(items, () => { virtualizer.value.scrollToOffset(0) })
 
 // ---------- operación masiva / importación ----------
 interface PreviewRow { sku: string, producto: string, codigo: string, talla: string, status: string, antes: any, despues: any, ops: any[], cambia: boolean, error?: string }
@@ -372,7 +458,11 @@ const snapshotAge = computed(() => {
   return `hace ${Math.round(s / 3600)} h`
 })
 
-onMounted(checkSession)
+onMounted(() => {
+  checkSession()
+  // Gancho de pruebas/medición (solo en dev): abrir o cerrar todos los productos de la página.
+  if (import.meta.dev) (window as any).__inv = { openAll: () => { open.value = new Set(items.value.map(p => p.sku)); for (const p of items.value) seedDrafts(p, false) }, closeAll: () => { open.value = new Set() } }
+})
 </script>
 
 <template>
@@ -585,100 +675,135 @@ onMounted(checkSession)
 
       <p v-if="listError" class="banner banner--warn">{{ listError }}</p>
 
-      <!-- tabla -->
+      <!-- tabla virtualizada: cabecera fija + lista con solo las filas visibles -->
       <div class="tbl-wrap">
-        <table class="tbl" :class="{ 'is-loading': loading }">
-          <thead>
-            <tr>
-              <th class="col-check"></th>
-              <th class="col-img"></th>
-              <th><button class="th-btn" type="button" @click="sortBy('name')">Producto <i v-if="orderby === 'name'">{{ order === 'asc' ? '↑' : '↓' }}</i></button></th>
-              <th><button class="th-btn" type="button" @click="sortBy('sku')">SKU <i v-if="orderby === 'sku'">{{ order === 'asc' ? '↑' : '↓' }}</i></button></th>
-              <th>Estado</th>
-              <th class="num"><button class="th-btn" type="button" @click="sortBy('price')">Precio <i v-if="orderby === 'price'">{{ order === 'asc' ? '↑' : '↓' }}</i></button></th>
-              <th>Tallas</th>
-              <th class="num"><button class="th-btn" type="button" @click="sortBy('stock')">Stock <i v-if="orderby === 'stock'">{{ order === 'asc' ? '↑' : '↓' }}</i></button></th>
-              <th class="col-exp"></th>
-            </tr>
-          </thead>
-          <tbody>
-            <template v-for="p in items" :key="p.sku">
-              <tr class="row" :class="{ 'is-open': open.has(p.sku), 'is-sel': selected.has(p.sku) }" @click="toggleOpen(p)">
-                <td class="col-check" @click.stop><input type="checkbox" :checked="selected.has(p.sku)" :aria-label="`Seleccionar ${p.name}`" @change="toggleSel(p.sku)"></td>
-                <td class="col-img"><img v-if="p.kustom.imagen" :src="p.kustom.imagen" alt="" loading="lazy"><span v-else class="noimg">sin foto</span></td>
-                <td>
-                  <div class="name">{{ p.name }}</div>
-                  <div class="sub">
-                    <span v-if="p.kustom.grupo" class="chip">{{ GRUPOS[p.kustom.grupo] ?? p.kustom.grupo }}</span>
-                    <span v-for="pu in p.kustom.publicos" :key="pu" class="chip chip--soft">{{ PUBLICOS[pu] ?? pu }}</span>
-                    <span v-if="p.kustom.soloWoo" class="chip chip--warn">solo en Woo</span>
-                  </div>
-                </td>
-                <td class="mono">{{ p.sku }}</td>
-                <td><span class="pill" :class="p.status === 'publish' ? 'pill--ok' : 'pill--draft'">{{ ESTADOS[p.status] ?? p.status }}</span></td>
-                <td class="num">{{ priceRange(p) }}<div v-if="p.variations.some(v => v.sale_price)" class="sub muted">con oferta</div></td>
-                <td>
-                  <div class="tallas">
-                    <span v-for="v in p.variations" :key="v.sku" class="talla" :class="`talla--${stockKind(v)}`" :title="`${v.sku} · ${stockLabel(v)}`">{{ talla(v) }}</span>
-                    <span v-if="!p.variations.length" class="muted small">sin tallas</span>
-                  </div>
-                </td>
-                <td class="num"><span class="stock" :class="`stock--${productStock(p).kind}`">{{ productStock(p).text }}</span></td>
-                <td class="col-exp"><span class="caret" :class="{ 'is-open': open.has(p.sku) }">›</span></td>
-              </tr>
-              <tr v-if="open.has(p.sku)" class="detail">
-                <td colspan="9">
-                  <div class="detail__grid">
-                    <div class="detail__vars">
-                      <table class="vars">
-                        <thead>
-                          <tr><th>Talla</th><th>SKU</th><th class="num">Precio normal</th><th class="num">Precio rebajado</th><th class="num">Stock</th><th>Estado</th><th></th></tr>
-                        </thead>
-                        <tbody>
-                          <tr v-for="v in p.variations" :key="v.sku" :class="{ 'is-dirty': dirty(v) }">
-                            <td class="talla-cell">{{ talla(v) }}</td>
-                            <td class="mono small">{{ v.sku }}</td>
-                            <td class="num">
-                              <input v-if="drafts[v.sku]" v-model="drafts[v.sku]!.regular_price" class="input input--num" inputmode="numeric" placeholder="—" @keydown.enter.prevent="save(p, v)">
-                            </td>
-                            <td class="num">
-                              <input v-if="drafts[v.sku]" v-model="drafts[v.sku]!.sale_price" class="input input--num" inputmode="numeric" placeholder="sin oferta" @keydown.enter.prevent="save(p, v)">
-                            </td>
-                            <td class="num">
-                              <input v-if="drafts[v.sku]" v-model="drafts[v.sku]!.stock_quantity" class="input input--num" inputmode="numeric" :placeholder="v.manage_stock ? '0' : 'sin gestionar'" @keydown.enter.prevent="save(p, v)">
-                            </td>
-                            <td><span class="stock" :class="`stock--${stockKind(v)}`">{{ stockLabel(v) }}</span></td>
-                            <td class="actions">
-                              <template v-if="rowState[v.sku]?.saving"><span class="muted small">Guardando…</span></template>
-                              <template v-else-if="dirty(v)">
-                                <button class="btn btn--primary btn--sm" type="button" @click="save(p, v)">Guardar</button>
-                                <button class="btn btn--ghost btn--sm" type="button" @click="reset(v)">Deshacer</button>
-                              </template>
-                              <span v-if="rowState[v.sku]?.msg" class="small" :class="rowState[v.sku]?.ok ? 'ok' : 'err'">{{ rowState[v.sku]?.msg }}</span>
-                            </td>
-                          </tr>
-                        </tbody>
-                      </table>
-                      <p class="hint muted small">Precios en pesos, sin puntos. Escribe un stock para activar la gestión de esa talla; en 0 queda agotada. Enter guarda.</p>
+        <div class="thead" role="row">
+          <span class="col-check"></span>
+          <span class="col-img"></span>
+          <button class="th-btn" type="button" @click="sortBy('name')">Producto <i v-if="orderby === 'name'">{{ order === 'asc' ? '↑' : '↓' }}</i></button>
+          <button class="th-btn" type="button" @click="sortBy('sku')">SKU <i v-if="orderby === 'sku'">{{ order === 'asc' ? '↑' : '↓' }}</i></button>
+          <span>Estado</span>
+          <button class="th-btn num" type="button" @click="sortBy('price')">Precio <i v-if="orderby === 'price'">{{ order === 'asc' ? '↑' : '↓' }}</i></button>
+          <span>Tallas</span>
+          <button class="th-btn num" type="button" @click="sortBy('stock')">Stock <i v-if="orderby === 'stock'">{{ order === 'asc' ? '↑' : '↓' }}</i></button>
+          <span class="col-exp"></span>
+        </div>
+
+        <!-- skeleton en la carga inicial -->
+        <div v-if="firstLoad && loading" class="sk-list" aria-busy="true" aria-label="Cargando productos">
+          <div v-for="i in 8" :key="i" class="row row--sk">
+            <span class="col-check"><Skeleton w="14px" h="14px" radius="3px" /></span>
+            <span class="col-img"><Skeleton w="44px" h="44px" radius="8px" /></span>
+            <span><Skeleton :w="`${120 + (i % 4) * 30}px`" h="14px" /><Skeleton w="140px" h="10px" radius="999px" /></span>
+            <span><Skeleton w="70px" h="12px" /></span>
+            <span><Skeleton w="72px" h="18px" radius="999px" /></span>
+            <span class="num"><Skeleton w="64px" h="14px" /></span>
+            <span><Skeleton w="180px" h="18px" /></span>
+            <span class="num"><Skeleton w="80px" h="14px" /></span>
+            <span class="col-exp"></span>
+          </div>
+        </div>
+
+        <div v-else ref="scrollEl" class="vlist" :class="{ 'is-loading': loading }">
+          <div class="vlist__inner" :style="{ height: `${totalSize}px` }">
+            <TransitionGroup name="vrow">
+              <div
+                v-for="vi in virtualItems"
+                :key="String(vi.key)"
+                :ref="measure"
+                :data-index="vi.index"
+                class="vitem"
+                :style="{ transform: `translateY(${vi.start}px)` }"
+              >
+                <!-- fila de producto -->
+                <div
+                  v-if="vrows[vi.index]!.kind === 'row'"
+                  class="row"
+                  :class="{ 'is-open': open.has(vrows[vi.index]!.p.sku), 'is-sel': selected.has(vrows[vi.index]!.p.sku) }"
+                  role="row"
+                  @click="toggleOpen(vrows[vi.index]!.p)"
+                >
+                  <span class="col-check" @click.stop><input type="checkbox" :checked="selected.has(vrows[vi.index]!.p.sku)" :aria-label="`Seleccionar ${vrows[vi.index]!.p.name}`" @change="toggleSel(vrows[vi.index]!.p.sku)"></span>
+                  <span class="col-img"><img v-if="vrows[vi.index]!.p.kustom.imagen" :src="vrows[vi.index]!.p.kustom.imagen" alt="" loading="lazy" width="44" height="44"><span v-else class="noimg">sin foto</span></span>
+                  <span class="cell-name">
+                    <span class="name">{{ vrows[vi.index]!.p.name }}</span>
+                    <span class="sub">
+                      <span v-if="vrows[vi.index]!.p.kustom.grupo" class="chip">{{ GRUPOS[vrows[vi.index]!.p.kustom.grupo!] ?? vrows[vi.index]!.p.kustom.grupo }}</span>
+                      <span v-for="pu in vrows[vi.index]!.p.kustom.publicos" :key="pu" class="chip chip--soft">{{ PUBLICOS[pu] ?? pu }}</span>
+                      <span v-if="vrows[vi.index]!.p.kustom.soloWoo" class="chip chip--warn">solo en Woo</span>
+                    </span>
+                  </span>
+                  <span class="mono">{{ vrows[vi.index]!.p.sku }}</span>
+                  <span><span class="pill" :class="vrows[vi.index]!.p.status === 'publish' ? 'pill--ok' : 'pill--draft'">{{ ESTADOS[vrows[vi.index]!.p.status] ?? vrows[vi.index]!.p.status }}</span></span>
+                  <span class="num">{{ priceRange(vrows[vi.index]!.p) }}<span v-if="vrows[vi.index]!.p.variations.some(v => v.sale_price)" class="sub muted">con oferta</span></span>
+                  <span>
+                    <span class="tallas">
+                      <span v-for="v in vrows[vi.index]!.p.variations" :key="v.sku" class="talla" :class="`talla--${stockKind(v)}`" :title="`${v.sku} · ${stockLabel(v)}`">{{ talla(v) }}</span>
+                      <span v-if="!vrows[vi.index]!.p.variations.length" class="muted small">sin tallas</span>
+                    </span>
+                  </span>
+                  <span class="num"><span class="stock" :class="`stock--${productStock(vrows[vi.index]!.p).kind}`">{{ productStock(vrows[vi.index]!.p).text }}</span></span>
+                  <span class="col-exp"><span class="caret" :class="{ 'is-open': open.has(vrows[vi.index]!.p.sku) }">›</span></span>
+                </div>
+
+                <!-- bloque de tallas (expandido): grid-template-rows anima el despliegue -->
+                <div v-else class="detail is-open">
+                  <div class="detail__clip">
+                    <div class="detail__grid">
+                      <div class="detail__vars">
+                        <table class="vars">
+                          <thead>
+                            <tr><th>Talla</th><th>SKU</th><th class="num">Precio normal</th><th class="num">Precio rebajado</th><th class="num">Stock</th><th>Estado</th><th></th></tr>
+                          </thead>
+                          <tbody>
+                            <tr v-for="v in vrows[vi.index]!.p.variations" :key="v.sku" :class="{ 'is-dirty': dirty(v), 'is-saving': rowState[v.sku]?.saving, 'is-flash': rowState[v.sku]?.flash, 'is-err': rowState[v.sku]?.ok === false }">
+                              <td class="talla-cell">{{ talla(v) }}</td>
+                              <td class="mono small">{{ v.sku }}</td>
+                              <td class="num">
+                                <input v-if="drafts[v.sku]" v-model="drafts[v.sku]!.regular_price" class="input input--num" inputmode="numeric" placeholder="—" :disabled="rowState[v.sku]?.saving" @keydown.enter.prevent="save(vrows[vi.index]!.p, v)">
+                              </td>
+                              <td class="num">
+                                <input v-if="drafts[v.sku]" v-model="drafts[v.sku]!.sale_price" class="input input--num" inputmode="numeric" placeholder="sin oferta" :disabled="rowState[v.sku]?.saving" @keydown.enter.prevent="save(vrows[vi.index]!.p, v)">
+                              </td>
+                              <td class="num">
+                                <input v-if="drafts[v.sku]" v-model="drafts[v.sku]!.stock_quantity" class="input input--num" inputmode="numeric" :placeholder="v.manage_stock ? '0' : 'sin gestionar'" :disabled="rowState[v.sku]?.saving" @keydown.enter.prevent="save(vrows[vi.index]!.p, v)">
+                              </td>
+                              <td><span class="stock" :class="`stock--${stockKind(v)}`">{{ stockLabel(v) }}</span></td>
+                              <td class="actions-cell">
+                                <div class="actions">
+                                  <span v-if="rowState[v.sku]?.saving" class="saving" aria-live="polite"><span class="saving__dot"></span> guardando</span>
+                                  <template v-else-if="dirty(v)">
+                                    <button class="btn btn--primary btn--sm" type="button" @click="save(vrows[vi.index]!.p, v)">Guardar</button>
+                                    <button class="btn btn--ghost btn--sm" type="button" @click="reset(v)">Deshacer</button>
+                                  </template>
+                                  <span v-if="rowState[v.sku]?.msg" class="small" :class="rowState[v.sku]?.ok ? 'ok' : 'err'">{{ rowState[v.sku]?.msg }}</span>
+                                </div>
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                        <p class="hint muted small">Precios en pesos, sin puntos. Escribe un stock para activar la gestión de esa talla; en 0 queda agotada. Enter guarda.</p>
+                      </div>
+                      <aside class="detail__hist">
+                        <h3>Últimos cambios</h3>
+                        <ul v-if="history[vrows[vi.index]!.p.sku]?.length">
+                          <li v-for="c in history[vrows[vi.index]!.p.sku]" :key="c.id">
+                            <span class="mono small">{{ c.sku.replace(`${vrows[vi.index]!.p.sku}-T`, 'T ') }}</span>
+                            <span>{{ campoLabel[c.campo] ?? c.campo }}: {{ changeValue(c.campo, c.anterior) }} → <b>{{ changeValue(c.campo, c.nuevo) }}</b></span>
+                            <span class="muted small">{{ fecha(c.created_at) }} · {{ c.origen }}{{ c.autor ? ` · ${c.autor}` : '' }}{{ c.backend === 'mock' ? ' · simulado' : '' }}</span>
+                          </li>
+                        </ul>
+                        <p v-else-if="history[vrows[vi.index]!.p.sku]" class="muted small">Sin cambios registrados.</p>
+                        <p v-else class="muted small"><Skeleton w="60%" h="12px" /></p>
+                      </aside>
                     </div>
-                    <aside class="detail__hist">
-                      <h3>Últimos cambios</h3>
-                      <ul v-if="history[p.sku]?.length">
-                        <li v-for="c in history[p.sku]" :key="c.id">
-                          <span class="mono small">{{ c.sku.replace(`${p.sku}-T`, 'T ') }}</span>
-                          <span>{{ campoLabel[c.campo] ?? c.campo }}: {{ changeValue(c.campo, c.anterior) }} → <b>{{ changeValue(c.campo, c.nuevo) }}</b></span>
-                          <span class="muted small">{{ fecha(c.created_at) }} · {{ c.origen }}{{ c.autor ? ` · ${c.autor}` : '' }}{{ c.backend === 'mock' ? ' · simulado' : '' }}</span>
-                        </li>
-                      </ul>
-                      <p v-else class="muted small">Sin cambios registrados.</p>
-                    </aside>
                   </div>
-                </td>
-              </tr>
-            </template>
-            <tr v-if="!loading && !items.length"><td colspan="9" class="empty">Ningún producto coincide.</td></tr>
-          </tbody>
-        </table>
+                </div>
+              </div>
+            </TransitionGroup>
+          </div>
+          <div v-if="!loading && !items.length" class="empty">Ningún producto coincide.</div>
+        </div>
       </div>
 
       <footer class="pager">
@@ -752,25 +877,34 @@ onMounted(checkSession)
 .toolbar__count { margin-left: auto; }
 .check { display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; }
 
-.tbl-wrap { overflow-x: auto; background: #fff; border: 1px solid var(--line); border-radius: 14px; }
-.tbl { width: 100%; border-collapse: collapse; font-size: 14px; }
-.tbl.is-loading { opacity: .6; }
-.tbl th { text-align: left; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--mut); padding: 10px 12px; border-bottom: 1px solid var(--line); background: var(--hueso); white-space: nowrap; }
-.tbl td { padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+/* ---------- tabla virtualizada ---------- */
+.tbl-wrap { background: #fff; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; display: flex; flex-direction: column; }
+/* misma rejilla en cabecera y filas: check · foto · producto · sku · estado · precio · tallas · stock · caret */
+.thead, .row { display: grid; grid-template-columns: 32px 56px minmax(180px, 1.6fr) 110px 100px 120px minmax(160px, 1.2fr) 120px 28px; align-items: center; column-gap: 12px; padding: 0 12px; }
+.thead { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--mut); background: var(--hueso); border-bottom: 1px solid var(--line); height: 40px; white-space: nowrap; }
+.thead > * { text-align: left; }
+.thead .num, .row .num { text-align: right; justify-self: end; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .th-btn { appearance: none; background: none; border: 0; font: inherit; color: inherit; cursor: pointer; padding: 0; text-transform: inherit; letter-spacing: inherit; }
 .th-btn i { font-style: normal; color: var(--purple); }
-.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.col-check { width: 32px; }
-.col-img { width: 56px; }
-.col-img img { width: 44px; height: 44px; object-fit: cover; border-radius: 8px; background: #fff; border: 1px solid var(--line); }
-.noimg { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 8px; background: var(--hueso); color: var(--mut-2); font-size: 10px; text-align: center; }
-.col-exp { width: 28px; }
-.row { cursor: pointer; }
+/* altura fija (el virtualizador necesita un contenedor con scroll propio): lo que queda de la pantalla */
+.vlist { position: relative; overflow-y: auto; overflow-x: auto; height: clamp(360px, calc(100dvh - 330px), 1200px); contain: strict; }
+.vlist.is-loading { opacity: .65; transition: opacity .15s; }
+.vlist__inner { position: relative; width: 100%; min-width: 980px; }
+.vitem { position: absolute; top: 0; left: 0; width: 100%; will-change: transform; }
+.row { min-height: 64px; border-bottom: 1px solid var(--line); cursor: pointer; font-size: 14px; transition: background-color .12s; }
 .row:hover { background: #FBFAF7; }
 .row.is-open { background: var(--purple-soft); }
-.row.is-sel td:first-child { box-shadow: inset 3px 0 0 var(--purple); }
-.name { font-weight: 600; }
-.sub { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 3px; font-size: 12px; }
+.row.is-sel { box-shadow: inset 3px 0 0 var(--purple); }
+.row--sk { cursor: default; }
+.row--sk > span { display: grid; gap: 6px; }
+.col-check { width: 32px; }
+.col-img { width: 56px; }
+.col-img img { width: 44px; height: 44px; object-fit: cover; border-radius: 8px; background: #fff; border: 1px solid var(--line); display: block; }
+.noimg { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 8px; background: var(--hueso); color: var(--mut-2); font-size: 10px; text-align: center; }
+.col-exp { width: 28px; }
+.cell-name { min-width: 0; display: grid; gap: 3px; }
+.name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sub { display: flex; flex-wrap: wrap; gap: 4px; font-size: 12px; }
 .chip { background: var(--purple-soft); color: var(--purple-d); border-radius: 999px; padding: 1px 7px; font-size: 11.5px; }
 .chip--soft { background: var(--hueso); color: var(--mut); }
 .chip--warn { background: #FFF1D6; color: #9A5B00; }
@@ -785,22 +919,47 @@ onMounted(checkSession)
 .stock--bajo { color: #9A5B00; }
 .stock--agotado { color: #B00020; }
 .stock--sin { color: var(--mut); font-weight: 500; }
-.caret { display: inline-block; transition: transform .15s; color: var(--mut); font-size: 20px; }
+.caret { display: inline-block; transition: transform .18s var(--ease-out, ease); color: var(--mut); font-size: 20px; }
 .caret.is-open { transform: rotate(90deg); }
 .empty { text-align: center; color: var(--mut); padding: 32px; }
 
-.detail td { background: #FBFAF7; padding: 14px 16px 16px; }
-.detail__grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(240px, 320px); gap: 18px; }
+/* expandir / contraer: grid-template-rows 0fr → 1fr (CSS puro) */
+.detail { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .2s var(--ease-out, ease); background: #FBFAF7; border-bottom: 1px solid var(--line); }
+.detail.is-open { grid-template-rows: 1fr; }
+.detail__clip { min-height: 0; overflow: hidden; }
+.detail__grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(240px, 320px); gap: 18px; padding: 14px 16px 16px; }
 .vars { width: 100%; border-collapse: collapse; font-size: 13.5px; background: #fff; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
 .vars th { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--mut); padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: left; }
-.vars td { padding: 6px 10px; border-bottom: 1px solid var(--line); }
+.vars td { padding: 6px 10px; border-bottom: 1px solid var(--line); transition: background-color .25s; }
 .vars tr.is-dirty td { background: #FFFBEE; }
+.vars tr.is-saving td { background: #F5F2FB; }
+.vars tr.is-err td { background: #FDE7E9; }
+/* destello verde breve al confirmar el guardado */
+.vars tr.is-flash td { animation: flash-ok .9s var(--ease-out, ease) 1; }
+@keyframes flash-ok { 0% { background: #BFEFD3; } 100% { background: transparent; } }
 .talla-cell { font-weight: 700; }
-.actions { display: flex; align-items: center; gap: 6px; white-space: nowrap; min-width: 160px; }
+.actions-cell { width: 1%; }
+.actions { display: flex; align-items: center; gap: 6px; white-space: nowrap; min-width: 170px; min-height: 28px; }
+.saving { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--purple-d); }
+.saving__dot { width: 8px; height: 8px; border-radius: 50%; background: var(--purple); animation: pulse .9s ease-in-out infinite; }
+@keyframes pulse { 0%, 100% { opacity: .35; transform: scale(.8); } 50% { opacity: 1; transform: scale(1); } }
 .hint { margin: 8px 2px 0; }
 .detail__hist h3 { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--mut); margin: 0 0 8px; }
 .detail__hist ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; max-height: 320px; overflow-y: auto; }
 .detail__hist li { display: grid; gap: 1px; font-size: 13px; padding-bottom: 6px; border-bottom: 1px dashed var(--line); }
+
+/* filas entrando / saliendo al filtrar */
+.vrow-enter-active { transition: opacity .18s var(--ease-out, ease), transform .18s var(--ease-out, ease); }
+.vrow-leave-active { transition: opacity .15s ease, transform .15s ease; pointer-events: none; }
+.vrow-enter-from { opacity: 0; transform: translateY(6px); }
+.vrow-leave-to { opacity: 0; transform: translateY(-6px); }
+
+@media (prefers-reduced-motion: reduce) {
+  .detail, .caret, .row, .vars td, .vrow-enter-active, .vrow-leave-active, .vlist.is-loading { transition: none; }
+  .vars tr.is-flash td { animation: none; background: #BFEFD3; }
+  .saving__dot { animation: none; opacity: 1; }
+  .vrow-enter-from, .vrow-leave-to { opacity: 1; transform: none; }
+}
 
 .warn { color: #9A5B00; }
 .linkbtn { appearance: none; background: none; border: 0; padding: 0; font: inherit; color: var(--purple-d); text-decoration: underline; cursor: pointer; }
@@ -814,7 +973,6 @@ onMounted(checkSession)
 .preview__summary { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .preview__wrap { max-height: 55dvh; overflow: auto; border: 1px solid var(--line); border-radius: 10px; }
 .preview__wrap .vars { border: 0; }
-.vars tr.is-err td { background: #FDE7E9; }
 .modal { position: fixed; inset: 0; z-index: 30; background: rgba(17,17,17,.45); display: flex; align-items: center; justify-content: center; padding: 20px; }
 .modal__box { background: #fff; border-radius: 16px; padding: 20px; width: min(760px, 100%); max-height: 90dvh; overflow-y: auto; display: grid; gap: 12px; }
 .modal__box h3 { margin: 0; font-size: 17px; }
@@ -823,6 +981,7 @@ onMounted(checkSession)
 .steps pre { margin: 4px 0 0; font-size: 12.5px; white-space: pre-wrap; background: var(--hueso); padding: 8px 10px; border-radius: 8px; color: var(--ink); }
 .steps li.err > b { color: #B00020; }
 .steps li.ok > b { color: #1B7F4B; }
+
 .pager { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .pager__nav { display: flex; align-items: center; gap: 10px; }
 
@@ -830,11 +989,10 @@ onMounted(checkSession)
   .filters { grid-template-columns: 1fr 1fr; }
   .input--search { grid-column: 1 / -1; }
   .detail__grid { grid-template-columns: 1fr; }
-  .tbl th:nth-child(4), .tbl td:nth-child(4), .tbl th:nth-child(7), .tbl td:nth-child(7) { display: none; }
+  .vlist { height: clamp(320px, calc(100dvh - 380px), 1200px); }
 }
 @media (max-width: 600px) {
   .inv__app { padding: 10px 10px 32px; }
-  .tbl th:nth-child(2), .tbl td:nth-child(2), .tbl th:nth-child(5), .tbl td:nth-child(5) { display: none; }
   .input--num { width: 84px; }
   .actions { min-width: 0; flex-wrap: wrap; }
 }
