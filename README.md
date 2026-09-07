@@ -11,6 +11,22 @@ npm run build    # build de producción
 npm run generate # SSG estático
 ```
 
+### Deploy: verificar qué código corre (paso OBLIGATORIO tras cada push a master)
+
+`GET /api/version` (público, sin datos sensibles) devuelve el commit desplegado,
+la rama, el entorno de Vercel y la fecha del build. Vercel Hobby ya rechazó
+deploys **en silencio** dos veces (crons de más de 1/día en `vercel.json`): el
+dashboard sigue mostrando el último deploy exitoso y nadie se entera. Por eso,
+después de `git push origin master`:
+
+```bash
+node scripts/verificar-deploy.mjs --esperar     # producción vs origin/master (reintenta 5 min)
+node scripts/verificar-deploy.mjs https://<preview>.vercel.app feature/x   # un preview
+```
+
+Si el hash no coincide, **el deploy no entró**: mirar el check de Vercel en el
+commit de GitHub y `vercel.json`.
+
 ## Estructura
 
 ```

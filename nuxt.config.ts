@@ -165,6 +165,15 @@ export default defineNuxtConfig({
     alertWhatsappTo: process.env.NUXT_ALERT_WHATSAPP_TO || '',                       // -> NUXT_ALERT_WHATSAPP_TO
     alertTemplateName: process.env.NUXT_ALERT_TEMPLATE_NAME || 'alerta_atencion',    // -> NUXT_ALERT_TEMPLATE_NAME
     public: {
+      // Identidad del BUILD para GET /api/version (Vercel inyecta VERCEL_GIT_* al
+      // construir). Sirve para confirmar qué commit corre en producción: dos veces
+      // Vercel rechazó deploys en silencio (crons horarios en plan Hobby).
+      build: {
+        commit: process.env.VERCEL_GIT_COMMIT_SHA || '',
+        rama: process.env.VERCEL_GIT_COMMIT_REF || '',
+        entorno: process.env.VERCEL_ENV || 'local',
+        fecha: new Date().toISOString(),
+      },
       // Origen del catálogo: 'local' (catalogo.json) | 'woo' (proxy /api/products).
       // Default LOCAL — el switch a woo se hace tras verificar paridad (README).
       dataSource: process.env.DATA_SOURCE || 'local',       // -> NUXT_PUBLIC_DATA_SOURCE
