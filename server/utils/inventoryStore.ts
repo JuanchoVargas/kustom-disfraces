@@ -9,7 +9,6 @@ import { stockBajoUmbral } from './inventoryCommon'
 import { getStockState, publicStockEnabled } from './stockState'
 
 export type { WriteContext } from './inventoryCommon'
-export { stockBajoUmbral, listChanges, logChanges, normalizePrice, normalizeStock, InvValidationError } from './inventoryCommon'
 
 /**
  * CAPA DE ADAPTADOR del inventario. El panel (/admin/inventario) y el resto del
