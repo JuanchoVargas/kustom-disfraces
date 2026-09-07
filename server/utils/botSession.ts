@@ -5,7 +5,7 @@ import {
   ALERT_COOLDOWN_MIN, attachMedia, autoReturnToBot, claimHandoffAlert, getMessageByWamid, HUMAN_TIMEOUT_MIN, incomingMeta,
   incomingTipo, incomingToText, loadBotState, markWamidReplied, recordMessage, saveBotState, setEstado, upsertConversation, waMessageToText,
 } from './inbox'
-import { downloadFromUrl, downloadWaMedia, saveMedia } from './media'
+import { downloadFromUrl, downloadWaMedia, saveMediaChecked } from './media'
 import { sendHandoffAlert } from './orderEmail'
 import { sendTemplateMessage } from './whatsapp'
 
@@ -193,11 +193,15 @@ async function ingestMedia(canal: Canal, messageId: number, media: NonNullable<W
       await attachMedia(messageId, null, { download_failed: got })
       return
     }
-    const saved = await saveMedia(got.data, media.mime || got.mime, media.filename)
-    if (!saved) {
-      await attachMedia(messageId, null, { download_failed: 'demasiado_grande' })
+    // Tope por archivo (4 MB) y tope TOTAL de almacenamiento (ver media.ts): si no
+    // cabe, el mensaje queda registrado con su aviso y el motivo en meta.
+    const savedR = await saveMediaChecked(got.data, media.mime || got.mime, media.filename)
+    if (!savedR.ok) {
+      console.warn(`[${canal}] medio ${media.kind} (${ref}) no guardado: ${savedR.reason}`)
+      await attachMedia(messageId, null, { download_failed: savedR.reason })
       return
     }
+    const saved = savedR.row
     await attachMedia(messageId, saved.id, { mime: saved.mime, bytes: saved.bytes })
     console.info(`[${canal}] medio ${media.kind} guardado (${saved.bytes} bytes, ${saved.mime}) para el mensaje #${messageId}`)
   }

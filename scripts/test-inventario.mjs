@@ -298,6 +298,33 @@ else {
   if (sql) await sql.query(`DELETE FROM conversations WHERE canal = 'wa' AND external_id = $1`, [WA_FROM])
 }
 
+// ---------- 15. con el stock público APAGADO (config de producción: mock + auto) el sitio, el bot y el checkout NO cambian ----------
+if (stock0.public_stock) {
+  console.log('⏭️  15. stock público activo: la verificación "sitio intacto" se corre con el dev server sin NUXT_INVENTORY_PUBLIC_STOCK')
+}
+else {
+  const SLUG = 'gato-con-botas'
+  const WA_FROM = '570000000016'
+  await ops([{ op: 'stock', sku: V_BEBE, stock_quantity: 0 }, { op: 'stock', sku: `${P_BEBE}-T0`, stock_quantity: 0 }, { op: 'stock', sku: V_NUM2, stock_quantity: 0 }, { op: 'stock', sku: V_NUM, stock_quantity: 0 }])
+  const st = await fetch(`${BASE}/api/stock`).then(r => r.json())
+  check('15. /api/stock: enabled=false y nada agotado aunque el mock tenga 4 tallas en 0', st.enabled === false && st.agotados.length === 0 && Object.keys(st.tallas).length === 0, JSON.stringify(st).slice(0, 80))
+  const pdp = await fetch(`${BASE}/producto/${SLUG}`)
+  const html = await pdp.text()
+  const btn4 = html.match(/<button[^>]*>\s*4\s*<\/button>/)?.[0] ?? ''
+  check('15. la PDP responde 200 y la talla 4 sigue habilitada', pdp.status === 200 && btn4 && !/disabled/.test(btn4), btn4.slice(0, 90))
+  const plp = await fetch(`${BASE}/categoria/bebes`).then(r => r.text())
+  check('15. la PLP de bebés sigue listando el producto', plp.includes(`/producto/${SLUG}"`))
+  const hook = { object: 'whatsapp_business_account', entry: [{ id: '0', changes: [{ field: 'messages', value: { messaging_product: 'whatsapp', contacts: [{ profile: { name: 'Prueba Intacto' }, wa_id: WA_FROM }], messages: [{ from: WA_FROM, id: `test.intacto.${Date.now()}`, timestamp: String(Date.now() / 1000 | 0), type: 'text', text: { body: 'gato con botas talla 4' } }] } }] }] }
+  await fetch(`${BASE}/api/whatsapp`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(hook) })
+  const bot = sql ? (await sql.query(`SELECT m.texto FROM messages m JOIN conversations c ON c.id = m.conversation_id WHERE c.canal = 'wa' AND c.external_id = $1 AND m.direccion = 'out' ORDER BY m.id DESC LIMIT 1`, [WA_FROM]))[0]?.texto ?? '' : ''
+  check('15. el bot sigue ofreciendo el producto con todas sus tallas y la 4 disponible', /Gato con Botas/.test(bot) && /Tallas: Bebé, 0, 2, 4/.test(bot) && /✅ Talla \*4\* disponible/.test(bot), bot.split('\n').slice(0, 4).join(' | '))
+  const co = await fetch(`${BASE}/api/checkout/mercadopago`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ items: [{ sku: P_BEBE, quantity: 1, size: '4' }], buyer: { nombre: 'Prueba Intacto', email: 'prueba@example.com', telefono: '3000000000', pais: 'Colombia', departamento: 'Bogotá', ciudad: 'Bogotá', localidad: 'Kennedy', barrio: 'Centro', direccion: 'Calle 1 # 2-3' } }) })
+  check('15. el checkout no bloquea por stock (no es 409)', co.status !== 409, `status ${co.status}`)
+  const { json: est } = await api('/estado')
+  check('15. el panel sí ve las 4 tallas agotadas (la simulación vive solo en el panel)', est.agotadas >= 4 && est.public_stock === false && est.simulation === true, `agotadas=${est.agotadas} public_stock=${est.public_stock}`)
+  if (sql) await sql.query(`DELETE FROM conversations WHERE canal = 'wa' AND external_id = $1`, [WA_FROM])
+}
+
 if (!KEEP) await cleanup()
 else console.log('--keep: overrides de prueba conservados para revisar en /admin/inventario')
 console.log(fails ? `\n❌ ${fails} fallo(s)` : '\n✅ todo OK')

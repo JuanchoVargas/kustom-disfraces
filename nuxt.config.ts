@@ -122,6 +122,11 @@ export default defineNuxtConfig({
     // La cookie de sesión se firma con una clave derivada de ella. Sin valor, la
     // bandeja responde 503. Postgres se lee directo de POSTGRES_URL (Neon↔Vercel).
     inboxPassword: process.env.NUXT_INBOX_PASSWORD || '',    // -> NUXT_INBOX_PASSWORD
+    // MEDIOS de la bandeja (tabla media, BYTEA en Neon free = 0,5 GB para TODO):
+    // retención automática (cron diario /api/cron/keepalive) y tope duro total.
+    // Al superar el tope no se guardan más binarios (el mensaje se registra igual).
+    mediaRetentionDays: process.env.NUXT_MEDIA_RETENTION_DAYS || '60',   // -> NUXT_MEDIA_RETENTION_DAYS
+    mediaMaxTotalMb: process.env.NUXT_MEDIA_MAX_TOTAL_MB || '300',       // -> NUXT_MEDIA_MAX_TOTAL_MB
     // MÓDULO DE INVENTARIO (/admin/inventario): qué adaptador ejecuta las escrituras.
     //   mock (default) = simulación: lee productos reales de Woo (llave de lectura) y
     //                    guarda los cambios en Postgres (inventory_overrides); NO toca Woo.

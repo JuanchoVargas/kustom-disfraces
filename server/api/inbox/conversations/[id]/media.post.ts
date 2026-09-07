@@ -1,4 +1,4 @@
-import { extForMime, MAX_MEDIA_BYTES, mediaUrl, saveMedia } from '../../../../utils/media'
+import { extForMime, MAX_MEDIA_BYTES, mediaUrl, saveMediaChecked } from '../../../../utils/media'
 import { uploadWhatsAppMedia, waImage } from '../../../../utils/whatsapp'
 import { sendMessengerAttachment } from '../../../../utils/messenger'
 
@@ -33,8 +33,13 @@ export default defineEventHandler(async (event) => {
   if (conv.canal === 'wa' && !windowOpen(conv.ultimo_cliente_at)) throw createError({ statusCode: 409, statusMessage: 'window_closed' })
 
   const filename = (file.filename && /\.[a-z0-9]{2,5}$/i.test(file.filename)) ? file.filename : `imagen.${extForMime(mime)}`
-  const saved = await saveMedia(Buffer.from(file.data), mime, filename)
-  if (!saved) throw createError({ statusCode: 503, statusMessage: 'db_not_configured' })
+  const savedR = await saveMediaChecked(Buffer.from(file.data), mime, filename)
+  if (!savedR.ok) {
+    if (savedR.reason === 'limite_almacenamiento') throw createError({ statusCode: 507, statusMessage: 'storage_full' })
+    if (savedR.reason === 'demasiado_grande') throw createError({ statusCode: 413, statusMessage: 'too_large' })
+    throw createError({ statusCode: 503, statusMessage: 'db_not_configured' })
+  }
+  const saved = savedR.row
   const url = mediaUrl(saved.token)
 
   const dryRun = deliverOrDryRun(conv.canal, async () => {

@@ -81,6 +81,7 @@ async function checkSession() {
   }
   catch { authed.value = false }
   checking.value = false
+  if (authed.value) loadMediaUso()
 }
 async function login() {
   loginError.value = ''
@@ -90,6 +91,7 @@ async function login() {
     password.value = ''
     authed.value = true
     await refreshList()
+    loadMediaUso()
     const c = Number(route.query.c)
     if (c) await openConv(c)
   }
@@ -276,6 +278,7 @@ function errorText(e: any, fallback: string) {
   if (code === 'window_closed') return 'Ventana de 24h cerrada: este cliente debe escribir primero.'
   if (code === 'whatsapp_not_configured' || code === 'messenger_not_configured') return 'El canal no está configurado en el servidor.'
   if (code === 'too_large') return 'La imagen es demasiado pesada (máx. 5 MB).'
+  if (code === 'storage_full') return 'El almacenamiento de medios está lleno: no se puede guardar la imagen (revisa el tope o la retención).'
   if (code === 'bad_type') return 'Solo se aceptan imágenes JPG, PNG o WebP.'
   if (code === 'send_failed') return 'Meta rechazó el envío. Revisa el log del servidor.'
   return fallback
@@ -400,6 +403,7 @@ async function sendImage() {
     form.append('file', p.blob, p.name)
     if (caption.value.trim()) form.append('caption', caption.value.trim())
     const r = await $fetch<{ ok: boolean, dry_run?: boolean }>(`/api/inbox/conversations/${conv.id}/media`, { method: 'POST', body: form })
+    loadMediaUso()
     cancelPending()
     if (r.dry_run) actionInfo.value = 'Imagen guardada sin enviar: el canal no tiene credenciales en este entorno (solo local).'
     await loadConv(conv.id, true)
@@ -424,12 +428,30 @@ function bubbleText(m: Msg) {
   return m.texto
 }
 function failNote(m: Msg) {
+  if (m.media) return ''
+  // Retención: el binario se borró a los N días; el mensaje se conserva.
+  if (m.meta?.expirado) return `[archivo expirado] Se conservan ${mediaUso.value?.retencion_dias ?? 60} días.`
   const f = m.meta?.download_failed
-  if (!f || m.media) return ''
+  if (!f) return ''
   if (f === 'sin_token') return 'No se descargó: el servidor no tiene el token de WhatsApp.'
   if (f === 'demasiado_grande') return 'No se guardó: el archivo supera los 4 MB.'
+  if (f === 'limite_almacenamiento') return 'No se guardó: el almacenamiento de medios está lleno.'
   return 'No se pudo descargar el archivo.'
 }
+
+// ---------- uso del almacenamiento de medios (retención + tope) ----------
+interface MediaUso { db: boolean, mb: number, limite_mb: number, archivos: number, pct: number, lleno: boolean, retencion_dias: number, mas_antiguo: string | null }
+const mediaUso = ref<MediaUso | null>(null)
+async function loadMediaUso() {
+  try { mediaUso.value = await $fetch<MediaUso>('/api/admin/media-stats') }
+  catch (e) { onUnauthorized(e) }
+}
+const mediaUsoText = computed(() => {
+  const u = mediaUso.value
+  if (!u?.db) return ''
+  const desde = u.mas_antiguo ? new Date(u.mas_antiguo).toLocaleDateString('es-CO', { day: 'numeric', month: 'short' }) : '—'
+  return `Medios: ${u.mb} MB de ${u.limite_mb} (${u.pct}%) · ${u.archivos} archivos · desde ${desde} · se conservan ${u.retencion_dias} días`
+})
 function mapsUrl(m: Msg) {
   return `https://www.google.com/maps?q=${m.meta?.lat},${m.meta?.lng}`
 }
@@ -554,7 +576,11 @@ function windowLeft(c: Conv) {
             Chats
             <span v-if="totalUnread" class="badge">{{ totalUnread }}</span>
           </div>
-          <button class="btn btn--ghost btn--sm" type="button" @click="logout">Salir</button>
+          <div class="list__right">
+            <span v-if="mediaUsoText" class="media-uso" :class="{ 'media-uso--warn': (mediaUso?.pct ?? 0) >= 80, 'media-uso--full': mediaUso?.lleno }" :title="mediaUsoText">{{ mediaUsoText }}</span>
+            <NuxtLink class="btn btn--ghost btn--sm" to="/admin/inventario">Inventario</NuxtLink>
+            <button class="btn btn--ghost btn--sm" type="button" @click="logout">Salir</button>
+          </div>
         </header>
         <div class="list__tabs" role="tablist">
           <button
@@ -928,10 +954,14 @@ function windowLeft(c: Conv) {
   background: #fff;
 }
 .list__head {
-  display: flex; align-items: center; justify-content: space-between;
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
   padding: 12px 14px;
   border-bottom: 1px solid var(--line);
 }
+.list__right { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.media-uso { font-size: 11px; color: var(--mut); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 260px; }
+.media-uso--warn { color: #9A5B00; font-weight: 600; }
+.media-uso--full { color: #B00020; font-weight: 700; }
 .list__title { display: flex; align-items: center; gap: 8px; font-family: var(--ff-display); font-size: 20px; letter-spacing: .5px; }
 .list__tabs { display: flex; gap: 4px; padding: 8px 12px 0; border-bottom: 1px solid var(--line); }
 .tab-btn {

@@ -718,6 +718,27 @@ por campo cambiado (SKU, valor anterior, nuevo, origen, autor, fecha).
 - Todo probado en `scripts/test-inventario.mjs` (sección 14, con el dev server
   arrancado con `NUXT_INVENTORY_PUBLIC_STOCK=on`).
 
-Pendiente: merge a master (tras `feature/bandeja-v2`) y, con la gestión de stock
-activa en Woo, verificar el descuento de inventario al confirmarse un pago
-(checklist `docs/inventario-activacion.md`).
+Pendiente: con la gestión de stock activa en Woo, verificar el descuento de
+inventario al confirmarse un pago (checklist `docs/inventario-activacion.md`).
+
+---
+
+## 🗄️ Medios de la bandeja: retención y tope de almacenamiento
+
+Los binarios de la bandeja (fotos, audios, documentos) viven en la tabla `media`
+de la **misma** base Neon (plan free: 0,5 GB para todo, incluidos la bandeja, el
+estado del bot y el inventario). Para que nunca la llenen:
+
+- **Retención automática**: el cron diario `/api/cron/keepalive` borra los medios
+  con más de `NUXT_MEDIA_RETENTION_DAYS` días (default **60**). El mensaje se
+  conserva con `meta.expirado = true` y la bandeja muestra "[archivo expirado]".
+- **Tope duro total** `NUXT_MEDIA_MAX_TOTAL_MB` (default **300**): al superarlo no
+  se guardan más binarios. El mensaje entrante se registra igual (con su aviso y
+  `meta.download_failed = limite_almacenamiento`), enviar una imagen desde la
+  bandeja responde 507 `storage_full`, y queda una alerta en el log. El cron
+  también avisa en el log al pasar del 80 %.
+- **Uso visible**: `GET /api/admin/media-stats` (sesión del panel) → MB usados,
+  archivos, más antiguo, tope y retención; la cabecera de `/admin/chats` lo
+  muestra (ámbar ≥ 80 %, rojo lleno).
+- Prueba local: `node scripts/test-media-retencion.mjs` (inserta y limpia sus
+  propias filas; ejercita retención, tope y el 507).

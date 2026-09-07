@@ -62,9 +62,100 @@ export function mediaUrl(token: string): string {
   return `${site}${mediaPath(token)}`
 }
 
-/** Guarda un archivo en la BD. null si no hay BD o el archivo excede el tope. */
+// ---------- retención y tope de almacenamiento ----------
+// Neon free da 0,5 GB para TODA la BD (bandeja + estado del bot + inventario).
+// Sin tope, los binarios la llenarían y tumbarían todo lo demás. Por eso:
+//   - retención: el cron diario borra los medios de más de N días (el mensaje se
+//     conserva con meta.expirado = true → "[archivo expirado]" en la bandeja);
+//   - tope duro: al superar M MB en total no se guardan más binarios; el mensaje
+//     se registra igual (con su aviso) y se loguea la alerta.
+export function mediaRetentionDays(): number {
+  const n = Number(useRuntimeConfig().mediaRetentionDays)
+  return Number.isFinite(n) && n > 0 ? n : 60
+}
+export function mediaMaxTotalBytes(): number {
+  const mb = Number(useRuntimeConfig().mediaMaxTotalMb)
+  return (Number.isFinite(mb) && mb > 0 ? mb : 300) * 1024 * 1024
+}
+
+export interface MediaStats {
+  bytes: number
+  archivos: number
+  mas_antiguo: string | null
+  mas_reciente: string | null
+  limite_bytes: number
+  retencion_dias: number
+  /** porcentaje usado del tope (0-100+) */
+  pct: number
+  lleno: boolean
+}
+
+export async function mediaStats(): Promise<MediaStats | null> {
+  if (!await ready()) return null
+  const rows = await sql().query(`SELECT COALESCE(SUM(bytes),0)::bigint AS b, count(*)::int AS c, min(created_at) AS o, max(created_at) AS n FROM media`) as any[]
+  const r = rows[0] ?? {}
+  const bytes = Number(r.b ?? 0)
+  const limite = mediaMaxTotalBytes()
+  return {
+    bytes, archivos: Number(r.c ?? 0),
+    mas_antiguo: r.o ? new Date(r.o).toISOString() : null,
+    mas_reciente: r.n ? new Date(r.n).toISOString() : null,
+    limite_bytes: limite, retencion_dias: mediaRetentionDays(),
+    pct: Math.round((bytes / limite) * 1000) / 10,
+    lleno: bytes >= limite,
+  }
+}
+
+export type SaveFail = 'sin_bd' | 'demasiado_grande' | 'limite_almacenamiento'
+export type SaveResult = { ok: true, row: MediaRow } | { ok: false, reason: SaveFail }
+
+/** Guarda un archivo en la BD respetando tope por archivo y tope TOTAL. */
+export async function saveMediaChecked(data: Buffer, mime: string, filename?: string | null): Promise<SaveResult> {
+  if (!data?.length || data.length > MAX_MEDIA_BYTES) return { ok: false, reason: 'demasiado_grande' }
+  if (!await ready()) return { ok: false, reason: 'sin_bd' }
+  const stats = await mediaStats()
+  if (stats && stats.bytes + data.length > stats.limite_bytes) {
+    console.error(`[media] ⚠️ ALMACENAMIENTO DE MEDIOS LLENO: ${(stats.bytes / 1048576).toFixed(1)} MB de ${(stats.limite_bytes / 1048576).toFixed(0)} MB (${stats.archivos} archivos) — no se guarda ${filename ?? mime} (${data.length} bytes). Sube NUXT_MEDIA_MAX_TOTAL_MB, baja NUXT_MEDIA_RETENTION_DAYS o corre la retención.`)
+    return { ok: false, reason: 'limite_almacenamiento' }
+  }
+  const token = randomBytes(16).toString('hex')
+  const rows = await sql().query(
+    `INSERT INTO media (token, mime, bytes, filename, data) VALUES ($1, $2, $3, $4, $5) RETURNING id, token, mime, bytes, filename, created_at`,
+    [token, mime || 'application/octet-stream', data.length, filename || null, data],
+  ) as any[]
+  return rows[0] ? { ok: true, row: normMedia(rows[0]) } : { ok: false, reason: 'sin_bd' }
+}
+
+/**
+ * RETENCIÓN: borra los medios de más de `mediaRetentionDays()` días. Antes marca
+ * sus mensajes con meta.expirado = true (el registro del mensaje se conserva; la
+ * bandeja muestra "[archivo expirado]"). Devuelve cuántos borró y cuántos bytes.
+ */
+export async function purgeExpiredMedia(): Promise<{ borrados: number, bytes: number, mensajes: number, dias: number }> {
+  const dias = mediaRetentionDays()
+  if (!await ready()) return { borrados: 0, bytes: 0, mensajes: 0, dias }
+  const q = sql()
+  const cutoff = new Date(Date.now() - dias * 86_400_000).toISOString()
+  const marked = await q.query(
+    `UPDATE messages SET meta = COALESCE(meta, '{}'::jsonb) || '{"expirado": true}'::jsonb
+     WHERE media_id IN (SELECT id FROM media WHERE created_at < $1) RETURNING id`,
+    [cutoff],
+  ) as any[]
+  const deleted = await q.query(`DELETE FROM media WHERE created_at < $1 RETURNING bytes`, [cutoff]) as any[]
+  const bytes = deleted.reduce((s, r) => s + Number(r.bytes ?? 0), 0)
+  if (deleted.length) console.info(`[media] retención: ${deleted.length} medios (> ${dias} días, ${(bytes / 1048576).toFixed(1)} MB) borrados; ${marked.length} mensajes marcados como expirados`)
+  return { borrados: deleted.length, bytes, mensajes: marked.length, dias }
+}
+
+/** Guarda un archivo en la BD. null si no hay BD, excede el tope por archivo o el tope total. */
 export async function saveMedia(data: Buffer, mime: string, filename?: string | null): Promise<MediaRow | null> {
-  if (!data?.length || data.length > MAX_MEDIA_BYTES) return null
+  const r = await saveMediaChecked(data, mime, filename)
+  return r.ok ? r.row : null
+}
+
+/** (Inserción directa sin comprobar el tope total: solo la usan las pruebas.) */
+export async function saveMediaUnchecked(data: Buffer, mime: string, filename?: string | null): Promise<MediaRow | null> {
+  if (!data?.length) return null
   if (!await ready()) return null
   const token = randomBytes(16).toString('hex')
   const rows = await sql().query(
