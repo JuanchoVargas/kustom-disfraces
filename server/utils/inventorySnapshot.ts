@@ -26,7 +26,7 @@ export const SYNC_CHUNK = 12
 const FRESH_MS = 10 * 60 * 1000
 
 // ---------- shape crudo de Woo (solo lo que usamos) ----------
-interface WooProductRaw {
+export interface WooProductRaw {
   id: number
   sku: string
   name: string
@@ -104,7 +104,7 @@ function sortVariations(vs: InvVariation[]): InvVariation[] {
   return [...vs].sort((a, b) => compareTallas(tallaFromSku(a.sku) ?? a.sku, tallaFromSku(b.sku) ?? b.sku))
 }
 
-function fromWoo(raw: WooProductRaw, variations: WooVariationRaw[] | null, fetchedAt: string): InvProduct {
+export function fromWoo(raw: WooProductRaw, variations: WooVariationRaw[] | null, fetchedAt: string): InvProduct {
   const tallas = tallaOptions(raw.attributes)
   const vs: InvVariation[] = variations
     ? variations.map(v => ({

@@ -58,7 +58,7 @@ const listLabel = (imgs: InvImage[]) => imgs.map(i => i.id).join(',') || null
 interface WooProductImages { id: number, images: { id: number, src: string, name?: string, alt?: string }[] }
 
 /** Escribe la lista de imágenes del producto en Woo y actualiza el snapshot. */
-async function writeImages(p: InvProduct, images: InvImage[], campo: string, autor?: string): Promise<InvProduct> {
+export async function writeImages(p: InvProduct, images: InvImage[], campo: string, autor?: string): Promise<InvProduct> {
   const before = listLabel(p.images)
   const res = await wooWriteFetch<WooProductImages>(`/products/${p.id}`, { method: 'PUT', body: { images: images.map(i => ({ id: i.id })) } })
   const next: InvProduct = { ...p, images: (res.images ?? []).map(i => ({ id: i.id, src: i.src, name: i.name, alt: i.alt })), fetched_at: new Date().toISOString() }

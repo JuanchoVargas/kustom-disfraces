@@ -56,17 +56,48 @@ async function wp<T>(path: string, opts: { method?: string, body?: BodyInit, hea
   return json as T
 }
 
-/** ¿Las credenciales sirven? Devuelve el usuario o el motivo. */
-export async function wpMediaPing(): Promise<{ ok: boolean, detail: string }> {
-  if (!wpMediaConfigured()) return { ok: false, detail: 'faltan NUXT_WP_APP_USER / NUXT_WP_APP_PASSWORD' }
+export interface WpWhoAmI {
+  ok: boolean
+  /** HTTP de users/me (0 si no hubo respuesta) */
+  status: number
+  id?: number
+  slug?: string
+  name?: string
+  capabilities?: Record<string, boolean>
+  upload_files: boolean
+  error?: string
+}
+
+/**
+ * GET wp/v2/users/me?context=edit con las credenciales reales. Un 200 distingue
+ * "contraseñas de aplicación deshabilitadas" de "credenciales incorrectas" (ambas
+ * dan 401) y expone capabilities: ok solo si upload_files está presente.
+ */
+export async function wpWhoAmI(): Promise<WpWhoAmI> {
+  if (!wpMediaConfigured()) return { ok: false, status: 0, upload_files: false, error: 'faltan NUXT_WP_APP_USER / NUXT_WP_APP_PASSWORD' }
+  const c = useRuntimeConfig()
+  let res: Response
   try {
-    const me = await wp<{ name?: string, slug?: string, capabilities?: Record<string, boolean> }>('/users/me?context=edit')
-    const puede = !!(me.capabilities?.upload_files)
-    return { ok: puede, detail: puede ? `WordPress: ${me.name ?? me.slug} puede subir medios` : `WordPress: ${me.name ?? me.slug} NO tiene permiso upload_files` }
+    res = await fetch(`${c.wooBaseUrl}/wp-json/wp/v2/users/me?context=edit`, { headers: { Authorization: authHeader() }, signal: AbortSignal.timeout(30_000) })
   }
   catch (err) {
-    return { ok: false, detail: `WordPress no responde: ${sanitizeWpError(err)}` }
+    return { ok: false, status: 0, upload_files: false, error: `WordPress no responde: ${sanitizeWpError(err)}` }
   }
+  const text = await res.text()
+  let me: any
+  try { me = JSON.parse(text) }
+  catch { me = { message: text.slice(0, 200) } }
+  if (!res.ok) return { ok: false, status: res.status, upload_files: false, error: String(me?.message ?? text.slice(0, 200)) }
+  const upload = me?.capabilities?.upload_files === true
+  return { ok: upload, status: res.status, id: me?.id, slug: me?.slug, name: me?.name, capabilities: me?.capabilities, upload_files: upload, error: upload ? undefined : 'el usuario no tiene la capacidad upload_files' }
+}
+
+/** ¿Las credenciales sirven? Devuelve el usuario o el motivo. */
+export async function wpMediaPing(): Promise<{ ok: boolean, detail: string }> {
+  const me = await wpWhoAmI()
+  if (me.ok) return { ok: true, detail: `WordPress: ${me.name ?? me.slug} puede subir medios` }
+  if (me.status === 200) return { ok: false, detail: `WordPress: ${me.name ?? me.slug} NO tiene permiso upload_files` }
+  return { ok: false, detail: me.status ? `WordPress HTTP ${me.status}: ${me.error}` : (me.error ?? 'WordPress no responde') }
 }
 
 export interface Processed { data: Buffer, width: number, height: number, bytes: number, mime: 'image/webp' }
@@ -114,4 +145,10 @@ export async function uploadMedia(data: Buffer, filename: string, opts: { title?
 export async function getMedia(id: number): Promise<WpMedia | null> {
   try { return await wp<WpMedia>(`/media/${id}`) }
   catch { return null }
+}
+
+/** Borra un archivo de la biblioteca (force=true: sin papelera). Devuelve true si WordPress confirma. */
+export async function deleteMedia(id: number): Promise<boolean> {
+  const res = await wp<{ deleted?: boolean }>(`/media/${id}?force=true`, { method: 'DELETE' })
+  return res?.deleted === true
 }
