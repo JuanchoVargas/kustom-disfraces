@@ -27,6 +27,7 @@ export default defineEventHandler(async (event) => {
       external_id: c.external_id,
       nombre: c.nombre,
       telefono: c.telefono ?? null,
+      telefono_lead: c.telefono_lead ?? null,
       bsuid: c.bsuid ?? null,
       username: c.username ?? null,
       ultimo_mensaje: c.ultimo_mensaje,

@@ -150,6 +150,22 @@ const MIGRATION = [
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
   )`,
   `CREATE INDEX IF NOT EXISTS inventory_changes_sku_idx ON inventory_changes (sku, id DESC)`,
+  // ===== BOT: búsquedas sin resultado (reporte de demanda) =====
+  // Cada "no encontré" queda con canal, texto exacto, término normalizado, motivo
+  // y qué sugerencias se ofrecieron. Sirve para saber qué piden y no tenemos.
+  `CREATE TABLE IF NOT EXISTS bot_busquedas_fallidas (
+    id          BIGSERIAL PRIMARY KEY,
+    canal       TEXT NOT NULL,
+    external_id TEXT,
+    texto       TEXT NOT NULL,
+    termino     TEXT NOT NULL,
+    motivo      TEXT NOT NULL,
+    sugerencias JSONB,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+  )`,
+  `CREATE INDEX IF NOT EXISTS bot_busquedas_fallidas_termino_idx ON bot_busquedas_fallidas (termino, created_at DESC)`,
+  // Teléfono que el cliente escribió en el chat (lead), aparte del de la identidad de WhatsApp.
+  `ALTER TABLE conversations ADD COLUMN IF NOT EXISTS telefono_lead TEXT`,
   `CREATE INDEX IF NOT EXISTS messages_conversation_idx ON messages (conversation_id, id)`,
   `CREATE INDEX IF NOT EXISTS conversations_actividad_idx ON conversations (ultima_actividad DESC)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS messages_wamid_idx ON messages (wamid) WHERE wamid IS NOT NULL`,

@@ -37,6 +37,8 @@ export interface ConversationRow {
   humano_at?: string | null
   /** WhatsApp: teléfono si Meta lo entregó (con BSUID puede no venir) */
   telefono?: string | null
+  /** celular que el cliente ESCRIBIÓ en el chat (lead), aparte de la identidad */
+  telefono_lead?: string | null
   /** WhatsApp: Business-Scoped User ID (identidad nueva de Meta) */
   bsuid?: string | null
   /** WhatsApp: username del cliente (solo si activó la función) */
@@ -230,6 +232,12 @@ export async function recordMessage(m: RecordMessageInput): Promise<MessageRow |
 }
 
 /** Asocia (o marca como fallido) el archivo de un mensaje ya guardado; mezcla meta. */
+/** Guarda el celular que el cliente escribió (lead) y deja la conversación como no leída. */
+export async function saveLeadPhone(id: number, phone: string): Promise<void> {
+  if (!await ready()) return
+  await sql().query(`UPDATE conversations SET telefono_lead = $2, no_leidos = GREATEST(no_leidos, 1) WHERE id = $1`, [id, phone])
+}
+
 export async function attachMedia(messageId: number, mediaId: number | null, metaPatch: Record<string, unknown> = {}): Promise<void> {
   if (!await ready()) return
   await sql().query(

@@ -723,6 +723,43 @@ inventario al confirmarse un pago (checklist `docs/inventario-activacion.md`).
 
 ---
 
+## 🎯 Bot: conversión (análisis de 113 conversaciones reales)
+
+Hallazgo: el 32 % de las conversaciones moría en "No tenemos ese disfraz" y casi
+todas eran de Messenger. **Causa real**: los tres *Ice Breakers* de la página de
+Facebook ("¿Qué tallas están disponibles…?", "¿Cuál es el código de descuento…?",
+"¿Se puede personalizar…?") llegan como texto y el bot los buscaba como producto;
+además producción corrió el bot anterior a las preguntas informativas hasta el
+2026-09-06. No era truncamiento de botones ("Spider-Man Clásico L" sí resolvía).
+
+- **Búsqueda sin resultado** (`sinResultados` en `botReplies.ts`): nunca es un
+  callejón sin salida. `similarProducts()` (`productSearch.ts`) ofrece hasta 3
+  parecidos por coincidencia parcial (trigramas), typos fuertes (edición ≤ 3) y
+  fonética ("deep pool" → Deadpool, "venimos" → Venom); solo con puntaje ≥ 0,3
+  (nada de "Lady Bug" para "Woody"). "Hablar con alguien" siempre presente.
+- **Reporte de demanda**: cada fallo queda en `bot_busquedas_fallidas` (canal,
+  texto exacto, término, motivo, sugerencias) y en el log `[bot-nf]`.
+  `GET /api/inbox/demanda` agrupa por término.
+- **Descuento** ("código", "cupón", "descuento", "20%", "promoción"…): "No
+  necesitas código 🎉 El 20 % ya está aplicado…" + Ver disfraces · Cómo comprar
+  · Hablar con alguien. **Personalización**: qué incluye cada diseño, sin
+  personalización a medida. **Tallas**: niños 0–14, adultos S–XL.
+- **Ficha de producto** que empuja a la venta: nombre, precio, tallas, enlace y
+  botones 🛒 Comprar ahora (`buyp:<slug>`, link a la PDP con `?talla=`) ·
+  📏 ¿Qué talla? (`talla:<slug>`: pregunta edad o estatura y sugiere talla con
+  la guía real; adultos S/M/L/XL con estaturas de referencia) · 💬 Hablar con alguien.
+- **Leads con teléfono**: un celular colombiano escrito en el chat (10 dígitos,
+  empieza por 3, con o sin +57/espacios) se guarda en `conversations.telefono_lead`,
+  la conversación queda no leída, se avisa a ventas@ y al encargado por WhatsApp,
+  y la bandeja lo muestra con botón de copiar. El bot no se apaga.
+- **Ventana de 24 h por vencer**: `/api/cron/ventana-24h` (cada hora) manda a
+  ventas@ la lista de chats de WhatsApp en atención humana con 20–24 h sin
+  respuesta de agente, con enlace a cada uno; avisa una vez por ventana.
+- Evidencia con casos reales: `node scripts/test-bot-conversion.mjs` (27
+  comprobaciones); `scripts/probar-bot.mjs msg|wa "frase" "@boton"` para probar a mano.
+
+---
+
 ## 🗄️ Medios de la bandeja: retención y tope de almacenamiento
 
 Los binarios de la bandeja (fotos, audios, documentos) viven en la tabla `media`

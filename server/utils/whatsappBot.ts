@@ -352,7 +352,11 @@ function handoff(): WaMessage {
 
 // ---------- búsqueda de productos (texto libre) ----------
 
-/** Ficha de un producto: nombre, precio, tallas, enlace y CTA de volver. */
+/**
+ * Ficha de un producto que EMPUJA A LA VENTA: nombre, precio, tallas, enlace y
+ * tres botones — 🛒 Comprar ahora (link directo a la PDP, con la talla si se
+ * pidió), 📏 ¿Qué talla? (pregunta edad/estatura y sugiere) y 💬 Hablar con alguien.
+ */
 function productoFicha(p: FoundProduct, requestedSize: string | null): WaMessage {
   const tallas = p.tallas.join(', ')
   const link = `${site()}/producto/${p.slug}`
@@ -362,14 +366,108 @@ function productoFicha(p: FoundProduct, requestedSize: string | null): WaMessage
       ? `✅ Talla *${requestedSize}* disponible\n`
       : `⚠️ Talla *${requestedSize}* no disponible en este. Tallas: ${tallas}\n`
   }
-  return waText(
+  return waButtons(
     `🎭 *${p.nombre}*\n`
-    + `💲 ${formatCOP(p.precio)}\n`
+    + `💲 ${formatCOP(p.precio)} · envío gratis 🚚\n`
     + `📏 Tallas: ${tallas}\n`
     + sizeLine
-    + `🔗 ${link}\n\n`
-    + 'Escribe *MENÚ* para volver.',
+    + `🔗 ${link}`,
+    [
+      { id: `buyp:${p.slug}`, title: '🛒 Comprar ahora' },
+      { id: `talla:${p.slug}`, title: '📏 ¿Qué talla?' },
+      { id: 'main:human', title: '💬 Hablar con alguien' },
+    ],
   )
+}
+
+/** "Comprar ahora": link directo a la PDP (con ?talla= si el cliente ya la dijo). */
+function comprarAhora(p: FoundProduct, size: string | null): WaMessage {
+  const link = `${site()}/producto/${p.slug}${size && hasSize(p, size) ? `?talla=${encodeURIComponent(size)}` : ''}`
+  return waButtons(
+    `¡Vamos! 🛒 Aquí compras *${p.nombre}* en la web:\n${link}\n\n`
+    + 'Eliges la talla, pagas con Mercado Pago, Nequi o contra entrega, y el envío es gratis 🚚\n'
+    + 'Si prefieres pedirlo por aquí, toca "Hablar con alguien".',
+    [{ id: 'main:human', title: '💬 Pedir por chat' }, { id: 'main:como', title: 'Cómo comprar' }, { id: 'main:menu', title: '🏠 Menú' }],
+  )
+}
+
+// ---------- "¿Qué talla?": edad o estatura → talla sugerida ----------
+// Tabla real de la guía (guia-tallas.webp): estatura por talla, Súper Acolchado
+// (hombro a suelo en la Línea Eco es ~10 cm menos, por eso hay dos columnas).
+const GUIA_CM: Array<{ talla: number, super: [number, number], eco: number }> = [
+  { talla: 2, super: [70, 80], eco: 81 },
+  { talla: 4, super: [81, 90], eco: 88 },
+  { talla: 6, super: [91, 100], eco: 95.5 },
+  { talla: 8, super: [101, 110], eco: 103 },
+  { talla: 10, super: [111, 120], eco: 110 },
+  { talla: 12, super: [121, 130], eco: 117 },
+]
+export function tallaPorEstatura(cm: number, eco: boolean): number | null {
+  if (!Number.isFinite(cm) || cm < 55 || cm > 175) return null
+  if (eco) {
+    // Eco: la medida de la guía es la talla "justa"; se toma la primera talla cuya medida cubra.
+    for (const g of GUIA_CM) if (cm <= g.eco + 3) return g.talla
+    return 12
+  }
+  if (cm < 70) return 0
+  for (const g of GUIA_CM) if (cm >= g.super[0] && cm <= g.super[1]) return g.talla
+  return cm > 130 ? 14 : 2
+}
+/** El número de talla infantil coincide aproximadamente con la edad (talla 6 ≈ 6 años). */
+export function tallaPorEdad(anios: number): number | null {
+  if (!Number.isFinite(anios) || anios < 0 || anios > 16) return null
+  if (anios < 1) return 0
+  const pares = [0, 2, 4, 6, 8, 10, 12, 14]
+  let best = pares[0]!
+  for (const p of pares) if (Math.abs(p - anios) < Math.abs(best - anios)) best = p
+  return best
+}
+const ADULT_SIZES = new Set(['S', 'M', 'L', 'XL', 'XS'])
+function esAdulto(p: FoundProduct): boolean {
+  return p.tallas.some(t => ADULT_SIZES.has(String(t).toUpperCase()))
+}
+
+function preguntaTalla(p: FoundProduct): WaMessage {
+  if (esAdulto(p)) {
+    return waButtons(
+      `📏 *${p.nombre}* viene en tallas *${p.tallas.join(', ')}* (adulto).\n`
+      + 'Como referencia: S ≈ 1,55–1,62 m · M ≈ 1,62–1,70 m · L ≈ 1,70–1,78 m · XL ≈ más de 1,78 m.\n'
+      + `Guía completa: ${site()}/tallas\n\n¿Quieres que te ayude una persona a elegir?`,
+      [{ id: `buyp:${p.slug}`, title: '🛒 Comprar ahora' }, { id: 'main:human', title: '💬 Hablar con alguien' }, { id: 'main:menu', title: '🏠 Menú' }],
+    )
+  }
+  return waButtons(
+    `📏 Para sugerirte la talla de *${p.nombre}* dime la *edad* o la *estatura* del niño o la niña 😊\n`
+    + 'Ejemplos: *5 años* · *1,10 m* · *110 cm*\n'
+    + `(Guía completa: ${site()}/tallas)`,
+    [{ id: `buyp:${p.slug}`, title: '🛒 Comprar ahora' }, { id: 'main:human', title: '💬 Hablar con alguien' }, { id: 'main:menu', title: '🏠 Menú' }],
+  )
+}
+
+/** Respuesta a "5 años" / "1,10 m" / "110 cm" tras "¿Qué talla?" (o con un producto vivo). */
+export function sugerirTalla(p: FoundProduct, text: string): WaMessage | null {
+  const norm = text.toLowerCase().replace(',', '.')
+  let sugerida: number | null = null
+  let base = ''
+  const mCm = norm.match(/(\d{2,3})\s*(?:cm|cent[ií]metros?)\b/) ?? norm.match(/\b(\d{2,3})\b(?!\s*(?:a[nñ]os?|a[nñ]itos?))/)
+  const mM = norm.match(/(\d)[.](\d{1,2})\s*(?:m|mts?|metros?)?\b/)
+  const mAnios = norm.match(/(\d{1,2})\s*(?:a[nñ]os?|a[nñ]itos?|years?)\b/) ?? (/\b(?:un|1)\s*a[nñ]o\b/.test(norm) ? ['', '1'] : null)
+  const mMedio = /a[nñ]o y medio/.test(norm)
+  if (mM) { const cm = Math.round(Number(`${mM[1]}.${mM[2]}`) * 100); sugerida = tallaPorEstatura(cm, p.grupo === 'economico'); base = `${cm} cm` }
+  else if (mAnios) { let a = Number(mAnios[1]); if (mMedio) a += 0.5; sugerida = tallaPorEdad(a); base = `${mMedio ? `${Math.floor(a)} años y medio` : `${a} años`}` }
+  else if (mCm) { const cm = Number(mCm[1]); if (cm >= 55 && cm <= 175) { sugerida = tallaPorEstatura(cm, p.grupo === 'economico'); base = `${cm} cm` } }
+  if (sugerida === null) return null
+  const disponible = hasSize(p, String(sugerida))
+  const alternativa = !disponible ? p.tallas.map(Number).filter(n => Number.isFinite(n)).sort((a, b) => Math.abs(a - sugerida!) - Math.abs(b - sugerida!))[0] : undefined
+  const link = `${site()}/producto/${p.slug}?talla=${disponible ? sugerida : alternativa ?? ''}`
+  const body = disponible
+    ? `Para *${base}* te sugiero la *talla ${sugerida}* de *${p.nombre}* ✅\n${p.grupo === 'economico' ? 'En la Línea Eco la medida se toma del hombro al suelo.' : 'Si está entre dos tallas, elige la mayor: los niños crecen 😉'}\n🔗 ${link}`
+    : `Para *${base}* la talla ideal sería la *${sugerida}*, pero *${p.nombre}* ${alternativa !== undefined ? `no la tiene: la más cercana es la *${alternativa}*` : 'no la tiene disponible'} ⚠️\n🔗 ${link}`
+  return waButtons(body, [
+    { id: `buyp:${p.slug}`, title: '🛒 Comprar ahora' },
+    { id: 'main:human', title: '💬 Hablar con alguien' },
+    { id: 'main:menu', title: '🏠 Menú' },
+  ])
 }
 
 /**
@@ -502,6 +600,14 @@ export function buildBotReplies(input: WaIncoming, state: ConvState): BotResult 
     const p = getProductBySlug(slug)
     if (p) return { replies: [productoFicha(p, state.askedSize ?? null)], patch: { step: `prod:${slug}`, stack: [] } }
   }
+  if (id.startsWith('buyp:')) {
+    const p = getProductBySlug(id.slice(5))
+    if (p) return { replies: [comprarAhora(p, state.askedSize ?? null)], patch: { step: `buyp:${p.slug}`, stack: [] } }
+  }
+  if (id.startsWith('talla:')) {
+    const p = getProductBySlug(id.slice(6))
+    if (p) return { replies: [preguntaTalla(p)], patch: { step: `talla:${p.slug}`, stack: [], askedSize: undefined } }
+  }
 
   // Texto libre (no comando, no número de menú, no reinicio) -> búsqueda de productos.
   // Los clientes de Marketplace escriben "del hombre araña talla 4", "goku"…
@@ -511,7 +617,7 @@ export function buildBotReplies(input: WaIncoming, state: ConvState): BotResult 
       // Recuerda la talla pedida (o límpiala si esta búsqueda no trae talla).
       const askedSize = res.requestedSize ?? undefined
       if (res.matches.length === 1) {
-        return { replies: [productoFicha(res.matches[0], res.requestedSize)], patch: { step: 'ficha', stack: ['menu'], askedSize } }
+        return { replies: [productoFicha(res.matches[0], res.requestedSize)], patch: { step: `prod:${res.matches[0].slug}`, stack: ['menu'], askedSize } }
       }
       return { replies: [resultadosList(res.matches, res.requestedSize)], patch: { step: 'resultados', stack: ['menu'], askedSize } }
     }

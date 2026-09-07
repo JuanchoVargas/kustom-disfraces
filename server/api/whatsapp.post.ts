@@ -73,7 +73,7 @@ async function handleIncoming(incoming: WaIncoming): Promise<number> {
   // no cambia: se aplica igual sobre los mensajes resultantes, más abajo.
   // Stock del inventario (productos/tallas agotados) para búsquedas y fichas.
   await refreshBotStock()
-  const { replies, patch } = buildReplies(incoming, session.state)
+  const { replies, patch, failedSearch, leadPhone } = buildReplies(incoming, session.state)
 
   // Enviar cada respuesta del árbol (en orden). Si WhatsApp no está configurado,
   // sendWhatsAppMessage lo registra y no rompe (útil en local sin credenciales).
@@ -118,7 +118,7 @@ async function handleIncoming(incoming: WaIncoming): Promise<number> {
   const configured = whatsappConfigured()
   const delivered = configured && sent.length > 0
   const sentTexts = waTexts(configured ? sent : outgoing)
-  await closeBotSession({ session, canal: 'wa', externalId: incoming.from, incoming, sentTexts, delivered, patch: { ...patch, lastMenu } })
+  await closeBotSession({ session, canal: 'wa', externalId: incoming.from, incoming, sentTexts, delivered, patch: { ...patch, lastMenu }, failedSearch, leadPhone })
 
   if (!replies.length) log('replied=false skip=arbol_sin_respuesta (handoff pendiente)')
   else if (delivered) log(`replied=true enviados=${sent.length}/${outgoing.length}`)

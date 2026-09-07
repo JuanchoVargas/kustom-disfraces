@@ -7,6 +7,10 @@
     {
       "path": "/api/cron/stock-alertas",
       "schedule": "30 12 * * *"
+    },
+    {
+      "path": "/api/cron/ventana-24h",
+      "schedule": "0 * * * *"
     }
   ]
 }

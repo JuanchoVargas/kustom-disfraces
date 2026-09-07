@@ -43,7 +43,7 @@ export default defineEventHandler(async (event) => {
 
       // Capa de intención omnicanal: slots + lenguaje natural, reusando el cerebro base.
       await refreshBotStock() // productos/tallas agotados del inventario
-      const { replies, patch } = buildReplies(incoming, session.state)
+      const { replies, patch, failedSearch, leadPhone } = buildReplies(incoming, session.state)
 
       // Adaptar la salida del bot a Messenger (quick replies, texto con URL, etc.).
       const { messages, lastMenu } = toMessengerReplies(replies)
@@ -54,7 +54,7 @@ export default defineEventHandler(async (event) => {
         if (ok) delivered = true
         if (ok || !messengerConfigured()) sentTexts.push(messengerToText(msg))
       }
-      await closeBotSession({ session, canal: channel, externalId: String(senderId), incoming, sentTexts, delivered, patch: { ...patch, lastMenu } })
+      await closeBotSession({ session, canal: channel, externalId: String(senderId), incoming, sentTexts, delivered, patch: { ...patch, lastMenu }, failedSearch, leadPhone })
     }
   }
 

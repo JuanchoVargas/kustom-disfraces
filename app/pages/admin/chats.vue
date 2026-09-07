@@ -25,6 +25,8 @@ interface Conv {
   external_id: string
   nombre: string | null
   telefono: string | null
+  /** celular que el cliente escribió en el chat (lead) */
+  telefono_lead?: string | null
   bsuid: string | null
   username: string | null
   ultimo_mensaje: string | null
@@ -680,6 +682,7 @@ function windowLeft(c: Conv) {
                 </template>
                 <template v-else-if="selected.canal === 'wa'">
                   <span class="chat__locked" :title="selected.bsuid || selected.external_id">🔒 {{ NO_PHONE }}</span>
+                  <span v-if="selected.telefono_lead" class="chat__lead" :title="'Celular que dejó el cliente en el chat'">📲 Dejó su celular: <b>{{ selected.telefono_lead }}</b> <button class="copy" type="button" @click="copy(selected.telefono_lead!)">copiar</button></span>
                 </template>
                 <template v-else>
                   <span>{{ CANAL[selected.canal].label }} id {{ selected.external_id }}</span>
@@ -1030,6 +1033,7 @@ function windowLeft(c: Conv) {
 .chat__meta { font-size: 12px; color: var(--mut); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .chat__phone { font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; user-select: all; }
 .chat__locked { color: #9A5B00; font-weight: 600; }
+.chat__lead { color: var(--purple-d); font-weight: 600; margin-left: 8px; }
 .chat__user { display: inline-flex; align-items: center; gap: 4px; color: var(--purple-d); font-weight: 600; }
 .chat__actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
 .chat__body {

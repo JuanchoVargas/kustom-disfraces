@@ -1,9 +1,11 @@
 import type { WaMessage } from './whatsapp'
 import type { ConvState, WaIncoming } from './whatsappBot'
-import { interactiveOptions, waButtons, waText } from './whatsapp'
-import { buildBotReplies } from './whatsappBot'
+import { interactiveOptions, waButtons, waList, waText } from './whatsapp'
+import { buildBotReplies, sugerirTalla } from './whatsappBot'
+import { getProductBySlug } from './productSearch'
 import { publicoNombre } from './catalogNav'
-import { formatCOP, normalize, priceRange, searchProducts, searchVocabulary } from './productSearch'
+import { formatCOP, normalize, priceRange, searchProducts, searchVocabulary, similarProducts } from './productSearch'
+import type { SimilarProduct } from './productSearch'
 
 /**
  * Capa de intención OMNICANAL (WhatsApp + Messenger/Instagram). Envuelve al cerebro
@@ -13,7 +15,14 @@ import { formatCOP, normalize, priceRange, searchProducts, searchVocabulary } fr
  * de cada canal (quick replies vs chunking/texto) vive en su adaptador de salida.
  */
 
-export interface BotResult { replies: WaMessage[], patch: Partial<ConvState> }
+export interface BotResult {
+  replies: WaMessage[]
+  patch: Partial<ConvState>
+  /** Búsqueda sin resultado exacto (para registrar en bot_busquedas_fallidas). Transitorio. */
+  failedSearch?: { texto: string, termino: string, motivo: 'sin_coincidencia' | 'solo_parecidos', sugerencias: SimilarProduct[] }
+  /** Teléfono colombiano escrito por el cliente (lead). Transitorio. */
+  leadPhone?: string
+}
 
 const site = () => (useRuntimeConfig().public.siteUrl || 'https://www.disfraceskustom.com').replace(/\/$/, '')
 const SLOT_TTL = 30 * 60 * 1000 // 30 min
@@ -24,7 +33,7 @@ const GENERIC_WORDS = new Set(['traje', 'trajes', 'disfraz', 'disfraces', 'disfr
 // Conectores/palabras vacías (para decidir si QUEDA algún token de producto). No se
 // usan para la BÚSQUEDA (esa recibe la frase completa, para que los alias por frase
 // como "hombre arana" sigan funcionando), solo para clasificar la intención.
-const CONNECTORS = new Set(['de', 'del', 'el', 'la', 'los', 'las', 'un', 'una', 'unos', 'unas', 'y', 'o', 'para', 'por', 'con', 'en', 'a', 'que', 'al', 'lo', 'me', 'mi', 'te', 'se', 'tiene', 'tienen', 'tienes', 'tenes', 'hay', 'busco', 'quiero', 'necesito', 'ver', 'mira', 'quisiera', 'queria', 'este', 'esta', 'ese', 'esa', 'esos', 'esas', 'estos', 'estas', 'eso', 'esto', 'aqui', 'ahi', 'cual', 'cuales', 'algun', 'alguna'])
+const CONNECTORS = new Set(['hola', 'holaa', 'buenas', 'buenos', 'buen', 'dias', 'dia', 'tardes', 'noches', 'saludos', 'gracias', 'porfa', 'porfavor', 'favor', 'por favor', 'de', 'del', 'el', 'la', 'los', 'las', 'un', 'una', 'unos', 'unas', 'y', 'o', 'para', 'por', 'con', 'en', 'a', 'que', 'al', 'lo', 'me', 'mi', 'te', 'se', 'tiene', 'tienen', 'tienes', 'tenes', 'hay', 'busco', 'quiero', 'necesito', 'ver', 'mira', 'quisiera', 'queria', 'este', 'esta', 'ese', 'esa', 'esos', 'esas', 'estos', 'estas', 'eso', 'esto', 'aqui', 'ahi', 'cual', 'cuales', 'algun', 'alguna'])
 const BACK_WORDS = new Set(['volver', 'atras', 'regresar'])
 const RESET_WORDS = new Set(['menu', 'inicio', 'empezar', 'start'])
 // palabra de público (normalizada, sin tildes) → slug de catalogNav.
@@ -165,14 +174,43 @@ function askPersonaje(state: ConvState, slots: NonNullable<ConvState['slots']>, 
   }
 }
 
-/** 0 coincidencias: copy (sin carita triste) + link al PDF + catálogo/asesor/menú. */
-function sinResultados(state: ConvState, slots: NonNullable<ConvState['slots']>): BotResult {
+/**
+ * 0 coincidencias exactas: NUNCA un callejón sin salida. Se ofrecen los 3
+ * productos más parecidos ("¿Buscas algo parecido a esto?") como opciones,
+ * "Hablar con alguien" siempre presente, y el término queda registrado para el
+ * reporte de demanda (bot_busquedas_fallidas).
+ */
+function sinResultados(texto: string, termino: string, slots: NonNullable<ConvState['slots']>): BotResult {
+  // Sugerencias con un mínimo de parecido (< 0.3 = ruido: "Woody" no es "Lady Bug").
+  const parecidos = similarProducts(texto, 3).filter(p => p.score >= 0.3)
+  const failedSearch = { texto, termino, motivo: (parecidos.length ? 'solo_parecidos' : 'sin_coincidencia') as 'solo_parecidos' | 'sin_coincidencia', sugerencias: parecidos }
+  // Se repite el TÉRMINO de producto, no la frase completa ("venimos", no "hola buenas tiene disfraz de venimos talla 12").
+  const eco = (termino || texto).trim().slice(0, 40)
+  if (!parecidos.length) {
+    return {
+      replies: [waButtons(
+        `No tengo *"${eco}"* en el catálogo por ahora 🙈\nPuedo mostrarte las categorías, o una persona del equipo te ayuda a buscarlo y te avisa si llega.`,
+        [{ id: 'main:ver', title: 'Ver categorías' }, { id: 'main:human', title: 'Hablar con alguien' }, { id: 'main:menu', title: '🏠 Menú' }],
+      )],
+      patch: { step: 'sin-resultados', stack: [], slots: mergeSlots(slots, {}) },
+      failedSearch,
+    }
+  }
+  const strong = parecidos[0]!.score >= 0.5
+  const body = strong
+    ? `No encontré exactamente *"${eco}"*, pero creo que buscas uno de estos 👇`
+    : `No tengo *"${eco}"* en el catálogo. ¿Buscas algo parecido a esto? 👇`
+  const rows = parecidos.map(p => ({
+    id: `prod:${p.slug}`,
+    title: p.nombre,
+    description: `${formatCOP(p.precio)} · tallas ${p.tallas.join(', ')}`,
+  }))
+  rows.push({ id: 'main:human', title: '💬 Hablar con alguien', description: 'Una persona del equipo te ayuda a buscarlo' })
+  rows.push({ id: 'main:menu', title: '🏠 Menú', description: 'Volver al inicio' })
   return {
-    replies: [waButtons(
-      `No encontré ese disfraz en nuestro catálogo. Puedes ver el catálogo completo aquí 👇\n${site()}/catalogo-kustom.pdf\nO si prefieres, te paso con una persona del equipo 🙌`,
-      [{ id: 'main:catalogo', title: 'Ver catálogo' }, { id: 'main:human', title: 'Hablar con alguien' }, { id: 'main:menu', title: '🏠 Menú' }],
-    )],
-    patch: { step: 'sin-resultados', stack: [], slots: mergeSlots(slots, {}) },
+    replies: [waList(body, 'Ver opciones', rows, 'Parecidos')],
+    patch: { step: 'sin-resultados', stack: ['menu'], slots: mergeSlots(slots, {}) },
+    failedSearch,
   }
 }
 
@@ -181,8 +219,12 @@ function sinResultados(state: ConvState, slots: NonNullable<ConvState['slots']>)
 // vienen los disfraces?" es una pregunta general, no un disfraz que no tenemos.
 // El texto llega normalizado (minúsculas, sin tildes). El orden importa: la
 // primera regla que casa gana ("contra entrega" es pago aunque diga "entrega").
-type InfoKind = 'mayoristas' | 'garantia' | 'pago' | 'tallas' | 'envio' | 'horario' | 'direccion' | 'precio'
+type InfoKind = 'descuento' | 'personalizar' | 'mayoristas' | 'garantia' | 'pago' | 'tallas' | 'envio' | 'horario' | 'direccion' | 'precio'
 const INFO_RULES: Array<[InfoKind, RegExp]> = [
+  // 10 clientes preguntaron por el código de descuento (Ice Breaker de Messenger incluido).
+  ['descuento', /\b(codigos?|cupon(es)?|descuentos?|promocion(es)?|promo|oferta del? ?20|20 ?%|20 por ?ciento|rebaja)\b/],
+  // "¿Se puede personalizar un disfraz con mi propio diseño?" (Ice Breaker) y variantes.
+  ['personalizar', /\b(personaliza(r|do|da|dos|das|cion)?|a la medida|sobre medida|por encargo|encargo|hecho a medida|mi propio diseno|diseno propio|bordar|con nombre|fabrican)\b/],
   ['mayoristas', /\b(mayoristas?|al por mayor|por mayor|al mayor|distribuidor(es|a|as)?|revender|reventa|docenas?)\b/],
   ['garantia', /\b(garantias?|cambios?|cambiar(lo|la)?|devolucion(es)?|devolver(lo|la)?|reembolso|defectos?|defectuos[oa])\b/],
   ['pago', /\b(pagos?|pagar(lo|la)?|pagan?|pagas|pagamos|pagando|nequi|daviplata|transferencia|consignacion|efectivo|tarjeta|contra ?entrega|contraentrega|mercado ?pago|pse|bancolombia|datafono|cuotas|metodos? de pago|formas? de pago)\b/],
@@ -202,9 +244,17 @@ function detectInfo(norm: string, rest: string): InfoKind | null {
 }
 
 const INFO_TEXT: Record<InfoKind, () => string> = {
-  tallas: () => 'Manejamos tallas de la 0 a la 14 según el disfraz 📏\n'
-    + `Mira la guía completa aquí 👇\n${site()}/tallas\n\n`
-    + 'Si me dices el personaje y la talla, te confirmo si la tenemos 😉',
+  tallas: () => '📏 *Tallas*\n'
+    + '• Niños y niñas: de la *0 a la 14* según el disfraz (la 0 es para bebés).\n'
+    + '• Damas y caballeros: *S, M, L y XL*.\n'
+    + `Guía de medidas con edad y estatura 👇\n${site()}/tallas\n\n`
+    + 'Si me dices el personaje y la edad o estatura, te sugiero la talla 😉',
+  descuento: () => 'No necesitas código 🎉 El *20% de descuento ya está aplicado en la web*: el precio que ves es el precio final.\n'
+    + 'Y el envío es *gratis* a todo el país 🚚',
+  personalizar: () => '🎨 *Personalización*\n'
+    + 'Nuestros disfraces vienen con un diseño definido: cada ficha dice qué incluye (máscara, enterizo, capa, cubrebotas…). '
+    + 'No hacemos diseños a la medida ni personalizados con nombre o logo.\n'
+    + 'Si buscas un personaje específico, escríbeme el nombre y te digo si lo tenemos 😉',
   envio: () => '🚚 ¡El envío es *GRATIS* a todo el país!\n'
     + 'Enviamos a Bogotá y a toda Colombia con guía de la transportadora para que hagas seguimiento. El tiempo de entrega depende del destino.\n'
     + `Más info: ${site()}/envios`,
@@ -231,12 +281,42 @@ const INFO_TEXT: Record<InfoKind, () => string> = {
 
 /** Respuesta informativa: texto útil (con link) + el menú principal debajo (sin repetir el saludo). */
 function infoReply(kind: InfoKind, input: WaIncoming, state: ConvState, slots: NonNullable<ConvState['slots']>): BotResult {
+  if (kind === 'descuento') {
+    return {
+      replies: [waButtons(INFO_TEXT.descuento(), [
+        { id: 'main:ver', title: 'Ver disfraces' },
+        { id: 'main:como', title: 'Cómo comprar' },
+        { id: 'main:human', title: 'Hablar con alguien' },
+      ])],
+      patch: { step: 'info:descuento', stack: [], askedSize: undefined, slots: mergeSlots(slots, {}) },
+    }
+  }
   const menu = buildBotReplies({ from: input.from, kind: 'reply', replyId: 'main:menu', profileName: input.profileName }, state)
   const first = menu.replies[0]
   const follow = first?.type === 'interactive' ? cloneWithBody(first, '¿Qué más quieres hacer? 👇') : first
   return {
     replies: [waText(INFO_TEXT[kind](), true), ...(follow ? [follow] : [])],
     patch: { step: `info:${kind}`, stack: [], askedSize: undefined, slots: mergeSlots(slots, {}) },
+  }
+}
+
+// ---------- teléfono escrito por el cliente (lead) ----------
+// Celular colombiano: 10 dígitos que empiezan por 3, con o sin +57/57 y separadores.
+const PHONE_RE = /(?:\+?57[\s.-]?)?(3\d{2})[\s.-]?(\d{3})[\s.-]?(\d{4})(?!\d)/
+export function extractColombianPhone(text: string): string | null {
+  const m = String(text ?? '').match(PHONE_RE)
+  if (!m) return null
+  const digits = `${m[1]}${m[2]}${m[3]}`
+  return /^3\d{9}$/.test(digits) ? digits : null
+}
+function leadPhoneReply(phone: string, state: ConvState, slots: NonNullable<ConvState['slots']>): BotResult {
+  return {
+    replies: [waButtons(
+      `¡Anotado! 📲 Guardé tu número *${phone}* y una persona del equipo te escribe o te llama en nuestro horario (lunes a sábado, 8:00 a.m. a 7:00 p.m.).\nMientras tanto, ¿quieres ver disfraces?`,
+      [{ id: 'main:ver', title: 'Ver disfraces' }, { id: 'main:human', title: 'Hablar con alguien' }, { id: 'main:menu', title: '🏠 Menú' }],
+    )],
+    patch: { step: 'lead-telefono', stack: [], slots: mergeSlots(slots, {}) },
+    leadPhone: phone,
   }
 }
 
@@ -273,6 +353,17 @@ function handleText(input: WaIncoming, state: ConvState): BotResult {
   const norm = normalize(text)
   const slots = liveSlots(state)
 
+  // Tras "¿Qué talla?" (o con un producto vivo): "5 años", "1,10 m", "110 cm" → talla sugerida.
+  const tallaSlug = typeof state.step === 'string' && state.step.startsWith('talla:') ? state.step.slice(6) : slots.producto
+  if (tallaSlug && /\d/.test(text) && !/^\d{7,}$/.test(text.replace(/\D/g, ''))) {
+    const p = getProductBySlug(tallaSlug)
+    const sug = p ? sugerirTalla(p, text) : null
+    if (sug) return { replies: [sug], patch: { step: `prod:${tallaSlug}`, stack: [], slots: mergeSlots(slots, { producto: tallaSlug }) } }
+  }
+  // Un celular colombiano escrito en el chat = lead: se guarda, se marca no leída y se avisa a ventas.
+  // (Antes de mirar lastMenu: "3127318424" no es la opción 3.127.318.424 de un menú.)
+  const phone = extractColombianPhone(text)
+  if (phone) return leadPhoneReply(phone, state, slots)
   // Número puro → selección silenciosa por lastMenu (reusa el cerebro; sin copy numérico).
   if (/^\d+$/.test(text) && state.lastMenu?.length) return withSlots(buildBotReplies(input, state), slots, {})
   // "volver"/"atrás" escrito → back del cerebro (mantiene slots).
@@ -321,7 +412,10 @@ function handleText(input: WaIncoming, state: ConvState): BotResult {
   if (found) return productFlow()
 
   // Había términos de producto pero SIN coincidencia (p. ej. "diosa griega") → sin resultados.
-  if (hasProducto) return sinResultados(state, slots)
+  // Un número suelto sin menú activo ("3", "12") no es un producto: no se registra
+  // como demanda ni se responde "no tengo 3"; se vuelve a la bienvenida.
+  if (/^\d{1,3}$/.test(text)) return welcome(input, state)
+  if (hasProducto) return sinResultados(text, productoRaw.trim(), slots)
 
   // Sin término de producto → público / talla / producto vivo / bienvenida.
   if (publico) return promptPersonaje(publico, input, state, slots)
@@ -357,7 +451,7 @@ function withTip(res: BotResult): BotResult {
   if (!tip || first?.type !== 'interactive') return res
   const it = first.interactive as any
   const withBody: WaMessage = { type: 'interactive', interactive: { ...it, body: { ...it.body, text: `${String(it?.body?.text ?? '')}\n${tip}` } } }
-  return { replies: [withBody, ...res.replies.slice(1)], patch: res.patch }
+  return { ...res, replies: [withBody, ...res.replies.slice(1)] }
 }
 
 /**

@@ -519,6 +519,8 @@ export interface HandoffAlert {
   ultimoMensaje: string
   /** undefined si la BD estaba caída al registrar el handoff (la alerta sale igual) */
   conversationId?: number
+  /** Asunto alternativo (p. ej. lead con celular, ventana por vencer). */
+  asunto?: string
 }
 
 const CANAL_LABEL: Record<HandoffAlert['canal'], string> = { wa: 'WhatsApp', msg: 'Messenger', ig: 'Instagram' }
@@ -584,7 +586,7 @@ export async function sendHandoffAlert(data: HandoffAlert): Promise<{ sent: bool
     await createMailTransport().sendMail({
       from: `"Alertas Kustom" <${from}>`,
       to,
-      subject: `🙋 ${canal}: ${data.nombre || data.externalId} pide atención`,
+      subject: data.asunto ? `${data.asunto} — ${canal}: ${data.nombre || data.externalId}` : `🙋 ${canal}: ${data.nombre || data.externalId} pide atención`,
       text,
       html,
       headers: { 'List-Unsubscribe': LIST_UNSUB },

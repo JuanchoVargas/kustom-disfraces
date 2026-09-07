@@ -198,6 +198,106 @@ export function searchProducts(query: string, limit = 8): SearchResult | null {
   return { matches: scored.slice(0, limit).map(x => conStock(x.e.p)), requestedSize: size }
 }
 
+// ---------- coincidencia parcial / parecidos (cuando la búsqueda exacta falla) ----------
+// Distancia de edición acotada (Levenshtein ≤ max) y similitud por trigramas.
+function lev(a: string, b: string, max: number): number {
+  const m = a.length, n = b.length
+  if (Math.abs(m - n) > max) return max + 1
+  let prev = Array.from({ length: n + 1 }, (_, i) => i)
+  for (let i = 1; i <= m; i++) {
+    const cur = [i]
+    let rowMin = i
+    for (let j = 1; j <= n; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1
+      cur[j] = Math.min(prev[j]! + 1, cur[j - 1]! + 1, prev[j - 1]! + cost)
+      if (cur[j]! < rowMin) rowMin = cur[j]!
+    }
+    if (rowMin > max) return max + 1
+    prev = cur
+  }
+  return prev[n]!
+}
+const trigrams = (s: string): Set<string> => {
+  const t = ` ${s} `
+  const out = new Set<string>()
+  for (let i = 0; i + 3 <= t.length; i++) out.add(t.slice(i, i + 3))
+  return out
+}
+function trigramSim(a: string, b: string): number {
+  const A = trigrams(a), B = trigrams(b)
+  let inter = 0
+  for (const g of A) if (B.has(g)) inter++
+  return inter / Math.max(1, Math.min(A.size, B.size))
+}
+// Sonidos que los clientes confunden al escribir ("deep pool" → deadpool, "venimos" → venom).
+function phonetic(s: string): string {
+  return s.replace(/ph/g, 'f').replace(/ck|qu|q/g, 'k').replace(/c([ei])/g, 's$1').replace(/c/g, 'k').replace(/z/g, 's').replace(/v/g, 'b')
+    .replace(/ll|y/g, 'i').replace(/h/g, '').replace(/ee|ea/g, 'i').replace(/oo/g, 'u').replace(/(.)\1+/g, '$1').replace(/\s+/g, '')
+}
+
+export interface SimilarProduct extends FoundProduct { score: number, motivo: string }
+
+/**
+ * Los productos MÁS PARECIDOS a una consulta que no dio coincidencia exacta:
+ * tolera errores de escritura mayores (edición ≤ 2 por token, o ≤ 3 en tokens
+ * largos), coincidencia parcial contra nombre/alias (trigramas y prefijos), y
+ * una aproximación fonética. Siempre devuelve hasta `limit`, aunque el puntaje
+ * sea bajo; `score` permite decidir cuánto confiar (≥ 0.5 = probable, < 0.3 =
+ * solo "por si acaso").
+ */
+export function similarProducts(query: string, limit = 3): SimilarProduct[] {
+  const rawNorm = normalize(query)
+  const { cleaned } = parseSize(rawNorm)
+  const tokens = tokenize(cleaned)
+  const q = tokens.join(' ')
+  if (!q) return []
+  const qPh = phonetic(q)
+  const scored: SimilarProduct[] = []
+  for (const e of buildIndex()) {
+    if (productoAgotado(e.p.codigo)) continue
+    let best = 0, motivo = ''
+    const candidates = [e.nameNorm, e.p.slug.replace(/-/g, ' '), ...e.phrases]
+    for (const cand of candidates) {
+      const sim = trigramSim(q, cand)
+      if (sim > best) { best = sim; motivo = 'parcial' }
+    }
+    // token a token contra el vocabulario del producto (typos fuertes)
+    let tokHits = 0
+    for (const t of tokens) {
+      if (t.length < 3) continue
+      const max = t.length >= 7 ? 3 : t.length >= 5 ? 2 : 1
+      for (const h of e.tokens) {
+        if (h.length < 3) continue
+        if (h === t || lev(t, h, max) <= max) { tokHits++; break }
+      }
+    }
+    if (tokens.length && tokHits) {
+      const s = 0.45 + 0.4 * (tokHits / tokens.length)
+      if (s > best) { best = s; motivo = 'typo' }
+    }
+    // fonético contra nombre y alias
+    for (const cand of candidates) {
+      const cp = phonetic(cand)
+      if (!cp) continue
+      if (cp === qPh || cp.includes(qPh) || qPh.includes(cp)) { if (0.6 > best) { best = 0.6; motivo = 'fonetico' } }
+      else if (lev(qPh, cp, 2) <= 2 && qPh.length >= 5) { if (0.5 > best) { best = 0.5; motivo = 'fonetico' } }
+    }
+    if (best > 0) scored.push({ ...conStock(e.p), score: Math.round(best * 100) / 100, motivo })
+  }
+  scored.sort((a, b) => b.score - a.score || a.precio - b.precio)
+  // Un producto por nombre base (evita 3 variantes del mismo personaje).
+  const seen = new Set<string>()
+  const out: SimilarProduct[] = []
+  for (const s of scored) {
+    const base = s.nombre.replace(/\s+(linea eco|línea eco|linea entrada|línea entrada)$/i, '').toLowerCase()
+    if (seen.has(base)) continue
+    seen.add(base)
+    out.push(s)
+    if (out.length >= limit) break
+  }
+  return out
+}
+
 /** Rango de precios del catálogo visible (para la respuesta general de "¿precios?"). */
 export function priceRange(): { min: number, max: number } {
   const precios = buildIndex().map(e => e.p.precio).filter(n => Number.isFinite(n) && n > 0)

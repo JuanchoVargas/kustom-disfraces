@@ -7,6 +7,7 @@ import {
 } from './inbox'
 import { downloadFromUrl, downloadWaMedia, saveMediaChecked } from './media'
 import { sendHandoffAlert } from './orderEmail'
+import { recordFailedSearch } from './botDemand'
 import { sendTemplateMessage } from './whatsapp'
 
 /**
@@ -124,6 +125,10 @@ export interface CloseBotSessionInput {
    * con el mismo wamid debe poder volver a responder.
    */
   delivered: boolean
+  /** Búsqueda sin resultado exacto (reporte de demanda). Viene de buildReplies(). */
+  failedSearch?: { texto: string, termino: string, motivo: 'sin_coincidencia' | 'solo_parecidos', sugerencias: { slug: string, nombre: string, score: number, motivo: string }[] }
+  /** Celular colombiano escrito por el cliente: se guarda en la conversación y se avisa a ventas. */
+  leadPhone?: string
 }
 
 /**
@@ -132,8 +137,28 @@ export interface CloseBotSessionInput {
  * romper el webhook ni afectar lo que el cliente ya recibió.
  */
 export async function closeBotSession(input: CloseBotSessionInput): Promise<void> {
-  const { session, canal, externalId, incoming, sentTexts, patch, delivered } = input
+  const { session, canal, externalId, incoming, sentTexts, patch, delivered, failedSearch, leadPhone } = input
   const conv = session.conv
+  // Búsqueda fallida → log [bot-nf] + tabla bot_busquedas_fallidas (nunca lanza).
+  if (failedSearch) {
+    await recordFailedSearch({ canal, externalId, texto: failedSearch.texto, termino: failedSearch.termino, motivo: failedSearch.motivo, sugerencias: failedSearch.sugerencias.map(s => ({ slug: s.slug, nombre: s.nombre, score: s.score, motivo: s.motivo })) })
+  }
+  // LEAD con teléfono: se guarda en la conversación, queda NO LEÍDA y se avisa a ventas
+  // (correo + WhatsApp al encargado), sin apagar el bot.
+  if (leadPhone) {
+    console.info(`[${canal}] 📲 LEAD: ${externalId}${incoming.profileName ? ` (${incoming.profileName})` : ''} dejó el celular ${leadPhone}`)
+    try {
+      if (conv) await saveLeadPhone(conv.id, leadPhone)
+    }
+    catch (err) {
+      console.error(`[${canal}] ⚠️ BD caída guardando el lead ${leadPhone}:`, String((err as Error)?.message ?? err))
+    }
+    const nombre = incoming.profileName || conv?.nombre || undefined
+    const texto = `📲 Dejó su celular: ${leadPhone} — ${incomingToText(incoming)}`
+    await sendHandoffAlert({ canal, externalId, nombre, ultimoMensaje: texto, conversationId: conv?.id, asunto: `📲 Lead con celular ${leadPhone}` }).catch(err =>
+      console.error(`[${canal}] fallo enviando correo del lead:`, String((err as Error)?.message ?? err)))
+    await notifyManagerWhatsApp(canal, externalId, nombre, texto)
+  }
   try {
     if (conv) {
       for (const texto of sentTexts) {

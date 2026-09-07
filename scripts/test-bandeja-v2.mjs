@@ -133,7 +133,7 @@ await cleanup().catch(() => {})
 // 1. preguntas informativas por WhatsApp
 console.log('— 1. preguntas informativas (WhatsApp)')
 const INFO = [
-  ['EN QUÉ TALLA VIENEN LOS DISFRACES', 'tallas de la 0 a la 14', '/tallas'],
+  ['EN QUÉ TALLA VIENEN LOS DISFRACES', '0 a la 14', '/tallas'],
   ['precio', 'van desde', 'catalogo-kustom.pdf'],
   ['hacen envíos?', 'GRATIS', '/envios'],
   ['como se paga', 'contra entrega', '/como-comprar'],
@@ -144,7 +144,7 @@ for (const [q, ...expect] of INFO) {
   const all = await msgs(c.id)
   // El bot manda info + menú (que en texto se parte en 2 chunks): se miran los últimos 3.
   const last = all.filter(m => m.direccion === 'out').slice(-3).map(m => m.texto).join('\n')
-  check(`"${q}" → info`, expect.every(e => last.includes(e)) && !last.includes('No encontré ese disfraz'), expect.join(' + '))
+  check(`"${q}" → info`, expect.every(e => last.includes(e)) && !last.includes('No tengo *'), expect.join(' + '))
 }
 
 // 2. BSUID sin teléfono + username
