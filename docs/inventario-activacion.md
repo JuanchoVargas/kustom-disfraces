@@ -186,3 +186,18 @@ estén verificados.
 | `aplicar-overrides-woo.mjs --aplicar` | **No probado aún**: usa el mismo `bulkUpdate` del adaptador que sí está probado, pero la primera ejecución real es el paso B3 |
 | Lógica de agotado en web, bot y checkout | Probada en local con stock simulado (60 comprobaciones) |
 | Descuento de inventario al confirmarse un pago | **Pendiente**: paso B7 |
+| Subida de medios a WordPress desde Vercel (`GET /api/admin/test-wp-medios`, temporal) | **Pendiente de que JD lo ejecute** (2026-09-07): autentica, sube, lee, asigna a un borrador, retira y borra. Hasta que no dé todo OK no se usa el panel de imágenes ni la migración |
+
+## E. Imágenes (Fase A) — independiente del adaptador de inventario
+
+La subida de imágenes desde el panel **no depende** de `NUXT_INVENTORY_BACKEND`:
+funciona en mock o woo porque va directo a WordPress/Woo, y mientras
+`NUXT_PUBLIC_IMAGES_SOURCE` siga en `local` (o sin definir) **la web no cambia**.
+Tiene guarda propia: `NUXT_IMAGES_ONLY_DRAFTS=true` limita a borradores sin abrir
+precios/stock (esos siguen bajo `NUXT_INVENTORY_WOO_ONLY_DRAFTS`). Default `false`.
+
+- [ ] **[JD]** Ejecutar `https://www.disfraceskustom.com/api/admin/test-wp-medios`
+      con la sesión del panel y pasar el JSON. Si todo es `ok: true`, se borra el
+      endpoint y se puede usar el panel de imágenes.
+- [ ] **[JD]** La migración de las 189 fotos (`scripts/migrar-imagenes-woo.mjs`)
+      se corre **con JD presente**, primero en vista previa; nunca sin él.
