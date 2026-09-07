@@ -1,3 +1,5 @@
+import { listChanges } from '../../../utils/inventoryCommon'
+
 /** Un producto por SKU de padre o de variación, con sus últimos cambios. */
 export default defineEventHandler(async (event) => {
   requireInbox(event)

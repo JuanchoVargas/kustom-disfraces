@@ -1,3 +1,5 @@
+import { listChanges } from '../../utils/inventoryCommon'
+
 /** Registro de cambios (más recientes primero). ?sku= filtra por producto o variación; ?page= ?per_page= */
 export default defineEventHandler(async (event) => {
   requireInbox(event)
