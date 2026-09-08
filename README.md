@@ -781,12 +781,15 @@ inventario al confirmarse un pago (checklist `docs/inventario-activacion.md`).
 
 ## 📸 Guía visual del inventario (capturas automáticas)
 
-`node scripts/capturas-guia.mjs` (con `npm run dev` corriendo) genera las 18
-pantallas de la guía en `docs/guia/capturas/{escritorio,movil}/NN-*.png` con
+`node scripts/capturas-guia.mjs` (contra PRODUCCIÓN; contraseña del panel en
+`.env` como `NUXT_INBOX_PASSWORD_PROD`; `--local` usa `npm run dev`; `--copiar
+<carpeta>` deja una copia) genera las 18 pantallas de la guía en
+`docs/guia/capturas/{escritorio,movil}/NN-*.png` con
 Playwright (playwright-core + Edge instalado; sin descargar navegadores),
 resaltando en rojo el elemento clave de cada paso. Repetible: si cambia la
 interfaz, se vuelve a correr. Contraseña desde `.env`; los pasos que editan lo
-hacen solo sobre borradores y se revierten al final (`POSTGRES_URL`). La captura
+hacen solo sobre borradores y al final se reponen exactamente las sobreescrituras
+que había (`POSTGRES_URL` de ese entorno). La captura
 de imágenes (13) simula la respuesta del endpoint con las fotos reales del
 producto porque en local no hay credenciales de WordPress. `--solo movil`,
 `--ver` para ver la ventana.

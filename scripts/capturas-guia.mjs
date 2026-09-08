@@ -4,13 +4,16 @@
 // resalta el elemento clave de cada paso con un recuadro rojo dibujado por el
 // script. Repetible: si cambia la interfaz se vuelve a correr y se regeneran todas.
 //
-//   npm run dev                          # en otra terminal (usa el .env local)
-//   node scripts/capturas-guia.mjs       # → docs/guia/capturas/{escritorio,movil}/NN-*.png
-//   node scripts/capturas-guia.mjs --solo escritorio|movil   --ver (ventana visible)
+//   node scripts/capturas-guia.mjs                 # PRODUCCIÓN (www.disfraceskustom.com)
+//   node scripts/capturas-guia.mjs --local          # contra npm run dev (localhost:3000)
+//   opciones: --solo escritorio|movil · --ver (ventana visible) · --copiar <carpeta>
+//             BASE_URL=https://… para otro origen (p. ej. un preview)
 //
-// Requiere en .env: NUXT_INBOX_PASSWORD (la contraseña NUNCA va en el código) y
-// POSTGRES_URL (para revertir al final). Usa el Edge instalado (playwright-core,
-// canal msedge): no descarga navegadores.
+// Requiere en .env (la contraseña NUNCA va en el código):
+//   NUXT_INBOX_PASSWORD_PROD  contraseña del panel en producción (o NUXT_INBOX_PASSWORD
+//                             si es la misma); con --local usa NUXT_INBOX_PASSWORD
+//   POSTGRES_URL              la base del entorno capturado, para revertir al final
+// Usa el Edge instalado (playwright-core, canal msedge): no descarga navegadores.
 //
 // Datos: reales (snapshot local de Woo, adaptador mock). Los pasos que editan
 // (06-07 precio, 09-10 masiva, 14 stock) se hacen SOLO sobre BORRADORES y al
@@ -29,7 +32,9 @@ import { neon } from '@neondatabase/serverless'
 const args = process.argv.slice(2)
 const SOLO = args.includes('--solo') ? args[args.indexOf('--solo') + 1] : null
 const VER = args.includes('--ver')
-const BASE = (process.env.BASE_URL || 'http://localhost:3000').replace(/\/$/, '')
+const LOCAL = args.includes('--local')
+const COPIAR = args.includes('--copiar') ? args[args.indexOf('--copiar') + 1] : null
+const BASE = (process.env.BASE_URL || (LOCAL ? 'http://localhost:3000' : 'https://www.disfraceskustom.com')).replace(/\/$/, '')
 const OUT = path.resolve('docs/guia/capturas')
 const AUTOR = 'guia-capturas'
 
@@ -38,8 +43,10 @@ const env = Object.fromEntries(
     ? fs.readFileSync('.env', 'utf8').split(/\r?\n/).filter(l => l && !l.startsWith('#') && l.includes('=')).map(l => [l.slice(0, l.indexOf('=')).trim(), l.slice(l.indexOf('=') + 1).trim().replace(/^["']|["']$/g, '')])
     : [],
 )
-const PASSWORD = process.env.NUXT_INBOX_PASSWORD || env.NUXT_INBOX_PASSWORD
-if (!PASSWORD) { console.error('Falta NUXT_INBOX_PASSWORD en .env'); process.exit(1) }
+const PASSWORD = LOCAL
+  ? (process.env.NUXT_INBOX_PASSWORD || env.NUXT_INBOX_PASSWORD)
+  : (process.env.NUXT_INBOX_PASSWORD_PROD || env.NUXT_INBOX_PASSWORD_PROD || process.env.NUXT_INBOX_PASSWORD || env.NUXT_INBOX_PASSWORD)
+if (!PASSWORD) { console.error(`Falta ${LOCAL ? 'NUXT_INBOX_PASSWORD' : 'NUXT_INBOX_PASSWORD_PROD'} en .env`); process.exit(1) }
 const DB_URL = process.env.POSTGRES_URL || env.POSTGRES_URL || env.DATABASE_URL
 const sql = DB_URL ? neon(DB_URL) : null
 
@@ -173,13 +180,23 @@ async function prepararStock(ctx) {
   log(`   stock de prueba: ${res.ok} ok / ${res.fallidas} fallidas`)
 }
 
-/** Revierte TODO lo que la guía tocó: sobreescrituras (mock) e historial con autor guia-capturas. */
+/** Estado previo de las sobreescrituras de los borradores usados, para dejarlas EXACTAMENTE igual. */
+let previas = null
+async function guardarEstadoPrevio() {
+  if (!sql) { log('⚠ Sin POSTGRES_URL: no se podrá revertir automáticamente'); return }
+  previas = await sql.query(`SELECT sku, regular_price, sale_price, manage_stock, stock_quantity, updated_at, updated_by FROM inventory_overrides WHERE split_part(sku, '-T', 1) = ANY($1::text[])`, [SKUS_TOCADOS])
+  log(`   estado previo guardado: ${previas.length} sobreescrituras existentes en ${SKUS_TOCADOS.length} borradores`)
+}
+
+/** Revierte TODO lo que la guía tocó: repone las sobreescrituras previas y borra el historial con autor guia-capturas. */
 async function revertir() {
-  if (!sql) { log('⚠ Sin POSTGRES_URL: no se pudo revertir automáticamente. Borra las sobreescrituras de', SKUS_TOCADOS.join(', ')); return }
-  const skus = SKUS_TOCADOS
-  const a = await sql.query(`DELETE FROM inventory_overrides WHERE split_part(sku, '-T', 1) = ANY($1::text[]) RETURNING sku`, [skus])
+  if (!sql) { log('⚠ Sin POSTGRES_URL: no se pudo revertir. Borra a mano las sobreescrituras de', SKUS_TOCADOS.join(', ')); return }
+  const a = await sql.query(`DELETE FROM inventory_overrides WHERE split_part(sku, '-T', 1) = ANY($1::text[]) RETURNING sku`, [SKUS_TOCADOS])
+  for (const p of previas ?? []) {
+    await sql.query(`INSERT INTO inventory_overrides (sku, regular_price, sale_price, manage_stock, stock_quantity, updated_at, updated_by) VALUES ($1,$2,$3,$4,$5,$6,$7)`, [p.sku, p.regular_price, p.sale_price, p.manage_stock, p.stock_quantity, p.updated_at, p.updated_by])
+  }
   const b = await sql.query(`DELETE FROM inventory_changes WHERE autor = $1 RETURNING id`, [AUTOR])
-  log(`🧹 revertido: ${a.length} sobreescrituras y ${b.length} filas de historial borradas (solo borradores ${skus.join(', ')})`)
+  log(`🧹 revertido: ${a.length} sobreescrituras quitadas, ${(previas ?? []).length} previas repuestas, ${b.length} filas de historial borradas (solo borradores ${SKUS_TOCADOS.join(', ')})`)
 }
 
 function csvImportacion() {
@@ -206,6 +223,14 @@ function respuestaImagenes(sku, fotos) {
   }
 }
 
+async function comprobarAcceso() {
+  const r = await fetch(`${BASE}/api/inbox/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ password: PASSWORD }) })
+  if (r.status === 401) throw new Error(`${BASE} rechazó la contraseña (401). En producción la contraseña del panel es la de Vercel: ponla en .env como NUXT_INBOX_PASSWORD_PROD.`)
+  if (!r.ok) throw new Error(`${BASE}/api/inbox/login → HTTP ${r.status}`)
+  const v = await fetch(`${BASE}/api/version`).then(x => x.json()).catch(() => null)
+  log(`🔐 acceso OK a ${BASE}${v?.commit_corto ? ` · commit ${v.commit_corto} (${v.entorno})` : ''}`)
+}
+
 // ---------- secuencia ----------
 async function secuencia(browser, modo) {
   const dir = path.join(OUT, modo)
@@ -215,8 +240,8 @@ async function secuencia(browser, modo) {
   log(`\n▶ ${modo} (${VIEWPORTS[modo].viewport.width}×${VIEWPORTS[modo].viewport.height})`)
   const ctx = await browser.newContext({ ...VIEWPORTS[modo], locale: 'es-CO', colorScheme: 'light', reducedMotion: 'no-preference' })
   const page = await ctx.newPage()
-  // Artefactos SOLO del entorno local que no existen en producción: el widget de
-  // Nuxt DevTools y el candado "faltan credenciales de WordPress" (en Vercel sí están).
+  // Artefactos SOLO del entorno local (--local) que no existen en producción: el
+  // widget de Nuxt DevTools y el candado "faltan credenciales de WordPress".
   await ctx.addInitScript(() => {
     const css = '#nuxt-devtools-anchor, nuxt-devtools-frame, #nuxt-devtools-container, .nuxt-devtools-frame { display: none !important } .imgs__block { display: none !important }'
     const add = () => { const s = document.createElement('style'); s.textContent = css; document.head.appendChild(s) }
@@ -374,9 +399,12 @@ async function secuencia(browser, modo) {
 
 // ---------- main ----------
 fs.mkdirSync(OUT, { recursive: true })
-const browser = await chromium.launch({ channel: 'msedge', headless: !VER, args: EDGE_ARGS })
 let fallo = null
+let browser = null
 try {
+  await comprobarAcceso()
+  await guardarEstadoPrevio()
+  browser = await chromium.launch({ channel: 'msedge', headless: !VER, args: EDGE_ARGS })
   for (const modo of ['escritorio', 'movil']) {
     if (SOLO && SOLO !== modo) continue
     await secuencia(browser, modo)
@@ -385,9 +413,20 @@ try {
 }
 catch (err) { fallo = err; console.error('❌', err?.message ?? err) }
 finally {
-  await browser.close()
-  if (fallo) await revertir().catch(e => console.error('⚠ no se pudo revertir:', e.message))
+  if (browser) await browser.close()
+  if (fallo && previas) await revertir().catch(e => console.error('⚠ no se pudo revertir:', e.message))
   fs.rmSync(path.join(OUT, '.import-guia.csv'), { force: true })
+}
+if (!fallo && COPIAR) {
+  // Copia de entrega: <carpeta>/{escritorio,movil}/NN-*.png
+  for (const modo of ['escritorio', 'movil']) {
+    const src = path.join(OUT, modo)
+    if (!fs.existsSync(src)) continue
+    const dst = path.join(COPIAR, modo)
+    fs.mkdirSync(dst, { recursive: true })
+    for (const f of fs.readdirSync(src)) fs.copyFileSync(path.join(src, f), path.join(dst, f))
+  }
+  log(`📁 copiadas a ${COPIAR}`)
 }
 log(`\n${fallo ? '❌ incompleto' : '✅ listo'}: ${contador} capturas en ${OUT}`)
 process.exit(fallo ? 1 : 0)
