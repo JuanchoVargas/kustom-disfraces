@@ -11,10 +11,7 @@
  * está cerrada.
  */
 definePageMeta({ layout: 'inbox' })
-useHead({
-  title: 'Bandeja de chats — Kustom',
-  meta: [{ name: 'robots', content: 'noindex, nofollow' }],
-})
+useAdminHead('Mensajes de clientes — Kustom')
 
 type Canal = 'wa' | 'msg' | 'ig'
 type Estado = 'bot' | 'humano' | 'cerrado'
@@ -543,7 +540,7 @@ function windowLeft(c: Conv) {
         <div class="login__brand">
           <span class="login__k">K</span>
           <div>
-            <div class="login__title">Bandeja de chats</div>
+            <div class="login__title">Mensajes de clientes</div>
             <div class="login__sub">Kustom Disfraces · atención humana</div>
           </div>
         </div>
@@ -574,8 +571,8 @@ function windowLeft(c: Conv) {
       <aside class="list">
         <header class="list__head">
           <div class="list__title">
-            <span class="login__k login__k--sm">K</span>
-            Chats
+            <NuxtLink class="login__k login__k--sm" to="/admin" title="Administración Kustom" aria-label="Ir a Administración">K</NuxtLink>
+            Mensajes
             <span v-if="totalUnread" class="badge">{{ totalUnread }}</span>
           </div>
           <div class="list__right">

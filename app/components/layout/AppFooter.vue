@@ -43,6 +43,8 @@ const year = 2026
         <NuxtLink v-for="i in info" :key="i.to" :to="i.to">
           {{ i.label }}
         </NuxtLink>
+        <!-- acceso al panel interno: mismo tamaño y color que el resto, sin destacar -->
+        <NuxtLink to="/admin" rel="nofollow">Administración</NuxtLink>
       </div>
 
       <!-- Contáctanos -->

@@ -492,6 +492,25 @@ instancias serverless. Sin `POSTGRES_URL` cae a un `Map` en memoria (solo local)
 > para reactivar el bot; en cuanto un agente toma la conversación o responde desde
 > la bandeja, el bot queda apagado hasta "Devolver al bot".
 
+## 🧭 Administración: hub `/admin`, PWA y accesos
+
+- **`/admin`** es la entrada: título "Administración Kustom" y dos tarjetas
+  (Inventario y precios → `/admin/inventario`; Mensajes de clientes →
+  `/admin/chats`, con badge rojo de conversaciones sin responder). Misma
+  contraseña y misma cookie que las otras dos páginas: si ya entró a una, no la
+  vuelve a pedir. Sin sesión, login y cae aquí.
+- `GET /api/inbox/me` devuelve además `sin_responder` (conversaciones activas
+  con mensajes sin leer); alimenta el badge del hub y del botón **"Mensajes de
+  clientes"** del inventario (en pantallas angostas dice "Mensajes"; nunca
+  "Bandeja"). Se refresca cada minuto.
+- Banner del adaptador mock: "Modo práctica activo — no se puede dañar nada" +
+  contador "N tallas listas para aplicar" (o "Aún no hay cambios registrados").
+- PWA solo en `/admin/*` (`useAdminHead`): apple-mobile-web-app-title "Kustom
+  Admin", theme-color morado, `public/manifest.webmanifest` (start_url /admin,
+  standalone) e íconos `icon-192.png`/`icon-512.png` generados del isotipo.
+- Footer público: enlace discreto "Administración" → /admin (columna
+  Información, `rel=nofollow`); no va en header ni menú.
+
 ## 📥 Bandeja de atención humana (`/admin/chats`)
 
 El 311 884 4547 está en la Cloud API, así que **no existe bandeja de Meta**: la

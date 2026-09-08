@@ -16,7 +16,7 @@ import type { InvChange, InvOpResult, InvProduct, InvStatus, InvVariation } from
 import { tallaFromSku } from '~~/shared/utils/tallas'
 
 definePageMeta({ layout: 'inbox' })
-useHead({ title: 'Inventario — Kustom', meta: [{ name: 'robots', content: 'noindex, nofollow' }] })
+useAdminHead('Inventario — Kustom')
 
 const GRUPOS: Record<string, string> = {
   'super': 'Súper Acolchado', 'economico': 'Línea Eco', 'semi': 'Semi Acolchado', 'super-adulto': 'Súper Adulto',
@@ -33,12 +33,20 @@ const configured = ref(true)
 const password = ref('')
 const loginError = ref('')
 const loggingIn = ref(false)
+/** Conversaciones con mensajes sin responder (badge de "Mensajes de clientes"); se refresca cada minuto. */
+const sinResponder = ref(0)
+let sinResponderTimer: ReturnType<typeof setInterval> | null = null
+async function refreshSinResponder() {
+  try { sinResponder.value = (await $fetch<{ sin_responder?: number }>('/api/inbox/me')).sin_responder ?? 0 }
+  catch {}
+}
 
 async function checkSession() {
   try {
-    const me = await $fetch<{ configured: boolean, authenticated: boolean }>('/api/inbox/me')
+    const me = await $fetch<{ configured: boolean, authenticated: boolean, sin_responder?: number }>('/api/inbox/me')
     configured.value = me.configured
     authed.value = me.authenticated
+    sinResponder.value = me.sin_responder ?? 0
   }
   catch { authed.value = false }
   checking.value = false
@@ -51,6 +59,7 @@ async function login() {
     await $fetch('/api/inbox/login', { method: 'POST', body: { password: password.value } })
     password.value = ''
     authed.value = true
+    refreshSinResponder()
     await boot()
   }
   catch (e: any) {
@@ -615,9 +624,11 @@ const snapshotAge = computed(() => {
 
 onMounted(() => {
   checkSession()
+  sinResponderTimer = setInterval(() => { if (authed.value) refreshSinResponder() }, 60_000)
   // Gancho de pruebas/medición (solo en dev): abrir o cerrar todos los productos de la página.
   if (import.meta.dev) (window as any).__inv = { openAll: () => { open.value = new Set(items.value.map(p => p.sku)); for (const p of items.value) seedDrafts(p, false) }, closeAll: () => { open.value = new Set() } }
 })
+onBeforeUnmount(() => { if (sinResponderTimer) clearInterval(sinResponderTimer) })
 </script>
 
 <template>
@@ -647,9 +658,9 @@ onMounted(() => {
       <header class="top" :class="{ 'top--compact': densidad === 'compacto' }">
         <div class="top__row">
           <div class="top__brand">
-            <span class="login__k login__k--sm">K</span>
+            <NuxtLink class="login__k login__k--sm" to="/admin" title="Administración Kustom" aria-label="Ir a Administración">K</NuxtLink>
             <h1 class="top__title">Inventario</h1>
-            <span v-if="estado" class="pill" :class="estado.simulation ? 'pill--sim' : 'pill--live'">{{ estado.simulation ? 'simulación' : 'Woo en vivo' }}</span>
+            <span v-if="estado" class="pill" :class="estado.simulation ? 'pill--sim' : 'pill--live'">{{ estado.simulation ? 'modo práctica' : 'Woo en vivo' }}</span>
           </div>
           <div v-if="estado" class="top__totals" :title="estado.snapshot_age_s != null ? `Snapshot de Woo leído hace ${estado.snapshot_age_s} s` : 'Sin snapshot de Woo'">
             <span><b>{{ estado.productos }}</b> productos</span>
@@ -661,7 +672,11 @@ onMounted(() => {
           <div class="top__right">
             <button class="btn btn--ghost" type="button" :disabled="syncing" @click="sync(true)">{{ syncing ? 'Sincronizando…' : 'Sincronizar' }}</button>
             <button v-if="estado?.woo_write" class="btn btn--ghost" type="button" :disabled="probing" :title="estado.woo_only_drafts ? 'Escribe, relee y revierte precios en un BORRADOR; nunca toca publicados' : 'Escribe, relee y revierte precios en un borrador'" @click="probarWoo">{{ probing ? 'Probando…' : 'Probar Woo' }}</button>
-            <NuxtLink class="btn btn--ghost" to="/admin/chats">Bandeja</NuxtLink>
+            <NuxtLink class="btn btn--ghost btn--msgs" to="/admin/chats" :title="sinResponder ? `${sinResponder} sin responder` : 'Mensajes de clientes'">
+              <svg class="btn__ico" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path :d="CHAT_ICON_PATH" /></svg>
+              <span class="btn__full">Mensajes de clientes</span><span class="btn__short">Mensajes</span>
+              <span v-if="sinResponder" class="badge-red" :aria-label="`${sinResponder} sin responder`">{{ sinResponder }}</span>
+            </NuxtLink>
             <button class="btn btn--ghost" type="button" @click="logout">Salir</button>
           </div>
         </div>
@@ -695,7 +710,10 @@ onMounted(() => {
       </header>
 
       <div v-if="estado?.simulation" class="banner banner--sim">
-        <strong>Modo simulación</strong> — los cambios no se reflejan en el sitio ni en WooCommerce. Quedan guardados aquí ({{ estado.overrides }} tallas con cambios pendientes) para aplicarlos cuando se active la escritura.
+        <strong class="banner__title">Modo práctica activo — no se puede dañar nada</strong>
+        <span class="banner__body">Los cambios se guardan aquí, pero todavía no pasan a la tienda ni a la página web. Carguen precios, existencias y fotos con confianza; cuando terminen, avisen para aplicarlo todo de una vez.</span>
+        <span v-if="estado.overrides" class="banner__count"><b>{{ estado.overrides }}</b> {{ estado.overrides === 1 ? 'talla lista' : 'tallas listas' }} para aplicar</span>
+        <span v-else class="banner__count banner__count--zero">Aún no hay cambios registrados</span>
       </div>
       <div v-if="estado && !estado.simulation && estado.woo_only_drafts" class="banner banner--info">
         <strong>Woo en vivo, solo borradores</strong> — la guarda de validación rechaza cualquier escritura a un producto publicado hasta que se validen las operaciones masivas.
@@ -835,7 +853,7 @@ onMounted(() => {
               </table>
             </div>
             <p v-if="bulk.result" class="small" :class="bulk.result.fallidas ? 'err' : 'ok'">{{ bulk.result.msg }}</p>
-            <p v-if="estado?.simulation" class="muted small">Modo simulación: los cambios se guardan aquí, no llegan a Woo ni al sitio.</p>
+            <p v-if="estado?.simulation" class="muted small">Modo práctica: los cambios se guardan aquí, todavía no pasan a la tienda ni a la web.</p>
             <div class="modal__row">
               <button class="btn btn--ghost btn--sm" type="button" @click="bulk.preview = null; bulk.result = null">Volver</button>
               <button class="btn btn--ghost btn--sm" type="button" @click="closeBulk">Cerrar</button>
@@ -1127,7 +1145,15 @@ onMounted(() => {
 .pill--draft { background: var(--line); color: var(--mut); }
 
 .banner { padding: 10px 14px; border-radius: 12px; font-size: 14px; }
-.banner--sim { background: #FFF1D6; color: #7A4A00; border: 1px solid #F5D58F; }
+.banner--sim { background: #FFF1D6; color: #7A4A00; border: 1px solid #F5D58F; display: flex; flex-direction: column; gap: 3px; }
+.banner__title { font-size: 15px; }
+.banner__count { margin-top: 3px; font-weight: 700; }
+.banner__count b { font-size: 16px; }
+.banner__count--zero { font-weight: 400; color: #8A857A; }
+.btn--msgs { display: inline-flex; align-items: center; gap: 7px; }
+.btn__short { display: none; }
+.badge-red { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: #E0192B; color: #fff; font-size: 12px; font-weight: 700; line-height: 1; }
+@media (max-width: 560px) { .btn--msgs .btn__full { display: none; } .btn--msgs .btn__short { display: inline; } }
 .banner--warn { background: #FDE7E9; color: #8A1C2B; }
 .banner--info { background: var(--purple-soft); color: var(--purple-d); }
 .banner--alert { background: #FDE7E9; color: #8A1C2B; border: 1px solid #F3B1B8; }
