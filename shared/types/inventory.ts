@@ -205,4 +205,8 @@ export interface InvStatus {
   agotados_forzados: { sku: string, motivo: string }[]
   /** valores de NUXT_SKUS_AGOTADOS que no corresponden a ningún producto (no se aplican) */
   agotados_no_encontrados: string[]
+  /** publicados con TODAS las tallas en 0 que NUXT_SKUS_AGOTADOS no bloquea: se venden en cero */
+  agotados_sin_forzar: { codigo: string, nombre: string, tallas: string[] }[]
+  /** valor completo de NUXT_SKUS_AGOTADOS con esos añadidos, listo para pegar ('' si no falta ninguno) */
+  agotados_sugerencia: string
 }

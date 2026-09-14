@@ -41,6 +41,13 @@ export interface StockState {
    * aplican (antes se agotaba un código fantasma en silencio) y el panel las avisa.
    */
   forzadosNoEncontrados: string[]
+  /**
+   * ⚠️ LA GRIETA: productos PUBLICADOS con todas sus tallas en 0 en el inventario
+   * que NO están en NUXT_SKUS_AGOTADOS. Mientras el stock real no se aplique al
+   * sitio (NUXT_INVENTORY_PUBLIC_STOCK), la variable es lo ÚNICO que bloquea la
+   * compra, así que estos se siguen vendiendo con existencias en cero.
+   */
+  agotadosSinForzar: { codigo: string, nombre: string, tallas: string[] }[]
   umbral: number
   updated_at: string
 }
@@ -152,6 +159,23 @@ export function agotadosForzados(): { sku: string, motivo: string }[] {
   return [...productos, ...variaciones].map(sku => ({ sku, motivo: motivos.get(sku) || 'forzado a mano mientras se carga el stock real' }))
 }
 
+/**
+ * El valor COMPLETO de NUXT_SKUS_AGOTADOS con los agotados que hoy nadie bloquea
+ * ya añadidos, listo para pegar en Vercel. Se reconstruye desde la variable actual
+ * (respetando el motivo tal cual se escribió, sin el texto por defecto del panel)
+ * y se le suman los que faltan. Devuelve '' si no falta ninguno.
+ */
+export function sugerenciaSkusAgotados(state: StockState): string {
+  if (!state.agotadosSinForzar.length) return ''
+  const ov = skusAgotadosOverride()
+  const actual = [...ov.productos, ...ov.variaciones].map((s) => {
+    const motivo = ov.motivos.get(s)
+    return motivo ? `${s}:${motivo}` : s
+  })
+  const nuevos = state.agotadosSinForzar.map(p => `${p.codigo}:sin existencias en el inventario`)
+  return [...actual, ...nuevos].join(',')
+}
+
 export function computeStockState(products: InvProduct[], enabled: boolean, backend: 'mock' | 'woo'): StockState {
   const umbral = stockBajoUmbral()
   const ov = validarForzados(products)
@@ -170,11 +194,15 @@ export function computeStockState(products: InvProduct[], enabled: boolean, back
     bajo: [],
     agotadas: [],
     forzadosNoEncontrados: ov.noEncontrados,
+    agotadosSinForzar: [],
     umbral,
     updated_at: new Date().toISOString(),
   }
   for (const p of products) {
     const outs: string[] = []
+    // Tallas agotadas de VERDAD en el inventario, al margen del override y de si
+    // el stock se aplica o no al sitio: es lo que mide la grieta de abajo.
+    const realOuts: string[] = []
     const productoForzado = ov.productos.has(p.sku)
     for (const v of p.variations) {
       const forzada = productoForzado || ov.variaciones.has(v.sku)
@@ -187,6 +215,7 @@ export function computeStockState(products: InvProduct[], enabled: boolean, back
       if (forzada || (enabled && agotada(v))) outs.push(tallaDe(v))
       // Los contadores del panel reflejan el inventario REAL, no el override.
       if (agotada(v)) {
+        realOuts.push(tallaDe(v))
         if (p.status === 'publish') st.agotadas.push({ sku: v.sku, producto: p.name, talla: tallaDe(v) })
       }
       else if (v.manage_stock && (v.stock_quantity ?? 0) <= umbral && p.status === 'publish') {
@@ -195,6 +224,13 @@ export function computeStockState(products: InvProduct[], enabled: boolean, back
     }
     if (outs.length) st.tallasAgotadas.set(p.sku, outs)
     if (p.variations.length && outs.length === p.variations.length) st.agotados.add(p.sku)
+    // ⚠️ Publicado, sin una sola talla con existencias, y nadie lo bloquea: hoy se
+    // vende con stock cero. Da igual `enabled`: justo cuando el stock NO se aplica
+    // al sitio es cuando el override es lo único que separa esto de una venta.
+    if (p.status === 'publish' && p.variations.length && realOuts.length === p.variations.length) {
+      const cubierto = productoForzado || p.variations.every(v => ov.variaciones.has(v.sku))
+      if (!cubierto) st.agotadosSinForzar.push({ codigo: p.sku, nombre: p.name, tallas: realOuts })
+    }
   }
   // Un código del override que el inventario todavía no conozca (sin snapshot, sin
   // variaciones) igual queda agotado: si no, la cinta no saldría. Solo llegan aquí

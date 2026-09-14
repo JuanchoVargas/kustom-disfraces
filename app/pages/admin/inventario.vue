@@ -87,6 +87,16 @@ async function loadEstado() {
 interface Descartado { id: number, nombre: string, sku: string, status: string, motivo: string, choca_con?: { id: number, nombre: string, status: string }[], editar_url: string }
 const descartados = ref<Descartado[]>([])
 const descartadosAbierto = ref(false)
+const sugerenciaCopiada = ref(false)
+/** Copia el valor listo para pegar en Vercel. Sin portapapeles (http, permisos), el textarea queda seleccionable a mano. */
+async function copiarSugerencia() {
+  try {
+    await navigator.clipboard.writeText(estado.value?.agotados_sugerencia ?? '')
+    sugerenciaCopiada.value = true
+    setTimeout(() => (sugerenciaCopiada.value = false), 2000)
+  }
+  catch { /* el textarea sigue ahí para copiarlo a mano */ }
+}
 
 /**
  * Repite pasos de sincronización hasta que no queden pendientes. En una
@@ -851,6 +861,23 @@ onBeforeUnmount(() => { if (sinResponderTimer) clearInterval(sinResponderTimer) 
           </li>
         </ul>
       </div>
+      <!-- LA GRIETA: publicados sin una sola talla con existencias que la variable no
+           bloquea. Mientras el stock real no se aplique al sitio, se venden en cero.
+           Este aviso sobra el día que se active la Etapa 5. -->
+      <div v-if="estado?.agotados_sin_forzar?.length" class="banner banner--alert banner--grieta">
+        <strong>⚠ {{ estado.agotados_sin_forzar.length }} {{ estado.agotados_sin_forzar.length === 1 ? 'producto agotado sigue comprable' : 'productos agotados siguen comprables' }} en la web</strong>
+        <span class="muted small">Sin existencias en ninguna talla, pero NUXT_SKUS_AGOTADOS no los nombra.</span>
+        <ul class="descartes">
+          <li v-for="a in estado.agotados_sin_forzar" :key="a.codigo">
+            <b>{{ a.nombre }}</b>
+            <span class="mono small">{{ a.codigo }}</span>
+            <span class="muted small">{{ a.tallas.length }} {{ a.tallas.length === 1 ? 'talla' : 'tallas' }}: {{ a.tallas.join(', ') }}</span>
+          </li>
+        </ul>
+        <label class="small">Pega esto en NUXT_SKUS_AGOTADOS (Vercel → Settings → Environment Variables) y vuelve a desplegar:</label>
+        <textarea class="sugerencia mono" readonly rows="3" :value="estado.agotados_sugerencia" @focus="($event.target as HTMLTextAreaElement).select()" />
+        <button class="linkbtn" type="button" @click="copiarSugerencia">{{ sugerenciaCopiada ? '✓ copiado' : 'copiar' }}</button>
+      </div>
       <!-- Valores de NUXT_SKUS_AGOTADOS que no son ningún producto. El caso típico
            es una coma dentro del motivo, que parte la entrada en dos: antes el
            trozo sobrante agotaba un código fantasma sin que nadie se enterara. -->
@@ -1298,6 +1325,8 @@ onBeforeUnmount(() => { if (sinResponderTimer) clearInterval(sinResponderTimer) 
 .banner--info { background: var(--purple-soft); color: var(--purple-d); }
 .banner--alert { background: #FDE7E9; color: #8A1C2B; border: 1px solid #F3B1B8; }
 .banner--alert .linkbtn { color: inherit; font-weight: 700; }
+.banner--grieta { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+.sugerencia { width: 100%; resize: vertical; font-size: 12px; line-height: 1.5; padding: 8px; border-radius: 8px; border: 1px solid #F3B1B8; background: #fff; color: var(--ink); }
 .linkbtn { appearance: none; background: none; border: 0; padding: 0; font: inherit; color: var(--purple-d); text-decoration: underline; cursor: pointer; }
 .input { font: inherit; font-size: 14px; padding: 9px 10px; border: 1px solid var(--line-2); border-radius: 10px; background: #fff; color: var(--ink); min-width: 0; width: 100%; }
 .input:focus { outline: 2px solid var(--purple-line); border-color: var(--purple); }

@@ -15,7 +15,7 @@ globalThis.useRuntimeConfig = () => ({ skusAgotados: SKUS, inventoryStockBajo: 5
 
 const { createJiti } = await import('jiti')
 const jiti = createJiti(import.meta.url, { alias: { '~~': root, '~': root, '@@': root, '@': root } })
-const { computeStockState, validarForzados } = await jiti.import('../server/utils/stockState.ts')
+const { computeStockState, validarForzados, sugerenciaSkusAgotados } = await jiti.import('../server/utils/stockState.ts')
 
 let fails = 0
 const check = (nombre, ok, detalle = '') => {
@@ -97,6 +97,33 @@ const validar = (valor) => { SKUS = valor; return validarForzados(PRODUCTOS) }
   check('código inventado se reporta', v.noEncontrados.includes('00101XXXX'))
   check('talla inexistente de un producto real se reporta', v.noEncontrados.includes('001011001-T99'))
   check('lo válido de la misma lista se sigue aplicando', v.productos.has('001011001'))
+}
+
+// ---------- LA GRIETA: publicado sin existencias que la variable no bloquea ----------
+{
+  const cero = (codigo, talla) => ({ ...variacion(codigo, talla), manage_stock: true, stock_quantity: 0, stock_status: 'outofstock' })
+  const agotadoReal = (codigo, nombre, status) => ({ sku: codigo, name: nombre, status, variations: [0, 2, 4].map(t => cero(codigo, t)) })
+  const conGrieta = (valor, productos) => { SKUS = valor; return computeStockState(productos, false, 'mock').agotadosSinForzar }
+
+  const wolverine = agotadoReal('001001010', 'Wolverine', 'publish')
+  check('publicado sin existencias y fuera de la variable → se reporta',
+    conGrieta('', [wolverine]).some(a => a.codigo === '001001010'))
+  check('el mismo, ya en la variable → NO se reporta',
+    conGrieta('001001010', [wolverine]).length === 0)
+  check('el mismo, cubierto talla a talla → NO se reporta',
+    conGrieta('001001010-T0,001001010-T2,001001010-T4', [wolverine]).length === 0)
+  check('borrador sin existencias → NO se reporta (no se vende)',
+    conGrieta('', [agotadoReal('001003001', 'Semi', 'draft')]).length === 0)
+  check('publicado con una talla viva → NO se reporta',
+    conGrieta('', [{ ...wolverine, variations: [cero('001001010', 0), variacion('001001010', 2)] }]).length === 0)
+
+  SKUS = '001011001:sin stock'
+  const st = computeStockState([...PRODUCTOS, wolverine], false, 'mock')
+  const s = sugerenciaSkusAgotados(st)
+  check('la sugerencia conserva lo que ya había, con su motivo', s.startsWith('001011001:sin stock,'), s)
+  check('la sugerencia añade el que falta', s.includes('001001010:'), s)
+  check('sin grieta, la sugerencia va vacía',
+    sugerenciaSkusAgotados(computeStockState(PRODUCTOS, false, 'mock')) === '')
 }
 
 console.log(fails ? `\n❌ ${fails} comprobación(es) fallida(s)` : '\n✅ todo correcto')
