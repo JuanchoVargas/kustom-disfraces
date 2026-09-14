@@ -5,6 +5,7 @@ import {
   InvValidationError, applyFilters, logChanges, normalizePrice, normalizeStock, recomputeProduct, stockStatusFor, validatePricePair,
 } from './inventoryCommon'
 import { loadInventory, loadProductBySku } from './inventorySnapshot'
+import { SKUS_BLOQUEADOS } from './inventoryResolve'
 import { dbConfigured, ensureSchema, sql } from './db'
 
 /**
@@ -50,12 +51,26 @@ export async function getOverrides(): Promise<Map<string, Override>> {
   return new Map(memory)
 }
 
+/**
+ * TALLAS pendientes de aplicar, no filas de override. No es lo mismo: un SKU de
+ * variación repetido entre varias variaciones hace que UNA fila de override se
+ * aplique a TODAS ellas. Con las 8 copias de 005001001-T12, 393 filas afectaban
+ * 400 tallas y el aviso amarillo — que es el marcador de avance del cliente —
+ * se quedaba corto. Se cuentan las variaciones del snapshot que tienen override.
+ */
 export async function countOverrides(): Promise<number> {
-  if (await dbReady()) {
-    const rows = await sql().query(`SELECT count(*)::int AS c FROM inventory_overrides`) as any[]
-    return Number(rows[0]?.c ?? 0)
+  const overrides = await getOverrides()
+  if (!overrides.size) return 0
+  try {
+    const { products } = await loadInventory()
+    let tallas = 0
+    for (const p of products) for (const v of p.variations) if (overrides.has(v.sku)) tallas++
+    // Sin snapshot legible, al menos no mentir por debajo: una talla por fila.
+    return tallas || overrides.size
   }
-  return memory.size
+  catch {
+    return overrides.size
+  }
 }
 
 async function setOverride(sku: string, patch: Partial<Omit<Override, 'sku' | 'updated_at'>>): Promise<Override> {
@@ -123,6 +138,11 @@ export function createMockStore(): InventoryStore {
 
   async function applyOne(op: InvOperation, ctx: WriteContext): Promise<InvOpResult> {
     try {
+      // El bloqueo por estructura rota aplica TAMBIÉN en modo práctica: si no, el
+      // panel acumularía sobreescrituras sobre una variación equivocada que luego
+      // se aplicarían a Woo tal cual.
+      const bloqueo = SKUS_BLOQUEADOS[op.sku]
+      if (bloqueo) return { sku: op.sku, ok: false, error: `bloqueado — ${bloqueo}` }
       const before = await currentVariation(op.sku)
       if (!before) return { sku: op.sku, ok: false, error: 'SKU de variación inexistente' }
       let after: InvVariation

@@ -19,6 +19,10 @@ export interface WaRow {
   // recorta el título a 24 chars, pero el texto no tiene ese límite. Se conserva
   // en el mensaje para el fallback y se ELIMINA antes de enviar a Graph.
   fullTitle?: string
+  // Título CORTO (≤ 20) para los canales que solo tienen botones o quick replies
+  // (Messenger/Instagram): evita que un título de fila de 24 se corte a media
+  // palabra. También se ELIMINA antes de enviar a Graph.
+  shortTitle?: string
 }
 export interface WaSection { title: string, rows: WaRow[] }
 
@@ -78,6 +82,7 @@ export function waListSections(body: string, buttonLabel: string, sections: WaSe
       ...(r.description ? { description: cut(r.description, 72) } : {}),
       // Solo si el título se recorta: guarda el completo para el texto numerado.
       ...([...r.title].length > 24 ? { fullTitle: r.title } : {}),
+      ...(r.shortTitle ? { shortTitle: r.shortTitle } : {}),
     }))
     if (!rows.length) continue
     budget -= rows.length
@@ -118,7 +123,9 @@ export function toButtonChunks(message: WaMessage): WaMessage[] {
   const body = String(it?.body?.text ?? '')
   const chunks: WaMessage[] = []
   for (let i = 0; i < rows.length; i += 3) {
-    const slice = rows.slice(i, i + 3).map(r => ({ id: r.id, title: r.fullTitle ?? r.title }))
+    // Los botones se cortan a 20: se prefiere el título CORTO si la fila trae uno
+    // (fullTitle es lo contrario — la versión larga para el canal de texto).
+    const slice = rows.slice(i, i + 3).map(r => ({ id: r.id, title: r.shortTitle ?? r.fullTitle ?? r.title }))
     chunks.push(waButtons(i === 0 ? body : 'Más opciones 👇', slice))
   }
   return chunks
@@ -194,7 +201,7 @@ export function validateInteractive(message: WaMessage): string[] {
 }
 
 /** Opciones ordenadas [{id,title,description?}] de un interactivo, o null. */
-export function interactiveOptions(message: WaMessage): Array<{ id: string, title: string, description?: string }> | null {
+export function interactiveOptions(message: WaMessage): Array<{ id: string, title: string, shortTitle?: string, description?: string }> | null {
   if (message.type !== 'interactive') return null
   const it = message.interactive as any
   if (it?.type === 'button') {
@@ -202,7 +209,7 @@ export function interactiveOptions(message: WaMessage): Array<{ id: string, titl
   }
   if (it?.type === 'list') {
     return (it?.action?.sections ?? []).flatMap((s: any) => s?.rows ?? [])
-      .map((r: any) => ({ id: r?.id, title: r?.fullTitle ?? r?.title, description: r?.description }))
+      .map((r: any) => ({ id: r?.id, title: r?.fullTitle ?? r?.title, shortTitle: r?.shortTitle, description: r?.description }))
   }
   return null
 }
@@ -264,7 +271,7 @@ export function waNumberedFallback(message: WaMessage): { message: WaMessage, id
 }
 
 /**
- * Quita campos internos de display (fullTitle) de las filas antes de enviar a la
+ * Quita campos internos de display (fullTitle, shortTitle) de las filas antes de enviar a la
  * Cloud API, que rechaza parámetros desconocidos. Solo aplica a listas.
  */
 function sanitizeForSend(message: WaMessage): WaMessage {
@@ -273,7 +280,7 @@ function sanitizeForSend(message: WaMessage): WaMessage {
   if (it?.type !== 'list' || !Array.isArray(it?.action?.sections)) return message
   const sections = it.action.sections.map((s: any) => ({
     ...s,
-    rows: (s?.rows ?? []).map(({ fullTitle, ...r }: any) => r),
+    rows: (s?.rows ?? []).map(({ fullTitle, shortTitle, ...r }: any) => r),
   }))
   return { type: 'interactive', interactive: { ...it, action: { ...it.action, sections } } }
 }

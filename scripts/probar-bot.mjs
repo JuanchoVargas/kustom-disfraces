@@ -1,10 +1,12 @@
 // Manda frases al bot (webhook simulado de Messenger o WhatsApp) y muestra la respuesta.
 //   node scripts/probar-bot.mjs msg|wa "frase" "@id-de-boton" ...   (el prefijo @ envía un tap de botón/quick reply)
-import { neon } from '@neondatabase/serverless'
 import { readFileSync } from 'node:fs'
+import { exigirBdDePruebas } from './lib/guard-bd.mjs'
 const env = {}; for (const l of readFileSync('E:/Trabajo/KustomDisfracez/.env','utf8').split(/\r?\n/)) { const m = l.match(/^([A-Z_]+)=(.*)$/); if (m) env[m[1]] = m[2].trim() }
-const sql = neon(env.POSTGRES_URL)
-const BASE = 'http://localhost:3000'
+
+const __BASE_PEDIDA = 'http://localhost:3000'
+// GUARDA: este script ESCRIBE. No arranca si la base no es la rama de pruebas.
+const { sql, BASE } = await exigirBdDePruebas(__BASE_PEDIDA)
 const PSID = '9990000000000088'
 const canal = process.argv[2] === 'wa' ? 'wa' : 'msg'
 const frases = process.argv.slice(3)

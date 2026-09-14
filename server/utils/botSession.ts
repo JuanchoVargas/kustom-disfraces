@@ -129,6 +129,8 @@ export interface CloseBotSessionInput {
   failedSearch?: { texto: string, termino: string, motivo: 'sin_coincidencia' | 'solo_parecidos', sugerencias: { slug: string, nombre: string, score: number, motivo: string }[] }
   /** Celular colombiano escrito por el cliente: se guarda en la conversación y se avisa a ventas. */
   leadPhone?: string
+  /** Pidió aviso por un producto agotado: se guarda en stock_espera y se etiqueta la conversación. */
+  stockEspera?: { slug: string, sku: string, producto: string, talla?: string }
 }
 
 /**
@@ -137,11 +139,23 @@ export interface CloseBotSessionInput {
  * romper el webhook ni afectar lo que el cliente ya recibió.
  */
 export async function closeBotSession(input: CloseBotSessionInput): Promise<void> {
-  const { session, canal, externalId, incoming, sentTexts, patch, delivered, failedSearch, leadPhone } = input
+  const { session, canal, externalId, incoming, sentTexts, patch, delivered, failedSearch, leadPhone, stockEspera } = input
   const conv = session.conv
   // Búsqueda fallida → log [bot-nf] + tabla bot_busquedas_fallidas (nunca lanza).
   if (failedSearch) {
     await recordFailedSearch({ canal, externalId, texto: failedSearch.texto, termino: failedSearch.termino, motivo: failedSearch.motivo, sugerencias: failedSearch.sugerencias.map(s => ({ slug: s.slug, nombre: s.nombre, score: s.score, motivo: s.motivo })) })
+  }
+  // LISTA DE ESPERA POR STOCK: el cliente pidió aviso por algo agotado. Se guarda el
+  // SKU y la talla y la conversación queda etiquetada "espera stock" (remarketing al
+  // reponer). Best-effort: si la BD falla, el cliente ya recibió su respuesta.
+  if (stockEspera && conv) {
+    console.info(`[${canal}] 🔔 ESPERA STOCK: ${externalId} quiere ${stockEspera.producto} (${stockEspera.sku})${stockEspera.talla ? ` talla ${stockEspera.talla}` : ' sin talla'}`)
+    try {
+      await saveStockEspera({ conversationId: conv.id, canal, externalId, sku: stockEspera.sku, producto: stockEspera.producto, talla: stockEspera.talla ?? null })
+    }
+    catch (err) {
+      console.error(`[${canal}] ⚠️ no se pudo guardar la espera de stock:`, String((err as Error)?.message ?? err))
+    }
   }
   // LEAD con teléfono: se guarda en la conversación, queda NO LEÍDA y se avisa a ventas
   // (correo + WhatsApp al encargado), sin apagar el bot.

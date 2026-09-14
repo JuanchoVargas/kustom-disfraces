@@ -6,7 +6,7 @@ import { wooWriteConfigured } from './wooWrite'
 import { loadInventory, snapshotStats } from './inventorySnapshot'
 import type { WriteContext } from './inventoryCommon'
 import { stockBajoUmbral } from './inventoryCommon'
-import { getStockState, publicStockEnabled } from './stockState'
+import { agotadosForzados, getStockState, publicStockEnabled } from './stockState'
 
 export type { WriteContext } from './inventoryCommon'
 
@@ -64,6 +64,7 @@ export async function inventoryStatus(): Promise<InvStatus> {
     stock_bajo: stock.bajo.length,
     agotadas: stock.agotadas.length,
     public_stock: publicStockEnabled(),
+    agotados_forzados: agotadosForzados(),
     woo_write: wooWriteConfigured(),
     woo_only_drafts: wooOnlyDrafts(),
   }

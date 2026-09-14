@@ -115,10 +115,23 @@ export interface InvPage<T> {
   total_pages: number
 }
 
-/** Operación de escritura sobre UNA variación (por su SKU de talla). */
+/**
+ * Operación de escritura sobre UNA variación.
+ *
+ * `product_id` y `variation_id` son los ids REALES de Woo, resueltos en la VISTA
+ * PREVIA y transportados hasta la escritura. El adaptador woo escribe por esos ids
+ * y NO vuelve a resolver por SKU en el momento de escribir: re-resolver elegía la
+ * variación equivocada cuando el SKU está duplicado (005001001-T12 caía en la
+ * variación sin talla) o cuando un padre lleva el SKU de su variación (001002001).
+ * El `sku` se conserva para el registro de cambios y los mensajes.
+ */
+export interface InvOpIds {
+  product_id?: number
+  variation_id?: number
+}
 export type InvOperation =
-  | { op: 'price', sku: string, regular_price: string | number | null, sale_price: string | number | null }
-  | { op: 'stock', sku: string, stock_quantity: number, manage_stock?: boolean }
+  | ({ op: 'price', sku: string, regular_price: string | number | null, sale_price: string | number | null } & InvOpIds)
+  | ({ op: 'stock', sku: string, stock_quantity: number, manage_stock?: boolean } & InvOpIds)
 
 /** Origen de una escritura (queda en el registro de cambios). */
 export type InvChangeOrigin = 'panel' | 'masivo' | 'importacion' | 'script' | 'checkout' | 'prueba'
@@ -129,6 +142,25 @@ export interface InvOpResult {
   error?: string
   before?: Partial<InvVariation>
   after?: Partial<InvVariation>
+}
+
+/**
+ * Estado FINAL de una variación tras una tanda de escrituras: UNA entrada por
+ * SKU, aunque se hayan enviado varias operaciones sobre ella (precio y stock son
+ * dos). Lo devuelve /api/inventario/operaciones para que el panel actualice la
+ * grilla SIN recargar ni sincronizar. `ok:false` = alguna operación de ese SKU
+ * falló: la fila se marca en rojo con `error` y NUNCA se pinta como exitosa.
+ */
+export interface InvVariationState {
+  sku: string
+  ok: boolean
+  error?: string
+  regular_price?: string
+  sale_price?: string
+  price?: string
+  manage_stock?: boolean
+  stock_quantity?: number | null
+  stock_status?: InvStockStatus
 }
 
 export interface InvChange {
@@ -169,4 +201,6 @@ export interface InvStatus {
   agotadas: number
   /** el stock del adaptador se aplica al sitio, bot y checkout (NUXT_INVENTORY_PUBLIC_STOCK) */
   public_stock: boolean
+  /** referencias forzadas a agotado a mano (NUXT_SKUS_AGOTADOS) con su motivo */
+  agotados_forzados: { sku: string, motivo: string }[]
 }

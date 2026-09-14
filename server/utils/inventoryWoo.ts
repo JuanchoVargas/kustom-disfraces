@@ -1,10 +1,11 @@
-import type { InvListFilters, InvOpResult, InvOperation, InvPage, InvProduct, InvVariation } from '~~/shared/types/inventory'
+import type { InvListFilters, InvOpIds, InvOpResult, InvOperation, InvPage, InvProduct, InvVariation } from '~~/shared/types/inventory'
 import type { InventoryStore } from './inventoryStore'
 import type { WriteContext } from './inventoryCommon'
 import {
   InvValidationError, applyFilters, logChanges, normalizePrice, normalizeStock, recomputeProduct, stockStatusFor, validatePricePair,
 } from './inventoryCommon'
 import { fetchWooVariations, loadInventory, loadProductBySku, snapshotUpsert } from './inventorySnapshot'
+import { bloqueoDe } from './inventoryResolve'
 import { sanitizeWooError, wooFetch } from './woo'
 import { wooWriteCredentials, wooWriteFetch } from './wooWrite'
 
@@ -38,6 +39,10 @@ export function wooOnlyDrafts(): boolean {
 }
 const BLOQUEADO = 'bloqueado: el adaptador woo solo escribe en BORRADORES mientras se validan las operaciones masivas (NUXT_INVENTORY_WOO_ONLY_DRAFTS)'
 function guardDraft(product: InvProduct): string | null {
+  // Estructura rota en Woo (SKU duplicado / padre con SKU de variación): no se
+  // escribe ni en borradores, porque no se sabe en qué variación se escribiría.
+  const roto = bloqueoDe(product)
+  if (roto) return `bloqueado — ${roto}`
   return wooOnlyDrafts() && product.status === 'publish' ? BLOQUEADO : null
 }
 
@@ -75,8 +80,23 @@ const pick = (v: InvVariation): Partial<InvVariation> => ({
   regular_price: v.regular_price, sale_price: v.sale_price, price: v.price, manage_stock: v.manage_stock, stock_quantity: v.stock_quantity, stock_status: v.stock_status,
 })
 
-/** Resuelve producto padre + variación con ids REALES (leyendo Woo si el snapshot solo tiene derivadas). */
-async function resolve(skuTalla: string): Promise<{ product: InvProduct, variation: InvVariation } | null> {
+/**
+ * Resuelve producto padre + variación.
+ *
+ * Con `ids` (product_id/variation_id fijados en la VISTA PREVIA) la búsqueda va por
+ * id y NO por SKU: es lo que evita escribir en la variación equivocada cuando el SKU
+ * está duplicado o cuando un padre lleva el SKU de su propia variación. Sin ids se
+ * cae al camino antiguo por SKU, que solo debería usarse en scripts internos.
+ */
+async function resolve(skuTalla: string, ids?: InvOpIds): Promise<{ product: InvProduct, variation: InvVariation } | null> {
+  if (ids?.product_id && ids?.variation_id) {
+    const { products } = await loadInventory()
+    const p = products.find(x => x.id === ids.product_id)
+    const v = p?.variations.find(x => x.id === ids.variation_id)
+    if (p && v) return { product: p, variation: v }
+    // Los ids venían de la vista previa: si ya no casan, el catálogo cambió debajo.
+    return null
+  }
   let product = await loadProductBySku(skuTalla)
   if (!product) return null
   let variation = product.variations.find(v => v.sku === skuTalla)
@@ -173,8 +193,8 @@ export function createWooStore(): InventoryStore {
       for (const op of operations) {
         try {
           const body = bodyFor(op)
-          const r = await resolve(op.sku)
-          if (!r) { results.set(op.sku, { sku: op.sku, ok: false, error: 'SKU de variación inexistente en Woo' }); continue }
+          const r = await resolve(op.sku, op)
+          if (!r) { results.set(op.sku, { sku: op.sku, ok: false, error: op.variation_id ? `la variación ${op.variation_id} ya no existe en el catálogo (vuelve a calcular la vista previa)` : 'SKU de variación inexistente en Woo' }); continue }
           const blocked = guardDraft(r.product)
           if (blocked) { results.set(op.sku, { sku: op.sku, ok: false, error: blocked }); continue }
           let g = groups.get(r.product.id)

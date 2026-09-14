@@ -12,7 +12,7 @@
  */
 import { defineComponent, h } from 'vue'
 import { useVirtualizer } from '@tanstack/vue-virtual'
-import type { InvChange, InvOpResult, InvProduct, InvStatus, InvVariation } from '~~/shared/types/inventory'
+import type { InvChange, InvOpResult, InvProduct, InvStatus, InvVariation, InvVariationState } from '~~/shared/types/inventory'
 import { tallaFromSku } from '~~/shared/utils/tallas'
 
 definePageMeta({ layout: 'inbox' })
@@ -83,18 +83,35 @@ async function loadEstado() {
   try { estado.value = await $fetch<InvStatus>('/api/inventario/estado') }
   catch (e) { onUnauthorized(e) }
 }
-/** Repite pasos de sincronización hasta que no queden pendientes. */
+/** Productos que Woo tiene y el snapshot NO guardó, con el motivo. */
+interface Descartado { id: number, nombre: string, sku: string, status: string, motivo: string, choca_con?: { id: number, nombre: string, status: string }[], editar_url: string }
+const descartados = ref<Descartado[]>([])
+const descartadosAbierto = ref(false)
+
+/**
+ * Repite pasos de sincronización hasta que no queden pendientes. En una
+ * sincronización FORZADA se manda `desde` (marca de inicio de la tanda) en TODAS
+ * las llamadas: así el servidor sabe qué relee "en esta tanda" y el forzado
+ * alcanza el catálogo entero. Antes solo iba en la primera y se quedaba en 12.
+ */
 async function sync(force = false) {
   if (syncing.value) return
   syncing.value = true
   syncMsg.value = 'Leyendo productos de Woo…'
+  const desde = new Date().toISOString()
+  const vistos = new Map<number, Descartado>()
   try {
-    for (let i = 0; i < 40; i++) {
-      const r = await $fetch<{ total: number, pendientes: number, error?: string }>('/api/inventario/sincronizar', { method: 'POST', body: { force: force && i === 0 } })
+    for (let i = 0; i < 60; i++) {
+      const r = await $fetch<{ total: number, pendientes: number, descartados?: Descartado[], error?: string }>(
+        '/api/inventario/sincronizar',
+        { method: 'POST', body: { force, ...(force ? { desde } : {}), refrescarLista: i === 0 && force } },
+      )
       if (r.error) { syncMsg.value = `Woo no respondió: ${r.error}`; break }
+      for (const d of r.descartados ?? []) vistos.set(d.id, d)
       syncMsg.value = r.pendientes ? `Sincronizando con Woo… faltan ${r.pendientes} de ${r.total}` : ''
       if (!r.pendientes) break
     }
+    descartados.value = [...vistos.values()]
     await Promise.all([loadEstado(), refresh()])
   }
   catch (e: any) { onUnauthorized(e); syncMsg.value = 'No se pudo sincronizar.' }
@@ -201,13 +218,23 @@ const drafts = ref<Record<string, Draft>>({})
 const rowState = ref<Record<string, { saving?: boolean, msg?: string, ok?: boolean, flash?: boolean }>>({})
 const history = ref<Record<string, InvChange[]>>({})
 
+/**
+ * Tallas donde el USUARIO escribió y todavía no guardó. Es lo único que protege un
+ * borrador de ser resembrado. Antes se usaba `dirty(v)` para eso, pero tras una
+ * escritura masiva TODOS los borradores afectados quedan "sucios" (borrador viejo
+ * vs. dato nuevo del servidor) y el input se quedaba con el valor anterior.
+ */
+const touched = ref(new Set<string>())
+function markTouched(sku: string) { touched.value.add(sku) }
+function untouch(sku: string) { touched.value.delete(sku) }
+
 function draftOf(v: InvVariation): Draft {
   return { regular_price: v.regular_price, sale_price: v.sale_price, stock_quantity: v.manage_stock ? String(v.stock_quantity ?? 0) : '', manage_stock: v.manage_stock }
 }
-/** Siembra los borradores; con overwrite=false respeta los que ya están sucios (edición en curso). */
+/** Siembra los borradores; con overwrite=false respeta SOLO los que el usuario está editando. */
 function seedDrafts(p: InvProduct, overwrite = true) {
   for (const v of p.variations) {
-    if (!overwrite && drafts.value[v.sku] && dirty(v)) continue
+    if (!overwrite && drafts.value[v.sku] && touched.value.has(v.sku) && dirty(v)) continue
     drafts.value[v.sku] = draftOf(v)
   }
 }
@@ -242,6 +269,61 @@ function optimistic(v: InvVariation, d: Draft): InvVariation {
   next.stock_status = !manage ? next.stock_status : ((next.stock_quantity ?? 0) > 0 ? 'instock' : 'outofstock')
   return next
 }
+/** Recalcula precio mínimo y estado de stock del padre a partir de sus tallas. */
+function recomputeHeader(prod: InvProduct, variations: InvVariation[]): InvProduct {
+  const prices = variations.map(x => Number(x.price)).filter(n => n > 0)
+  const anyIn = variations.some(x => x.stock_status === 'instock')
+  return { ...prod, variations, price: prices.length ? String(Math.min(...prices)) : prod.price, stock_status: anyIn ? 'instock' : 'outofstock' }
+}
+
+/**
+ * Aplica a la grilla el ESTADO FINAL que devolvió el servidor para cada talla
+ * (operación masiva o importación de Excel), SIN recargar ni sincronizar:
+ * parchea la variación, resiembra el input con el valor real y marca la fila.
+ * Las tallas que fallaron quedan en rojo con el motivo y no se pintan como ok.
+ */
+function applyVariationStates(states: InvVariationState[]) {
+  if (!states.length) return
+  const bySku = new Map(states.map(s => [s.sku, s]))
+  for (let i = 0; i < items.value.length; i++) {
+    const prod = items.value[i]!
+    if (!prod.variations.some(v => bySku.has(v.sku))) continue
+    const variations = prod.variations.map((v) => {
+      const s = bySku.get(v.sku)
+      // Talla fallida: el servidor no cambió nada, así que ni se toca la fila ni se
+      // pisa lo que el usuario tuviera escrito en el input.
+      if (!s || !s.ok) return v
+      const next: InvVariation = {
+        ...v,
+        regular_price: s.regular_price ?? v.regular_price,
+        sale_price: s.sale_price ?? v.sale_price,
+        price: s.price ?? v.price,
+        manage_stock: s.manage_stock ?? v.manage_stock,
+        stock_quantity: s.stock_quantity !== undefined ? s.stock_quantity : v.stock_quantity,
+        stock_status: s.stock_status ?? v.stock_status,
+      }
+      // El servidor manda la verdad: el borrador del input se resiembra siempre.
+      drafts.value[v.sku] = draftOf(next)
+      untouch(v.sku)
+      return next
+    })
+    items.value[i] = recomputeHeader(prod, variations)
+  }
+  // Las fallidas se marcan ya (rojo persistente); el destello verde va al cerrar el modal.
+  for (const s of states) if (!s.ok) rowState.value[s.sku] = { ok: false, msg: s.error }
+}
+
+/** Destello verde de las tallas aplicadas, igual que la edición individual. */
+function flashApplied() {
+  const states = bulk.aplicadas
+  bulk.aplicadas = []
+  for (const s of states) {
+    if (!s.ok) continue
+    rowState.value[s.sku] = { ok: true, flash: true }
+    setTimeout(() => { if (rowState.value[s.sku]?.ok) rowState.value[s.sku] = {} }, 1200)
+  }
+}
+
 function replaceVariation(p: InvProduct, v: InvVariation) {
   const i = items.value.findIndex(x => x.sku === p.sku)
   if (i < 0) return
@@ -250,9 +332,7 @@ function replaceVariation(p: InvProduct, v: InvVariation) {
   if (vi < 0) return
   const variations = prod.variations.slice()
   variations[vi] = v
-  const prices = variations.map(x => Number(x.price)).filter(n => n > 0)
-  const anyIn = variations.some(x => x.stock_status === 'instock')
-  items.value[i] = { ...prod, variations, price: prices.length ? String(Math.min(...prices)) : prod.price, stock_status: anyIn ? 'instock' : 'outofstock' }
+  items.value[i] = recomputeHeader(prod, variations)
 }
 /**
  * Guarda una variación con ACTUALIZACIÓN OPTIMISTA: la fila cambia al instante,
@@ -263,9 +343,11 @@ async function save(p: InvProduct, v: InvVariation) {
   const d = drafts.value[v.sku]
   if (!d || !dirty(v)) return
   const ops: any[] = []
-  if (d.regular_price !== v.regular_price || d.sale_price !== v.sale_price) ops.push({ op: 'price', sku: v.sku, regular_price: d.regular_price, sale_price: d.sale_price })
+  // Los ids de Woo viajan con la operación: la escritura NO vuelve a resolver por SKU.
+  const ids = { product_id: p.id, variation_id: v.id }
+  if (d.regular_price !== v.regular_price || d.sale_price !== v.sale_price) ops.push({ op: 'price', sku: v.sku, regular_price: d.regular_price, sale_price: d.sale_price, ...ids })
   const stockNow = v.manage_stock ? String(v.stock_quantity ?? 0) : ''
-  if (d.stock_quantity !== stockNow && d.stock_quantity !== '') ops.push({ op: 'stock', sku: v.sku, stock_quantity: Number(d.stock_quantity) })
+  if (d.stock_quantity !== stockNow && d.stock_quantity !== '') ops.push({ op: 'stock', sku: v.sku, stock_quantity: Number(d.stock_quantity), ...ids })
   if (!ops.length) return
   const before = v
   const guess = optimistic(v, d)
@@ -286,6 +368,7 @@ async function save(p: InvProduct, v: InvVariation) {
     const real = r.resultados.reduce((acc, res) => ({ ...acc, ...(res.after ?? {}) }), guess) as InvVariation
     replaceVariation(p, real)
     drafts.value[v.sku] = draftOf(real)
+    untouch(v.sku)
     rowState.value[v.sku] = { ok: true, flash: true }
     setTimeout(() => { if (rowState.value[v.sku]?.ok) rowState.value[v.sku] = {} }, 1200)
     // Historial y cabecera del producto, en segundo plano (no bloquea la edición).
@@ -307,6 +390,7 @@ async function save(p: InvProduct, v: InvVariation) {
 }
 function reset(v: InvVariation) {
   drafts.value[v.sku] = draftOf(v)
+  untouch(v.sku)
   rowState.value[v.sku] = {}
 }
 
@@ -353,6 +437,8 @@ const bulk = reactive({
   open: false, mode: 'bulk' as 'bulk' | 'import', target: 'selected' as 'selected' | 'filtered', busy: false, error: '',
   tallas: '', precioModo: '', precioValor: '', ofertaModo: '', ofertaValor: '', stockModo: '', stockValor: '',
   preview: null as Preview | null, soloCambios: true, result: null as { msg: string, fallidas: number } | null,
+  /** estado final de las tallas escritas; se destella al cerrar el modal */
+  aplicadas: [] as InvVariationState[],
 })
 const previewRows = computed(() => {
   const f = bulk.preview?.filas ?? []
@@ -367,12 +453,13 @@ function exportUrl(formato: 'xlsx' | 'csv') {
 }
 function openBulk() {
   bulk.mode = 'bulk'; bulk.target = selected.value.size ? 'selected' : 'filtered'
-  bulk.preview = null; bulk.result = null; bulk.error = ''; bulk.open = true
+  bulk.preview = null; bulk.result = null; bulk.error = ''; bulk.aplicadas = []; bulk.open = true
 }
 function openImport() {
-  bulk.mode = 'import'; bulk.preview = null; bulk.result = null; bulk.error = ''; bulk.open = true
+  bulk.mode = 'import'; bulk.preview = null; bulk.result = null; bulk.error = ''; bulk.aplicadas = []; bulk.open = true
 }
-function closeBulk() { bulk.open = false }
+// Al cerrar, las tallas escritas destellan en verde (el modal las tapaba).
+function closeBulk() { bulk.open = false; flashApplied() }
 async function previewBulk() {
   bulk.busy = true; bulk.error = ''
   try {
@@ -404,15 +491,33 @@ async function previewImport() {
   catch (e: any) { onUnauthorized(e); bulk.error = e?.data?.statusMessage ?? e?.message ?? 'No se pudo leer el archivo' }
   bulk.busy = false
 }
+/**
+ * Aplica la vista previa (masiva o importación). El servidor devuelve el estado
+ * FINAL de cada talla escrita, que se vuelca en la grilla al instante: nada de
+ * recargar ni sincronizar. El destello verde se dispara al cerrar el modal.
+ */
 async function applyPreview() {
   if (!bulk.preview) return
   const ops = bulk.preview.filas.filter(f => f.cambia && !f.error).flatMap(f => f.ops)
   if (!ops.length) return
   bulk.busy = true
   try {
-    const r = await $fetch<{ ok: number, fallidas: number, resultados: InvOpResult[] }>('/api/inventario/operaciones', { method: 'POST', body: { operaciones: ops, origen: bulk.mode === 'import' ? 'importacion' : 'masivo' } })
-    const fallos = r.resultados.filter(x => !x.ok)
-    bulk.result = { fallidas: r.fallidas, msg: r.fallidas ? `${r.ok} aplicadas · ${r.fallidas} fallidas: ${fallos.slice(0, 5).map(x => `${x.sku} (${x.error})`).join(', ')}${fallos.length > 5 ? '…' : ''}` : `${r.ok} cambios aplicados.` }
+    const r = await $fetch<{ ok: number, fallidas: number, resultados: InvOpResult[], variaciones?: InvVariationState[], tallas_ok?: number, tallas_fallidas?: number }>(
+      '/api/inventario/operaciones',
+      { method: 'POST', body: { operaciones: ops, origen: bulk.mode === 'import' ? 'importacion' : 'masivo' } },
+    )
+    const estados = r.variaciones ?? []
+    bulk.aplicadas = estados
+    applyVariationStates(estados)
+    const fallos = estados.filter(x => !x.ok)
+    const okTallas = r.tallas_ok ?? estados.filter(x => x.ok).length
+    bulk.result = {
+      fallidas: fallos.length,
+      msg: fallos.length
+        ? `${okTallas} tallas aplicadas · ${fallos.length} fallidas: ${fallos.slice(0, 5).map(x => `${x.sku} (${x.error})`).join(', ')}${fallos.length > 5 ? '…' : ''}`
+        : `${okTallas} ${okTallas === 1 ? 'talla actualizada' : 'tallas actualizadas'} en la tabla.`,
+    }
+    // Contador del aviso amarillo + totales y orden de la lista (por si el orden es por precio/stock).
     await Promise.all([loadEstado(), refresh()])
   }
   catch (e: any) { onUnauthorized(e); bulk.result = { fallidas: 1, msg: e?.data?.statusMessage ?? 'No se pudieron aplicar los cambios' } }
@@ -728,6 +833,24 @@ onBeforeUnmount(() => { if (sinResponderTimer) clearInterval(sinResponderTimer) 
       <div v-if="estado && estado.simulation && estado.public_stock" class="banner banner--warn">
         <strong>Ojo:</strong> el stock simulado SÍ se está aplicando al sitio, al bot y al checkout (NUXT_INVENTORY_PUBLIC_STOCK=on). Úsalo solo en local o preview.
       </div>
+      <!-- Productos que Woo tiene y el snapshot NO guardó. Antes se descartaban en
+           silencio, que es justo lo que escondió el caso del SKU repetido. -->
+      <div v-if="descartados.length" class="banner banner--warn">
+        <strong>⚠ {{ descartados.length }} {{ descartados.length === 1 ? 'producto de Woo no entró' : 'productos de Woo no entraron' }} al inventario</strong>
+        <button class="linkbtn" type="button" @click="descartadosAbierto = !descartadosAbierto">{{ descartadosAbierto ? 'ocultar' : 'ver cuáles' }}</button>
+        <ul v-if="descartadosAbierto" class="descartes">
+          <li v-for="d in descartados" :key="d.id">
+            <span class="pill" :class="d.motivo === 'SKU duplicado' ? 'pill--err' : 'pill--draft'">{{ d.motivo }}</span>
+            <b>{{ d.nombre || '(sin nombre)' }}</b>
+            <span class="mono small">#{{ d.id }}{{ d.sku ? ` · ${d.sku}` : '' }}</span>
+            <span class="muted small">{{ d.status }}</span>
+            <span v-if="d.choca_con?.length" class="muted small">
+              choca con {{ d.choca_con.map(c => `#${c.id} ${c.nombre}`).join(', ') }}
+            </span>
+            <a class="linkbtn" :href="d.editar_url" target="_blank" rel="noopener">editar en WordPress ↗</a>
+          </li>
+        </ul>
+      </div>
       <div v-if="estado && !estado.ok" class="banner banner--warn">{{ estado.detail }}</div>
       <div v-if="syncMsg" class="banner banner--info">{{ syncMsg }}</div>
 
@@ -967,13 +1090,13 @@ onBeforeUnmount(() => { if (sinResponderTimer) clearInterval(sinResponderTimer) 
                                 <td class="talla-cell" data-label="Talla">{{ talla(v) }}</td>
                                 <td class="mono small" data-label="SKU">{{ v.sku }}</td>
                                 <td class="num" data-label="Precio normal">
-                                  <input v-if="drafts[v.sku]" v-model="drafts[v.sku]!.regular_price" class="input input--num" inputmode="numeric" placeholder="—" :disabled="rowState[v.sku]?.saving" @keydown.enter.prevent="save(vrows[vi.index]!.p, v)">
+                                  <input v-if="drafts[v.sku]" v-model="drafts[v.sku]!.regular_price" class="input input--num" inputmode="numeric" placeholder="—" :disabled="rowState[v.sku]?.saving" @input="markTouched(v.sku)" @keydown.enter.prevent="save(vrows[vi.index]!.p, v)">
                                 </td>
                                 <td class="num" data-label="Precio rebajado">
-                                  <input v-if="drafts[v.sku]" v-model="drafts[v.sku]!.sale_price" class="input input--num" inputmode="numeric" placeholder="sin oferta" :disabled="rowState[v.sku]?.saving" @keydown.enter.prevent="save(vrows[vi.index]!.p, v)">
+                                  <input v-if="drafts[v.sku]" v-model="drafts[v.sku]!.sale_price" class="input input--num" inputmode="numeric" placeholder="sin oferta" :disabled="rowState[v.sku]?.saving" @input="markTouched(v.sku)" @keydown.enter.prevent="save(vrows[vi.index]!.p, v)">
                                 </td>
                                 <td class="num" data-label="Stock">
-                                  <input v-if="drafts[v.sku]" v-model="drafts[v.sku]!.stock_quantity" class="input input--num" inputmode="numeric" :placeholder="v.manage_stock ? '0' : 'sin gestionar'" :disabled="rowState[v.sku]?.saving" @keydown.enter.prevent="save(vrows[vi.index]!.p, v)">
+                                  <input v-if="drafts[v.sku]" v-model="drafts[v.sku]!.stock_quantity" class="input input--num" inputmode="numeric" :placeholder="v.manage_stock ? '0' : 'sin gestionar'" :disabled="rowState[v.sku]?.saving" @input="markTouched(v.sku)" @keydown.enter.prevent="save(vrows[vi.index]!.p, v)">
                                 </td>
                                 <td data-label="Estado"><span class="stock" :class="`stock--${stockKind(v)}`"><i class="dot"></i>{{ stockLabel(v) }}</span></td>
                                 <td class="actions-cell">
@@ -1143,6 +1266,11 @@ onBeforeUnmount(() => { if (sinResponderTimer) clearInterval(sinResponderTimer) 
 .pill--live { background: #DDF7E8; color: #1B7F4B; }
 .pill--ok { background: #DDF7E8; color: #1B7F4B; }
 .pill--draft { background: var(--line); color: var(--mut); }
+.pill--err { background: #FDE2E2; color: #A11B1B; }
+
+/* lista de productos descartados por la sincronización (sin SKU / SKU duplicado) */
+.descartes { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; }
+.descartes li { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 
 .banner { padding: 10px 14px; border-radius: 12px; font-size: 14px; }
 .banner--sim { background: #FFF1D6; color: #7A4A00; border: 1px solid #F5D58F; display: flex; flex-direction: column; gap: 3px; }

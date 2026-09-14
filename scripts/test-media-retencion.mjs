@@ -12,11 +12,13 @@
 //   3. Tope total: con una fila "gorda" (bytes = tope) un adjunto que llega por
 //      Messenger se registra como mensaje pero NO se guarda (download_failed =
 //      limite_almacenamiento); enviar una imagen desde la bandeja responde 507.
-import { neon } from '@neondatabase/serverless'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
+import { exigirBdDePruebas } from './lib/guard-bd.mjs'
 
-const BASE = process.argv.slice(2).find(a => a.startsWith('http')) ?? 'http://localhost:3000'
+const __BASE_PEDIDA = process.argv.slice(2).find(a => a.startsWith('http')) ?? 'http://localhost:3000'
+// GUARDA: este script ESCRIBE. No arranca si la base no es la rama de pruebas.
+const { sql, BASE } = await exigirBdDePruebas(__BASE_PEDIDA)
 function loadEnv() {
   const env = {}
   const raw = readFileSync(fileURLToPath(new URL('../.env', import.meta.url)), 'utf8')
@@ -27,7 +29,7 @@ function loadEnv() {
   return env
 }
 const env = loadEnv()
-const sql = neon(env.POSTGRES_URL || env.DATABASE_URL)
+
 let fails = 0
 const check = (name, ok, detail = '') => { console.log(`${ok ? '✅' : '❌'} ${name}${detail ? ` — ${detail}` : ''}`); if (!ok) fails++ }
 const PSID = '9990000000000077'

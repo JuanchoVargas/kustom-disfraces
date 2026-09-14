@@ -15,7 +15,7 @@ const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCa
 const results = computed(() => {
   const tokens = norm(q.value).split(/\s+/).filter(Boolean)
   if (!tokens.length) return []
-  return products.filter((p) => {
+  const hits = products.filter((p) => {
     const haystack = norm(
       [p.name, p.description, ...(p.publicos ?? []), ...(p.subcategoriasNav ?? [])]
         .filter(Boolean)
@@ -24,6 +24,8 @@ const results = computed(() => {
     // todas las palabras deben aparecer (búsqueda AND)
     return tokens.every(t => haystack.includes(t))
   })
+  // Los agotados siguen saliendo en el buscador, pero al final.
+  return agotadosAlFinal(hits)
 })
 
 useHead(() => ({

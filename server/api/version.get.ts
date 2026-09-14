@@ -8,11 +8,16 @@
  * Los datos se fijan en el BUILD (runtimeConfig.public.build); si faltan, se
  * leen del entorno en ejecución (Vercel expone VERCEL_GIT_* a las funciones).
  */
-export default defineEventHandler((event) => {
+export default defineEventHandler(async (event) => {
   const b = useRuntimeConfig().public.build as { commit?: string, rama?: string, entorno?: string, fecha?: string }
   const commit = b.commit || process.env.VERCEL_GIT_COMMIT_SHA || ''
   setHeader(event, 'Cache-Control', 'no-store')
+  // ¿Este servidor está conectado a una base DE PRUEBAS? Es la señal que usan los
+  // scripts que escriben para negarse a correr contra producción. Solo un booleano:
+  // no expone la cadena de conexión ni nada del servidor.
+  const db_test = await isTestDatabase().catch(() => false)
   return {
+    db_test,
     commit: commit || null,
     commit_corto: commit ? commit.slice(0, 7) : null,
     rama: b.rama || process.env.VERCEL_GIT_COMMIT_REF || null,

@@ -1,7 +1,7 @@
-import type { WaMessage } from './whatsapp'
-import type { ConvState, WaIncoming } from './whatsappBot'
+import type { WaMessage, WaRow } from './whatsapp'
+import type { BotCanal, ConvState, WaIncoming } from './whatsappBot'
 import { interactiveOptions, waButtons, waList, waText } from './whatsapp'
-import { buildBotReplies, sugerirTalla } from './whatsappBot'
+import { ASESOR_TITULO, ASESOR_TITULO_CORTO, buildBotReplies, sugerirTalla } from './whatsappBot'
 import { getProductBySlug } from './productSearch'
 import { publicoNombre } from './catalogNav'
 import { formatCOP, normalize, priceRange, searchProducts, searchVocabulary, similarProducts } from './productSearch'
@@ -22,9 +22,13 @@ export interface BotResult {
   failedSearch?: { texto: string, termino: string, motivo: 'sin_coincidencia' | 'solo_parecidos', sugerencias: SimilarProduct[] }
   /** Teléfono colombiano escrito por el cliente (lead). Transitorio. */
   leadPhone?: string
+  /** Pidió aviso por un producto agotado (lista de espera por stock). Transitorio. */
+  stockEspera?: { slug: string, sku: string, producto: string, talla?: string }
 }
 
 const site = () => (useRuntimeConfig().public.siteUrl || 'https://www.disfraceskustom.com').replace(/\/$/, '')
+/** Canal del mensaje; sin marca explícita se asume WhatsApp (el webhook original). */
+const canal = (input: WaIncoming): BotCanal => input.canal ?? 'wa'
 const SLOT_TTL = 30 * 60 * 1000 // 30 min
 
 // ---------- vocabularios ----------
@@ -136,7 +140,9 @@ function mergeSlots(prev: NonNullable<ConvState['slots']>, patch: { producto?: s
   }
 }
 function withSlots(res: BotResult, prev: NonNullable<ConvState['slots']>, patch: Parameters<typeof mergeSlots>[1]): BotResult {
-  return { replies: res.replies, patch: { ...res.patch, slots: mergeSlots(prev, patch) } }
+  // `...res` conserva los campos transitorios (failedSearch, leadPhone, stockEspera):
+  // antes esta función los descartaba al reconstruir el objeto.
+  return { ...res, replies: res.replies, patch: { ...res.patch, slots: mergeSlots(prev, patch) } }
 }
 
 // ---------- respuestas específicas del canal ----------
@@ -187,10 +193,12 @@ function sinResultados(texto: string, termino: string, slots: NonNullable<ConvSt
   // Se repite el TÉRMINO de producto, no la frase completa ("venimos", no "hola buenas tiene disfraz de venimos talla 12").
   const eco = (termino || texto).trim().slice(0, 40)
   if (!parecidos.length) {
+    // Texto exacto del cliente (8C). El enlace al catálogo va debajo del 👇.
     return {
       replies: [waButtons(
-        `No tengo *"${eco}"* en el catálogo por ahora 🙈\nPuedo mostrarte las categorías, o una persona del equipo te ayuda a buscarlo y te avisa si llega.`,
-        [{ id: 'main:ver', title: 'Ver categorías' }, { id: 'main:human', title: 'Hablar con alguien' }, { id: 'main:menu', title: '🏠 Menú' }],
+        'La referencia solicitada no está disponible en este momento. '
+        + `Puedes ver nuestro catálogo completo aquí 👇\n${site()}/catalogo-kustom.pdf`,
+        [{ id: 'main:ver', title: 'Ver categorías' }, { id: 'main:human', title: ASESOR_TITULO_CORTO }, { id: 'main:menu', title: '🏠 Menú' }],
       )],
       patch: { step: 'sin-resultados', stack: [], slots: mergeSlots(slots, {}) },
       failedSearch,
@@ -200,12 +208,12 @@ function sinResultados(texto: string, termino: string, slots: NonNullable<ConvSt
   const body = strong
     ? `No encontré exactamente *"${eco}"*, pero creo que buscas uno de estos 👇`
     : `No tengo *"${eco}"* en el catálogo. ¿Buscas algo parecido a esto? 👇`
-  const rows = parecidos.map(p => ({
+  const rows: WaRow[] = parecidos.map(p => ({
     id: `prod:${p.slug}`,
     title: p.nombre,
     description: `${formatCOP(p.precio)} · tallas ${p.tallas.join(', ')}`,
   }))
-  rows.push({ id: 'main:human', title: '💬 Hablar con alguien', description: 'Una persona del equipo te ayuda a buscarlo' })
+  rows.push({ id: 'main:human', title: ASESOR_TITULO, shortTitle: ASESOR_TITULO_CORTO, description: 'Una persona del equipo te ayuda a buscarlo' })
   rows.push({ id: 'main:menu', title: '🏠 Menú', description: 'Volver al inicio' })
   return {
     replies: [waList(body, 'Ver opciones', rows, 'Parecidos')],
@@ -243,7 +251,19 @@ function detectInfo(norm: string, rest: string): InfoKind | null {
   return null
 }
 
-const INFO_TEXT: Record<InfoKind, () => string> = {
+/** Teléfono que se muestra al cliente en Messenger/Instagram (la línea real de ventas). */
+const TELEFONO_VISIBLE = '311 884 4547'
+
+/**
+ * PROMESA COMERCIAL del mensaje de precios. Es una promoción, así que tiene que
+ * poder apagarse SIN deploy: NUXT_BOT_TEXTO_PROMOCION vacío = mensaje sin promoción.
+ * Sin la variable definida se usa el texto por defecto que pidió el cliente.
+ */
+function textoPromocion(): string {
+  return String(useRuntimeConfig().botTextoPromocion ?? '').trim()
+}
+
+const INFO_TEXT: Record<InfoKind, (canal: BotCanal) => string> = {
   tallas: () => '📏 *Tallas*\n'
     + '• Niños y niñas: de la *0 a la 14* según el disfraz (la 0 es para bebés).\n'
     + '• Damas y caballeros: *S, M, L y XL*.\n'
@@ -266,16 +286,17 @@ const INFO_TEXT: Record<InfoKind, () => string> = {
     + `Todos los detalles: ${site()}/devoluciones`,
   mayoristas: () => '🏷️ ¡Sí manejamos ventas al por mayor!\n'
     + `Déjanos tus datos aquí y te contactamos con precios especiales 👇\n${site()}/mayoristas`,
-  horario: () => '🕒 Nuestro horario de atención es de *lunes a sábado, de 8:00 a.m. a 7:00 p.m.*\n'
-    + 'Por aquí puedes escribirnos a cualquier hora y te respondemos en ese horario.',
-  direccion: () => '📍 Estamos en *Cra 52 #39-89 sur, Bogotá*.\n'
-    + 'Horario: lunes a sábado, de 8:00 a.m. a 7:00 p.m. 🕒\n'
-    + 'Y si prefieres, enviamos *gratis* a todo el país 🚚',
+  // El teléfono solo tiene sentido en Messenger/Instagram: en WhatsApp el cliente
+  // YA está escribiendo a ese mismo número.
+  horario: canal => 'Nuestro horario de atención es de lunes a sábado, de 8:00 a.m. a 7:00 p.m. '
+    + 'Puedes escribirnos por aquí, por nuestra página web o al correo ventas@disfraceskustom.com.'
+    + (canal === 'wa' ? '' : ` O llámanos al ${TELEFONO_VISIBLE}.`),
+  direccion: () => 'Estamos ubicados en Bogotá, Colombia. 🕒 Horario de atención: lunes a sábado, de 8:00 a.m. a 7:00 p.m.',
   precio: () => {
-    const { min, max } = priceRange()
-    return `💲 Nuestros disfraces van desde ${formatCOP(min)} hasta ${formatCOP(max)} según la línea y la talla.\n`
-      + 'Escríbeme el personaje que buscas y te paso el precio exacto 😉\n'
-      + `Catálogo completo: ${site()}/catalogo-kustom.pdf`
+    const promo = textoPromocion()
+    return 'Los precios varían según la referencia. '
+      + (promo ? `${promo} ` : '')
+      + `Puedes ver nuestro catálogo completo aquí 👇\n${site()}/catalogo-kustom.pdf`
   },
 }
 
@@ -283,10 +304,10 @@ const INFO_TEXT: Record<InfoKind, () => string> = {
 function infoReply(kind: InfoKind, input: WaIncoming, state: ConvState, slots: NonNullable<ConvState['slots']>): BotResult {
   if (kind === 'descuento') {
     return {
-      replies: [waButtons(INFO_TEXT.descuento(), [
+      replies: [waButtons(INFO_TEXT.descuento(canal(input)), [
         { id: 'main:ver', title: 'Ver disfraces' },
         { id: 'main:como', title: 'Cómo comprar' },
-        { id: 'main:human', title: 'Hablar con alguien' },
+        { id: 'main:human', title: ASESOR_TITULO_CORTO },
       ])],
       patch: { step: 'info:descuento', stack: [], askedSize: undefined, slots: mergeSlots(slots, {}) },
     }
@@ -295,7 +316,7 @@ function infoReply(kind: InfoKind, input: WaIncoming, state: ConvState, slots: N
   const first = menu.replies[0]
   const follow = first?.type === 'interactive' ? cloneWithBody(first, '¿Qué más quieres hacer? 👇') : first
   return {
-    replies: [waText(INFO_TEXT[kind](), true), ...(follow ? [follow] : [])],
+    replies: [waText(INFO_TEXT[kind](canal(input)), true), ...(follow ? [follow] : [])],
     patch: { step: `info:${kind}`, stack: [], askedSize: undefined, slots: mergeSlots(slots, {}) },
   }
 }
@@ -313,7 +334,7 @@ function leadPhoneReply(phone: string, state: ConvState, slots: NonNullable<Conv
   return {
     replies: [waButtons(
       `¡Anotado! 📲 Guardé tu número *${phone}* y una persona del equipo te escribe o te llama en nuestro horario (lunes a sábado, 8:00 a.m. a 7:00 p.m.).\nMientras tanto, ¿quieres ver disfraces?`,
-      [{ id: 'main:ver', title: 'Ver disfraces' }, { id: 'main:human', title: 'Hablar con alguien' }, { id: 'main:menu', title: '🏠 Menú' }],
+      [{ id: 'main:ver', title: 'Ver disfraces' }, { id: 'main:human', title: ASESOR_TITULO_CORTO }, { id: 'main:menu', title: '🏠 Menú' }],
     )],
     patch: { step: 'lead-telefono', stack: [], slots: mergeSlots(slots, {}) },
     leadPhone: phone,

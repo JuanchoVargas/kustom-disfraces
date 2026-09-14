@@ -30,8 +30,10 @@ export default defineEventHandler(async (event) => {
       const senderId = ev?.sender?.id
       if (!senderId) continue
 
-      const incoming = parseMessengerEvent(String(senderId), ev)
-      if (!incoming) continue // read/delivery u otros eventos sin texto/payload
+      const parsed = parseMessengerEvent(String(senderId), ev)
+      if (!parsed) continue // read/delivery u otros eventos sin texto/payload
+      // El canal viaja con el mensaje: algunos textos (horario) cambian según él.
+      const incoming: WaIncoming = { ...parsed, canal: channel }
 
       const session = await openBotSession(channel, String(senderId), incoming)
       // Dedupe de reintentos (mismo mid ya respondido o en vuelo) y silencio por humano.
@@ -43,7 +45,7 @@ export default defineEventHandler(async (event) => {
 
       // Capa de intención omnicanal: slots + lenguaje natural, reusando el cerebro base.
       await refreshBotStock() // productos/tallas agotados del inventario
-      const { replies, patch, failedSearch, leadPhone } = buildReplies(incoming, session.state)
+      const { replies, patch, failedSearch, leadPhone, stockEspera } = buildReplies(incoming, session.state)
 
       // Adaptar la salida del bot a Messenger (quick replies, texto con URL, etc.).
       const { messages, lastMenu } = toMessengerReplies(replies)
@@ -54,7 +56,7 @@ export default defineEventHandler(async (event) => {
         if (ok) delivered = true
         if (ok || !messengerConfigured()) sentTexts.push(messengerToText(msg))
       }
-      await closeBotSession({ session, canal: channel, externalId: String(senderId), incoming, sentTexts, delivered, patch: { ...patch, lastMenu }, failedSearch, leadPhone })
+      await closeBotSession({ session, canal: channel, externalId: String(senderId), incoming, sentTexts, delivered, patch: { ...patch, lastMenu }, failedSearch, leadPhone, stockEspera })
     }
   }
 

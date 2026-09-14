@@ -7,12 +7,15 @@
 const { products } = useProducts()
 const { reveal } = useSiteMotion()
 
-// Línea premium: prioriza los featured del catálogo y toma 4
+// Línea premium: prioriza los featured del catálogo y toma 4. Los agotados no
+// encabezan la banda: se mandan al final ANTES de recortar, así que solo entran
+// si no hay suficientes disponibles.
 const items = computed(() =>
-  products
-    .filter(p => p.subcategoriasNav?.includes('super'))
-    .sort((a, b) => Number(b.featured ?? false) - Number(a.featured ?? false))
-    .slice(0, 4),
+  agotadosAlFinal(
+    products
+      .filter(p => p.subcategoriasNav?.includes('super'))
+      .sort((a, b) => Number(b.featured ?? false) - Number(a.featured ?? false)),
+  ).slice(0, 4),
 )
 </script>
 

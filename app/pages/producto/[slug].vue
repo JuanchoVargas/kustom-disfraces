@@ -132,8 +132,11 @@ const showSizeGuide = ref(false)
 const sizeGuideVariant = computed(() => (product.value?.grupo === 'economico' ? 'eco' : 'general'))
 // El aviso se apaga apenas el usuario elige talla
 watch(size, (s) => { if (s !== null) needsSize.value = false })
+/** Referencia agotada: todas las tallas bloqueadas (ver applyStock en useProducts). */
+const agotado = computed(() => !!product.value?.badges?.some(b => b.variant === 'soldout'))
+
 function addToCart() {
-  if (!product.value) return
+  if (!product.value || agotado.value) return
   // OJO: comparar contra null, no truthiness — la talla 0 es falsy
   if (size.value === null) { needsSize.value = true; return }
   cart.add({
@@ -154,8 +157,23 @@ function addToCart() {
 
 const waLink = computed(() => `${contact.whatsapp}?text=${encodeURIComponent(`Hola, me interesa el disfraz "${product.value?.name}". ¿Me ayudan?`)}`)
 
+/**
+ * "Avísame cuando llegue" — producto agotado. Abre WhatsApp con el mensaje ya
+ * escrito (la app en móvil, WhatsApp Web en escritorio: wa.me resuelve solo).
+ * Incluye el SKU para que ventas sepa exactamente qué referencia reponer, y la
+ * talla si el cliente alcanzó a elegirla.
+ */
+const avisameLink = computed(() => {
+  const p = product.value
+  if (!p) return contact.whatsapp
+  const talla = size.value !== null ? ` talla ${size.value}` : ''
+  const texto = `Hola, me interesa el disfraz ${p.name} (${p.code ?? p.slug})${talla}. ¿Cuándo tendrán existencias?`
+  return `${contact.whatsapp}?text=${encodeURIComponent(texto)}`
+})
+
 // ---------- relacionados ----------
 const related = computed(() =>
+  // byCategory ya devuelve los agotados al final; el slice respeta ese orden.
   byCategory(product.value!.categorySlug).filter(p => p.id !== product.value!.id).slice(0, 4),
 )
 
@@ -266,8 +284,15 @@ const perks = [
         </div>
 
         <div class="actions">
-          <KButton variant="primary" size="lg" block @click="addToCart">
-            {{ added ? '✓ Agregado al carrito' : 'Agregar al carrito' }}
+          <KButton variant="primary" size="lg" block :disabled="agotado" @click="addToCart">
+            {{ agotado ? 'Agotado' : added ? '✓ Agregado al carrito' : 'Agregar al carrito' }}
+          </KButton>
+          <!-- Agotado: no se pierde al cliente interesado, se le da cómo preguntar. -->
+          <KButton v-if="agotado" variant="whatsapp" size="lg" block :to="avisameLink">
+            <template #icon-left>
+              <span aria-hidden="true">🔔</span>
+            </template>
+            Avísame cuando llegue
           </KButton>
           <KButton variant="whatsapp" size="lg" block :to="waLink">
             <template #icon-left>

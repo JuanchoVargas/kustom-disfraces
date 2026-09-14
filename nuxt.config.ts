@@ -113,6 +113,11 @@ export default defineNuxtConfig({
     // interactivo). Mientras cazamos por qué Meta acepta y descarta el interactivo.
     // Override en runtime (Vercel) sin redeploy de código.
     whatsappForceTextMenu: process.env.NUXT_WHATSAPP_FORCE_TEXT_MENU === 'true', // -> NUXT_WHATSAPP_FORCE_TEXT_MENU ('true' para forzar texto)
+    // Promesa comercial que el bot añade al mensaje de precios ("20% de descuento
+    // y envío gratis"). Es una PROMOCIÓN: se apaga poniendo la variable VACÍA en
+    // Vercel, sin deploy. Sin definir = texto por defecto (el que pidió el cliente).
+    botTextoPromocion: process.env.NUXT_BOT_TEXTO_PROMOCION
+      ?? 'Recuerda que todos nuestros disfraces tienen 20% de descuento y envío gratis a todo el país.', // -> NUXT_BOT_TEXTO_PROMOCION ('' para quitarla)
     // Messenger + Instagram (misma app de Meta "kustombot"). Reutilizan el cerebro
     // del bot de WhatsApp vía adaptadores de canal (server/utils/messenger.ts).
     messengerVerifyToken: process.env.NUXT_MESSENGER_VERIFY_TOKEN || '', // -> NUXT_MESSENGER_VERIFY_TOKEN (verificación del webhook GET)
@@ -149,6 +154,11 @@ export default defineNuxtConfig({
     //   auto (default) = solo cuando el adaptador es woo (el mock es simulación).
     //   on  = también con mock (para probar en local / preview).   off = nunca.
     inventoryPublicStock: process.env.NUXT_INVENTORY_PUBLIC_STOCK || 'auto', // -> NUXT_INVENTORY_PUBLIC_STOCK (auto | on | off)
+    // ⚠️ TEMPORAL — agotados a mano mientras el stock real no está cargado. Códigos
+    // de producto (001011001) y/o SKU de talla (001011001-T4), separados por coma.
+    // Marca la cinta AGOTADO en la web, saca la referencia del bot y bloquea el
+    // carrito. ELIMINAR esta variable cuando el inventario tenga el stock real.
+    skusAgotados: process.env.NUXT_SKUS_AGOTADOS || '', // -> NUXT_SKUS_AGOTADOS
     // Umbral de "stock bajo" (alertas y semáforo del panel), en unidades por talla.
     inventoryStockBajo: process.env.NUXT_INVENTORY_STOCK_BAJO || '5', // -> NUXT_INVENTORY_STOCK_BAJO
     // IMÁGENES de producto desde el panel: la API de Woo no sube medios; se usa la

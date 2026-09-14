@@ -1,6 +1,6 @@
 import navegacionData from '~~/app/data/navegacion.json'
 import catalogoData from '~~/app/data/catalogo.json'
-import { productoAgotado } from './botStock'
+
 
 /**
  * Árbol de navegación (públicos → subcategorías) para el servidor, calculado como
@@ -22,8 +22,10 @@ const nav = navegacionData as { publicos: RawPublico[] }
 const catalogo = catalogoData as unknown as RawCatalogoItem[]
 
 export function getPublicos(): NavPublico[] {
-  // Los productos totalmente agotados no cuentan (lógica de agotado del inventario).
-  const products = catalogo.filter(p => p.disponibleWeb === true && !productoAgotado(p.codigo))
+  // Los agotados SÍ cuentan en los menús: siguen en el catálogo, marcados. Si no,
+  // un público con todo agotado desaparecía del menú y el cliente no tenía por
+  // dónde preguntar. La marca de agotado se da en la ficha, no escondiendo.
+  const products = catalogo.filter(p => p.disponibleWeb === true)
   return nav.publicos
     .map((pub) => {
       const prods = products.filter(p => p.publicos?.includes(pub.slug))

@@ -47,6 +47,38 @@ export function dbConfigured(): boolean {
   return !!(process.env.POSTGRES_URL || process.env.DATABASE_URL)
 }
 
+/**
+ * MARCADOR DE BASE DE PRUEBAS. Una rama de Neon creada para tests lleva la tabla
+ * `kustom_bd_pruebas` (la crea scripts/preparar-bd-pruebas.mjs); producción NO la
+ * tiene y nunca debe tenerla.
+ *
+ * Es un marcador POSITIVO a propósito: comparar cadenas de conexión falla en
+ * cuanto alguien copia y pega mal, mientras que esto solo da "true" si la base
+ * de verdad fue preparada como base de pruebas. Los scripts que ESCRIBEN se
+ * niegan a arrancar si esto es false (ver scripts/lib/guard-bd.mjs).
+ *
+ * Motivo: el 10/09 `test-inventario.mjs` corrió contra producción y borró
+ * sobreescrituras reales del equipo. Hubo que reconstruirlas desde inventory_changes.
+ */
+export const TEST_MARKER_TABLE = 'kustom_bd_pruebas'
+let testDbCache: { at: number, value: boolean } | null = null
+const TEST_DB_TTL_MS = 60_000
+
+export async function isTestDatabase(): Promise<boolean> {
+  if (!dbConfigured()) return false
+  if (testDbCache && Date.now() - testDbCache.at < TEST_DB_TTL_MS) return testDbCache.value
+  let value = false
+  try {
+    const rows = await sql().query(`SELECT to_regclass($1) IS NOT NULL AS existe`, [`public.${TEST_MARKER_TABLE}`]) as { existe: boolean }[]
+    value = !!rows[0]?.existe
+  }
+  catch {
+    value = false // ante la duda, NO es base de pruebas
+  }
+  testDbCache = { at: Date.now(), value }
+  return value
+}
+
 export function sql(): Sql {
   if (client) return client
   const url = process.env.POSTGRES_URL || process.env.DATABASE_URL
@@ -169,6 +201,25 @@ const MIGRATION = [
   `CREATE INDEX IF NOT EXISTS messages_conversation_idx ON messages (conversation_id, id)`,
   `CREATE INDEX IF NOT EXISTS conversations_actividad_idx ON conversations (ultima_actividad DESC)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS messages_wamid_idx ON messages (wamid) WHERE wamid IS NOT NULL`,
+  // LISTA DE ESPERA POR STOCK: quién preguntó por algo agotado y qué talla quería.
+  // Es la lista de remarketing para avisar cuando se reponga. Una fila por
+  // (conversación, producto, talla): si vuelve a preguntar lo mismo, se actualiza.
+  `CREATE TABLE IF NOT EXISTS stock_espera (
+    id              BIGSERIAL PRIMARY KEY,
+    conversation_id BIGINT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+    canal           TEXT NOT NULL,
+    external_id     TEXT NOT NULL,
+    sku             TEXT NOT NULL,
+    producto        TEXT NOT NULL,
+    talla           TEXT,
+    avisado_at      TIMESTAMPTZ,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS stock_espera_unico ON stock_espera (conversation_id, sku, COALESCE(talla, ''))`,
+  `CREATE INDEX IF NOT EXISTS stock_espera_sku_idx ON stock_espera (sku) WHERE avisado_at IS NULL`,
+  // Etiqueta visible en la bandeja ("espera stock") para filtrar esas conversaciones.
+  `ALTER TABLE conversations ADD COLUMN IF NOT EXISTS etiqueta TEXT`,
 ]
 
 export function ensureSchema(): Promise<void> {

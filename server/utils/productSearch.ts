@@ -20,10 +20,17 @@ interface RawProduct {
 }
 
 export interface FoundProduct {
+  /** Código de producto del catálogo (clave de la lógica de agotado). */
+  codigo: string
   nombre: string
   slug: string
   precio: number
+  /** Tallas DISPONIBLES (las del catálogo menos las agotadas). */
   tallas: Array<number | string>
+  /** Tallas SIN existencias. Vacío si la lógica de agotado no aplica. */
+  tallasAgotadas: Array<number | string>
+  /** true = todas sus tallas están agotadas. */
+  agotado: boolean
   /** Línea del catálogo (super, economico, anime…); agrupa los resultados. */
   grupo: string
 }
@@ -81,9 +88,22 @@ export function hasSize(p: FoundProduct, size: string): boolean {
   return tallasDisponibles(p.codigo, p.tallas).some(t => String(t).toLowerCase() === size.toLowerCase())
 }
 
-/** Copia del producto con solo las tallas disponibles (lo que el bot muestra en fichas y listas). */
-function conStock(p: FoundProduct): FoundProduct {
-  return { ...p, tallas: tallasDisponibles(p.codigo, p.tallas) }
+/**
+ * Copia del producto con el ESTADO de stock resuelto: tallas disponibles, tallas
+ * agotadas y bandera de agotado total. Antes esto solo recortaba las tallas
+ * agotadas y el producto entero se ocultaba del bot; ahora se devuelve MARCADO,
+ * porque quien pregunta por algo agotado es justo el cliente que hay que captar.
+ */
+function conEstadoStock(p: FoundProduct): FoundProduct {
+  const todas = p.tallas
+  const disponibles = tallasDisponibles(p.codigo, todas)
+  const agotadas = todas.filter(t => !disponibles.some(d => String(d) === String(t)))
+  return {
+    ...p,
+    tallas: disponibles,
+    tallasAgotadas: agotadas,
+    agotado: productoAgotado(p.codigo) || (todas.length > 0 && disponibles.length === 0),
+  }
 }
 
 // ---------- tabla de alias (sinónimos → familia de slugs) ----------
@@ -152,7 +172,7 @@ function buildIndex(): IndexEntry[] {
     }
     const phrases = [nameNorm, ...aliasTerms.map(normalize)].filter(x => x.includes(' '))
     return {
-      p: { codigo: p.codigo, nombre: p.nombre, slug: p.slug, precio: p.precio, tallas: p.tallas, grupo: p.grupo },
+      p: { codigo: p.codigo, nombre: p.nombre, slug: p.slug, precio: p.precio, tallas: p.tallas, tallasAgotadas: [], agotado: false, grupo: p.grupo },
       nameNorm,
       tokens: tokenSet,
       phrases,
@@ -180,8 +200,9 @@ export function searchProducts(query: string, limit = 8): SearchResult | null {
   const tokens = tokenize(cleaned)
   if (!tokens.length) return null
 
-  // Un producto totalmente agotado queda FUERA del bot (lógica de agotado del inventario).
-  const scored = buildIndex().filter(e => !productoAgotado(e.p.codigo)).map((e) => {
+  // Los agotados SÍ se encuentran: el bot los ofrece y propone avisar cuando lleguen.
+  // Antes se filtraban aquí y el cliente recibía "sin coincidencias", que lo perdía.
+  const scored = buildIndex().map((e) => {
     const phraseScore = e.phrases.filter(ph => rawNorm.includes(ph)).length
     // Nombre completo mencionado (p. ej. "batman") = señal fuerte.
     const nameHit = rawNorm.includes(e.nameNorm) ? 1 : 0
@@ -195,7 +216,7 @@ export function searchProducts(query: string, limit = 8): SearchResult | null {
 
   scored.sort((a, b) => b.score - a.score || a.e.p.precio - b.e.p.precio)
 
-  return { matches: scored.slice(0, limit).map(x => conStock(x.e.p)), requestedSize: size }
+  return { matches: scored.slice(0, limit).map(x => conEstadoStock(x.e.p)), requestedSize: size }
 }
 
 // ---------- coincidencia parcial / parecidos (cuando la búsqueda exacta falla) ----------
@@ -254,7 +275,6 @@ export function similarProducts(query: string, limit = 3): SimilarProduct[] {
   const qPh = phonetic(q)
   const scored: SimilarProduct[] = []
   for (const e of buildIndex()) {
-    if (productoAgotado(e.p.codigo)) continue
     let best = 0, motivo = ''
     const candidates = [e.nameNorm, e.p.slug.replace(/-/g, ' '), ...e.phrases]
     for (const cand of candidates) {
@@ -282,7 +302,7 @@ export function similarProducts(query: string, limit = 3): SimilarProduct[] {
       if (cp === qPh || cp.includes(qPh) || qPh.includes(cp)) { if (0.6 > best) { best = 0.6; motivo = 'fonetico' } }
       else if (lev(qPh, cp, 2) <= 2 && qPh.length >= 5) { if (0.5 > best) { best = 0.5; motivo = 'fonetico' } }
     }
-    if (best > 0) scored.push({ ...conStock(e.p), score: Math.round(best * 100) / 100, motivo })
+    if (best > 0) scored.push({ ...conEstadoStock(e.p), score: Math.round(best * 100) / 100, motivo })
   }
   scored.sort((a, b) => b.score - a.score || a.precio - b.precio)
   // Un producto por nombre base (evita 3 variantes del mismo personaje).
@@ -308,7 +328,7 @@ export function priceRange(): { min: number, max: number } {
 /** Lookup directo por slug (no búsqueda difusa). undefined si no existe/visible. */
 export function getProductBySlug(slug: string): FoundProduct | undefined {
   const hit = buildIndex().find(e => e.p.slug === slug)?.p
-  return hit ? conStock(hit) : undefined
+  return hit ? conEstadoStock(hit) : undefined
 }
 
 /**

@@ -37,8 +37,9 @@ const to = computed(() => `/producto/${props.product.slug}`)
 <template>
   <article class="pcard">
     <div class="pimg">
-      <div v-if="product.badges?.length || discountPct" class="pbadges">
-        <KBadge v-if="discountPct" variant="sale" size="lg">-{{ discountPct }}%</KBadge>
+      <!-- En agotado no se anuncia el descuento: no se puede comprar. -->
+      <div v-if="product.badges?.length || (discountPct && !isSoldOut)" class="pbadges">
+        <KBadge v-if="discountPct && !isSoldOut" variant="sale" size="lg">-{{ discountPct }}%</KBadge>
         <KBadge v-for="(b, i) in product.badges" :key="i" :variant="b.variant">
           {{ b.label }}
         </KBadge>

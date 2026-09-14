@@ -268,6 +268,19 @@ export async function snapshotStats(): Promise<{ count: number, newest: string |
 }
 
 // ---------- sincronización por tandas ----------
+/** Producto que la sincronización NO guarda, y por qué. Se muestra en el panel. */
+export interface SyncDescartado {
+  id: number
+  nombre: string
+  sku: string
+  status: string
+  motivo: 'sin SKU' | 'SKU duplicado'
+  /** En 'SKU duplicado': con qué otros productos choca (id y nombre). */
+  choca_con?: { id: number, nombre: string, status: string }[]
+  /** Enlace para editarlo en WordPress. */
+  editar_url: string
+}
+
 export interface SyncResult {
   total: number
   /** productos que aún no tienen variaciones frescas */
@@ -275,7 +288,64 @@ export interface SyncResult {
   procesados: number
   /** SKUs que Woo tiene y ya no existen (se retiran del snapshot) */
   retirados: number
+  /** productos que Woo tiene y NO entraron al snapshot, con motivo */
+  descartados: SyncDescartado[]
   error?: string
+}
+
+export interface SyncOptions {
+  /** Ignora la ventana de frescura: vuelve a leer aunque se leyera hace poco. */
+  force?: boolean
+  /**
+   * Marca de tiempo del INICIO de esta sincronización forzada. Con ella, "fresco"
+   * pasa a significar "ya releído EN ESTA tanda" en vez de "leído hace < 10 min".
+   * Sin esto, un `force` solo servía en la PRIMERA llamada: en la segunda volvía a
+   * mandar force=false y todo lo recién leído contaba como fresco, así que el
+   * bucle cortaba tras SYNC_CHUNK (12) de 109 productos.
+   */
+  desde?: string
+  /** Relee la lista de productos de Woo saltándose la caché de 2 min (solo la 1.ª llamada). */
+  refrescarLista?: boolean
+}
+
+const editarUrl = (id: number) => `${String(useRuntimeConfig().wooBaseUrl || '').replace(/\/$/, '')}/wp-admin/post.php?post=${id}&action=edit`
+
+/**
+ * Productos que Woo devuelve pero el snapshot NO puede guardar:
+ *  - sin SKU: la clave del snapshot es el SKU, así que no hay dónde ponerlos.
+ *  - SKU duplicado entre padres: `inventory_snapshot` tiene el SKU como clave con
+ *    ON CONFLICT DO UPDATE, así que el segundo pisaría al primero SIN avisar. Se
+ *    descartan TODOS los que chocan (ninguno gana) y se reportan para que alguien
+ *    decida en Woo. Esto es lo que antes ocurría en silencio.
+ */
+export function clasificarDescartes(list: WooProductRaw[]): { guardar: WooProductRaw[], descartados: SyncDescartado[] } {
+  const descartados: SyncDescartado[] = []
+  const sinSku = list.filter(p => !p.sku)
+  for (const p of sinSku) {
+    descartados.push({ id: p.id, nombre: p.name, sku: '', status: String(p.status ?? ''), motivo: 'sin SKU', editar_url: editarUrl(p.id) })
+  }
+  const conSku = list.filter(p => p.sku)
+  const porSku = new Map<string, WooProductRaw[]>()
+  for (const p of conSku) {
+    if (!porSku.has(p.sku)) porSku.set(p.sku, [])
+    porSku.get(p.sku)!.push(p)
+  }
+  const guardar: WooProductRaw[] = []
+  for (const [sku, ps] of porSku) {
+    if (ps.length === 1) { guardar.push(ps[0]!); continue }
+    for (const p of ps) {
+      descartados.push({
+        id: p.id,
+        nombre: p.name,
+        sku,
+        status: String(p.status ?? ''),
+        motivo: 'SKU duplicado',
+        choca_con: ps.filter(o => o.id !== p.id).map(o => ({ id: o.id, nombre: o.name, status: String(o.status ?? '') })),
+        editar_url: editarUrl(p.id),
+      })
+    }
+  }
+  return { guardar, descartados }
 }
 
 /**
@@ -283,15 +353,19 @@ export interface SyncResult {
  * de los que no requieren variaciones, (3) hasta SYNC_CHUNK productos variables
  * cuyas variaciones estén viejas o falten. Devuelve cuántos quedan.
  */
-export async function syncStep(force = false): Promise<SyncResult> {
+export async function syncStep(opts: boolean | SyncOptions = {}): Promise<SyncResult> {
+  const o: SyncOptions = typeof opts === 'boolean' ? { force: opts, refrescarLista: opts } : opts
+  const force = !!o.force
+  const desde = o.desde
+  const vacio = { total: 0, pendientes: 0, procesados: 0, retirados: 0, descartados: [] as SyncDescartado[] }
   let list: WooProductRaw[]
   try {
-    list = await fetchWooProductList(force)
+    list = await fetchWooProductList(o.refrescarLista ?? force)
   }
   catch (err) {
-    return { total: 0, pendientes: 0, procesados: 0, retirados: 0, error: sanitizeWooError(err) }
+    return { ...vacio, error: sanitizeWooError(err) }
   }
-  const withSku = list.filter(p => p.sku)
+  const { guardar: withSku, descartados } = clasificarDescartes(list)
   const now = new Date().toISOString()
   const existing = new Map((await snapshotAll()).map(p => [p.sku, p]))
 
@@ -309,10 +383,16 @@ export async function syncStep(force = false): Promise<SyncResult> {
       direct.push(fromWoo(raw, [], now))
       continue
     }
+    // "Fresco" = ya releído EN ESTA tanda forzada (si viene `desde`), o leído hace
+    // menos de FRESH_MS en una sincronización normal.
+    const releidoYa = desde ? prev != null && prev.fetched_at >= desde : false
+    const reciente = prev != null && Date.now() - new Date(prev.fetched_at).getTime() < FRESH_MS
     const fresh = prev && prev.origen === 'woo' && prev.variations.every(v => v.id > 0)
-      && Date.now() - new Date(prev.fetched_at).getTime() < FRESH_MS
+      && (desde ? releidoYa : reciente)
       && (!raw.date_modified || !prev.date_modified || raw.date_modified <= prev.date_modified)
-    if (force || !fresh) needs.push(raw)
+    // Con `desde`, la frescura YA significa "releído en esta tanda": forzar otra vez
+    // reprocesaría en bucle los mismos 12. Sin `desde`, force encola todo (legado).
+    if ((force && !desde) || !fresh) needs.push(raw)
     else if (prev && (prev.name !== raw.name || prev.status !== raw.status || prev.price !== raw.price)) {
       // Cambió algo del padre sin tocar variaciones: refrescar solo cabecera.
       direct.push({ ...fromWoo(raw, null, prev.fetched_at), variations: prev.variations })
@@ -337,7 +417,7 @@ export async function syncStep(force = false): Promise<SyncResult> {
     }))
   }
   await snapshotUpsert(done)
-  return { total: withSku.length, pendientes: needs.length - chunk.length, procesados: direct.length + done.length, retirados: gone.length }
+  return { total: withSku.length, pendientes: needs.length - chunk.length, procesados: direct.length + done.length, retirados: gone.length, descartados }
 }
 
 // ---------- carga para los adaptadores ----------

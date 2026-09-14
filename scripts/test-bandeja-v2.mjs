@@ -22,14 +22,16 @@
 //      por fecha, archivar/desarchivar (nunca se borra), envío de imagen desde la
 //      bandeja (en seco, multipart) y envío de texto en seco.
 // Con --keep NO limpia (para tomar capturas en /admin/chats). Sin él limpia al final.
-import { neon } from '@neondatabase/serverless'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
+import { exigirBdDePruebas } from './lib/guard-bd.mjs'
 
 const args = process.argv.slice(2)
 const KEEP = args.includes('--keep')
 const MODE = args.includes('cleanup') ? 'cleanup' : 'run'
-const BASE = args.find(a => a.startsWith('http')) ?? 'http://localhost:3000'
+const __BASE_PEDIDA = args.find(a => a.startsWith('http')) ?? 'http://localhost:3000'
+// GUARDA: este script ESCRIBE. No arranca si la base no es la rama de pruebas.
+const { sql, BASE } = await exigirBdDePruebas(__BASE_PEDIDA)
 
 const WA_PHONE = '570000000002' // ficticios SOLO para pruebas
 const WA_BSUID = 'CO.9990000000000001'
@@ -47,7 +49,7 @@ function loadEnv() {
   return env
 }
 const env = loadEnv()
-const sql = neon(env.POSTGRES_URL || env.DATABASE_URL)
+
 
 let fails = 0
 function check(name, ok, detail = '') {

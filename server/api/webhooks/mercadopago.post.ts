@@ -192,11 +192,14 @@ export default defineEventHandler(async (event) => {
     }
     const title = String(it.title ?? 'Producto')
     const m = title.match(/^(.*?)\s*\(Talla\s*(.+?)\)\s*$/) // separa nombre y talla del título compuesto
+    // Talla LIMPIA (sin la gama): el título es "Nombre (Talla 4, Súper Acolchado)" y
+    // el grupo de arriba se tragaba la gama entera. Es la que resuelve la variación.
+    const talla = tallaDesdeTitulo(title)
     return {
       sku,
       title, // nombre+talla (línea de la orden en Woo)
       name: real?.name ?? (m ? m[1] : title), // nombre limpio (correo)
-      talla: m ? m[2] : '—', // talla (correo)
+      talla: talla ?? '—', // talla (correo y resolución de la variación)
       slug: real?.slug || undefined, // foto pública (correo)
       quantity: Math.max(1, Math.trunc(Number(it.quantity) || 1)),
       unitPrice: real?.price ?? paidPrice, // ← precio REAL del servidor cuando está disponible
@@ -255,6 +258,28 @@ export default defineEventHandler(async (event) => {
       buyer: buyer ?? undefined,
     })
     console.info(`[mp-webhook] orden creada en Woo #${order.id} (pago ${payment.id}, ${payment.status})`)
+
+    // AJUSTE MANUAL DE INVENTARIO. La orden se creó y el cliente ya pagó; lo que
+    // falló es enlazar alguna línea con su variación, así que Woo NO le descontó
+    // stock. Se avisa a ventas para que lo ajusten a mano. Best-effort: un fallo
+    // aquí no puede tumbar el webhook ni provocar un reintento de MP (eso
+    // duplicaría correos), por eso va en su propio catch.
+    if (order.lineasSinEnlazar.length) {
+      const detalle = order.lineasSinEnlazar
+        .map(l => `• ${l.title} — SKU ${l.sku ?? 'ausente'}${l.talla ? `, talla ${l.talla}` : ', sin talla'} → ${l.motivo}`)
+        .join('\n')
+      console.error(`[mp-webhook] ⚠️ AJUSTE MANUAL en Woo #${order.id}: ${order.lineasSinEnlazar.length} línea(s) sin stock descontado\n${detalle}`)
+      await sendOrderFailureAlert({
+        variante: 'ajuste_manual',
+        orderId: order.id,
+        paymentId: String(payment.id),
+        amount: payment.transaction_amount,
+        payerName: buyer?.nombre || [payment.payer?.first_name, payment.payer?.last_name].filter(Boolean).join(' ') || undefined,
+        payerEmail: buyer?.email || payment.payer?.email,
+        items: orderItems.map(i => ({ name: i.name, talla: i.talla, quantity: i.quantity, unitPrice: i.unitPrice })),
+        reason: order.lineasSinEnlazar.map(l => `${l.sku ?? '?'}${l.talla ? ` talla ${l.talla}` : ''}: ${l.motivo}`).join(' · '),
+      }).catch(e => console.error('[mp-webhook] no se pudo avisar del ajuste manual:', String((e as Error)?.message ?? e)))
+    }
 
     // Correo de confirmación con marca (Fase 4). Idempotente: solo se envía en esta
     // ruta de orden NUEVA (si el webhook llega otra vez, cae en el `existing` de arriba).

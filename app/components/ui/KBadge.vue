@@ -52,8 +52,10 @@ withDefaults(defineProps<Props>(), {
   background: var(--yellow);
   color: var(--ink);
 }
+/* Gris oscuro (no el gris de texto secundario): con blanco encima da ~10:1 de
+   contraste y se distingue del fucsia de oferta que puede ir al lado. */
 .kbadge--soldout {
-  background: var(--mut);
+  background: #3a3a38;
 }
 .kbadge--neutral {
   background: var(--ink);

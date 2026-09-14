@@ -43,18 +43,23 @@ Fecha del inventario: 2026-09-05 · Actualizado 2026-09-06 (rama `feature/bot-co
 **Texto actual (WhatsApp, lista 📋 con botón "Ver opciones", sección "Menú")**
 
 ```
-¡Hola, {nombre}! 👋 Soy el asistente de *Kustom Disfraces* 👽
-¿Qué quieres hacer?
+¡Hola, {nombre}! 👋 Bienvenido a Kustom Disfraces, soy Jaime, tu asistente virtual. Estoy aquí para ayudarte a encontrar el disfraz perfecto.
+
+¿Qué disfraz estás buscando? Escríbeme el personaje y la talla. Por ejemplo: «Spiderman talla 6».
+
+O elige una opción del menú 👇
 💡 O escríbeme lo que buscas y te lo encuentro. Ej: *spiderman talla 6*
 ```
 
 Opciones:
 1. Ver disfraces
 2. Cómo comprar
-3. Hablar con alguien
+3. Comunícate con un asesor
 4. Ver catálogo 📖
 
-**Texto propuesto:** _______________________________________________
+> ✅ **Aprobado por el cliente (2026-09-10).** El menú se conserva detrás de la constante `MOSTRAR_MENU_BIENVENIDA` (whatsappBot.ts): quitarlo rompe el fallback numerado. Al volver con 🏠 **Menú** el bot NO repite la presentación, solo dice "¿Qué quieres hacer? 👇".
+>
+> La opción 3 sale como **"Hablar con un asesor"** (20 caracteres) en los botones de WhatsApp y en los quick replies de Messenger/Instagram, que topan en 20; "Comunícate con un asesor" (24) se lee entera en el menú numerado de texto.
 
 > Nota: el saludo y el menú **borran la memoria** de lo que el cliente venía buscando (personaje, talla).
 
@@ -124,7 +129,7 @@ Míralo en la web 👇
 {sitio}/categoria/caballeros
 ```
 
-Botones: **Ver otros** · **Hablar con alguien** · ⬅️ Volver · 🏠 Menú (se parte en dos tandas en WhatsApp).
+Botones: **Ver otros** · **Hablar con un asesor** · ⬅️ Volver · 🏠 Menú (se parte en dos tandas en WhatsApp).
 
 **Texto propuesto:** _______________________________________________
 
@@ -182,7 +187,7 @@ Pasa la conversación a una persona del equipo. Es la **misma respuesta** de la 
 Guía completa: {sitio}/como-comprar
 ```
 
-Botones: **Ver disfraces** · **Hablar con alguien** · ⬅️ Volver · 🏠 Menú.
+Botones: **Ver disfraces** · **Hablar con un asesor** · ⬅️ Volver · 🏠 Menú.
 
 **Texto propuesto:** _______________________________________________
 
@@ -204,10 +209,10 @@ Cuando veas uno que te guste, escríbeme el nombre y te paso precio y tallas �
 
 ---
 
-## 7. Hablar con alguien (paso a una persona)
+## 7. Hablar con un asesor (paso a una persona)
 
 **Cuándo aparece**
-- Al tocar 🔘 **Hablar con alguien** (menú principal, cómo comprar, sin resultados, público vacío) o 🔘 **💬 Pedir por WhatsApp**.
+- Al tocar 🔘 **Hablar con un asesor** (menú principal, cómo comprar, sin resultados, público vacío) o 🔘 **💬 Pedir por WhatsApp**.
 - Cuando el cliente **escribe** que quiere una persona. Frases que lo activan:
   - El mensaje es solo el pedido: *asesor, asesora, un asesor por favor, agente, humano, vendedor, operador…*
   - Verbo + con quién: *quiero hablar con alguien, hablar con una persona, chatear con un asesor, comunicarme con ustedes, contactar al equipo, hablar con el encargado…*
@@ -217,10 +222,7 @@ Cuando veas uno que te guste, escríbeme el nombre y te paso precio y tallas �
 **Texto actual (texto plano)**
 
 ```
-Te paso con una persona del equipo 🙌
-En un momento te escribimos por aquí. Horario: Lunes a sábado, 8:00 a.m. a 7:00 p.m.
-
-(Escribe *menú* si quieres volver a las opciones.)
+¡Perfecto! 🙌 Un asesor de Kustom Disfraces te atenderá personalmente y te ayudará a encontrar la mejor opción. ¡Estamos para ayudarte a encontrar el disfraz perfecto! 🎃✨
 ```
 
 **Texto propuesto:** _______________________________________________
@@ -333,14 +335,13 @@ Al tocar un producto de la lista se muestra su ficha (8a) con el ✅/⚠️ de l
 **Texto actual (botones 🔘)**
 
 ```
-No encontré ese disfraz en nuestro catálogo. Puedes ver el catálogo completo aquí 👇
+La referencia solicitada no está disponible en este momento. Puedes ver nuestro catálogo completo aquí 👇
 {sitio}/catalogo-kustom.pdf
-O si prefieres, te paso con una persona del equipo 🙌
 ```
 
-Botones: **Ver catálogo** · **Hablar con alguien** · **🏠 Menú**.
+Botones: **Ver categorías** · **Hablar con un asesor** · **🏠 Menú**.
 
-**Texto propuesto:** _______________________________________________
+> ✅ **Aprobado por el cliente (2026-09-10).** Se unificaron el mensaje principal y el de reserva: ambos usan este texto.
 
 > Existe una versión de reserva de este mensaje (solo en casos raros, cuando la búsqueda interna falla en un segundo paso): "No encontré nada para *"{lo que escribió}"* 😅 / Puedo mostrarte el catálogo por categorías o pasarte con una persona." seguido del menú principal. Si se aprueba el texto de arriba, se unifican los dos.
 
@@ -455,37 +456,35 @@ Déjanos tus datos aquí y te contactamos con precios especiales 👇
 **Palabras:** horario(s), hora de atención, abren, cierran, atienden, abierto(s), hasta qué hora, a qué hora, qué días.
 
 ```
-🕒 Nuestro horario de atención es de *lunes a sábado, de 8:00 a.m. a 7:00 p.m.*
-Por aquí puedes escribirnos a cualquier hora y te respondemos en ese horario.
+Nuestro horario de atención es de lunes a sábado, de 8:00 a.m. a 7:00 p.m. Puedes escribirnos por aquí, por nuestra página web o al correo ventas@disfraceskustom.com.
 ```
 
-**Texto propuesto:** _______________________________________________
+En **Messenger e Instagram** se añade al final ` O llámanos al 311 884 4547.`; en **WhatsApp no**, porque el cliente ya está escribiendo a ese mismo número.
+
+> ✅ **Aprobado por el cliente (2026-09-10).**
 
 ### 10g. Dirección
 
 **Palabras:** dirección, ubicados, ubicación, dónde están / quedan / queda / se encuentran, local, tienda física, punto de venta, sede, almacén, visitarlos, ir personalmente.
 
 ```
-📍 Estamos en *Cra 52 #39-89 sur, Bogotá*.
-Horario: lunes a sábado, de 8:00 a.m. a 7:00 p.m. 🕒
-Y si prefieres, enviamos *gratis* a todo el país 🚚
+Estamos ubicados en Bogotá, Colombia. 🕒 Horario de atención: lunes a sábado, de 8:00 a.m. a 7:00 p.m.
 ```
 
-**Texto propuesto:** _______________________________________________
+> ✅ **Aprobado por el cliente (2026-09-10).** Se quitó la dirección de la calle; ya no aparece en ninguna respuesta del bot.
 
 ### 10h. Precio en general (sin personaje)
 
 **Palabras:** precio(s), vale, valen, cuesta, cuestan, costo(s), cuánto(s). Si nombra un personaje que **no** existe ("precio de diosa griega"), responde "sin resultados" (8c).
 
 ```
-💲 Nuestros disfraces van desde {precio mínimo} hasta {precio máximo} según la línea y la talla.
-Escríbeme el personaje que buscas y te paso el precio exacto 😉
-Catálogo completo: {sitio}/catalogo-kustom.pdf
+Los precios varían según la referencia. {promoción} Puedes ver nuestro catálogo completo aquí 👇
+{sitio}/catalogo-kustom.pdf
 ```
 
-Hoy los precios se calculan solos desde el catálogo: **$69.000** a **$159.000**.
+`{promoción}` = `NUXT_BOT_TEXTO_PROMOCION`, por defecto *"Recuerda que todos nuestros disfraces tienen 20% de descuento y envío gratis a todo el país."* Dejarla **vacía** en Vercel quita la frase sin deploy (es una promesa comercial).
 
-**Texto propuesto:** _______________________________________________
+> ✅ **Aprobado por el cliente (2026-09-10).** Se quitó el rango $69.000–$159.000.
 
 > El **orden** en que se revisan las palabras importa cuando una frase tiene varias: mayoristas → garantía → pago → tallas → envío → horario → dirección → precio. Por eso "contra entrega" responde pago y no envío.
 
@@ -564,7 +563,7 @@ Cuando un cliente pide hablar con alguien (sección 7):
 | 4a | Aquí tienes el link para comprar… | 🛒 Comprar en la web | Texto |
 | 5 | Cómo comprar en Kustom | Cómo comprar | Botones |
 | 6 | Catálogo PDF | Ver catálogo | Texto |
-| 7 | Te paso con una persona del equipo | Hablar con alguien, Pedir por WhatsApp, texto pidiendo persona | Texto + silencio del bot |
+| 7 | Un asesor te atenderá personalmente | Hablar con un asesor, Pedir por WhatsApp, texto pidiendo persona | Texto + silencio del bot |
 | 8a | Ficha de producto | búsqueda con 1 resultado, toque en lista, talla con producto reciente | Texto |
 | 8b | Encontré N opciones | búsqueda con 2 o más resultados | Lista agrupada |
 | 8c | No encontré ese disfraz | búsqueda sin resultados | Botones |

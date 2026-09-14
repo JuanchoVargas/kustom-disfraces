@@ -7,7 +7,8 @@
     "dev": "nuxt dev",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
-    "postinstall": "nuxt prepare"
+    "postinstall": "nuxt prepare",
+    "dev:test": "nuxt dev --dotenv .env.test"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",

@@ -4,14 +4,16 @@
 // webhook simulado del canal donde ocurrió y se comprueba la respuesta del bot.
 //
 //   node scripts/test-bot-conversion.mjs [baseUrl]
-import { neon } from '@neondatabase/serverless'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
+import { exigirBdDePruebas } from './lib/guard-bd.mjs'
 
-const BASE = process.argv.slice(2).find(a => a.startsWith('http')) ?? 'http://localhost:3000'
+const __BASE_PEDIDA = process.argv.slice(2).find(a => a.startsWith('http')) ?? 'http://localhost:3000'
+// GUARDA: este script ESCRIBE. No arranca si la base no es la rama de pruebas.
+const { sql, BASE } = await exigirBdDePruebas(__BASE_PEDIDA)
 const env = {}
 for (const l of readFileSync(fileURLToPath(new URL('../.env', import.meta.url)), 'utf8').split(/\r?\n/)) { const m = l.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/); if (m) env[m[1]] = m[2].replace(/^["']|["']$/g, '').trim() }
-const sql = neon(env.POSTGRES_URL || env.DATABASE_URL)
+
 const PSID = '9990000000000089', WA = '570000000089'
 let fails = 0
 const check = (name, ok, detail = '') => { console.log(`${ok ? '✅' : '❌'} ${name}${detail ? ` — ${detail}` : ''}`); if (!ok) fails++ }
@@ -42,7 +44,7 @@ let r = await send('msg', '¿Qué tallas están disponibles en los disfraces?')
 check('"¿Qué tallas están disponibles…?" → guía de tallas (niños 0–14, adultos S–XL)', /0 a la 14/.test(r) && /S, M, L y XL/.test(r) && !/No tengo/.test(r))
 r = await send('msg', '¿Cuál es el código de descuento para aplicar?')
 check('"¿Cuál es el código de descuento…?" → "No necesitas código", 20 % ya aplicado, envío gratis', /No necesitas código/.test(r) && /20% de descuento ya está aplicado/.test(r) && /gratis/.test(r))
-check('  …con botones Ver disfraces · Cómo comprar · Hablar con alguien', /Ver disfraces/.test(r) && /Cómo comprar/.test(r) && /Hablar con alguien/.test(r))
+check('  …con botones Ver disfraces · Cómo comprar · Hablar con un asesor', /Ver disfraces/.test(r) && /Cómo comprar/.test(r) && /Hablar con un asesor/.test(r))
 r = await send('msg', '¿Se puede personalizar un disfraz con mi propio diseño?')
 check('"¿Se puede personalizar…?" → qué incluye cada diseño y que no hay personalización a medida', /Personalización/.test(r) && /No hacemos diseños a la medida/.test(r))
 r = await send('msg', 'Spider-Man Clásico L')
@@ -53,15 +55,15 @@ for (const q of ['descuento', 'tienen promoción?', 'codigo', 'cupon', 'hay 20%'
 }
 
 // ---------- 2. "No encontrado" nunca es un callejón sin salida ----------
-console.log('— 2. Sin resultado exacto: parecidos + Hablar con alguien + registro de demanda')
+console.log('— 2. Sin resultado exacto: parecidos + Hablar con un asesor + registro de demanda')
 r = await send('msg', 'Tiene deep pool')
-check('"Tiene deep pool" → sugiere Deadpool (fonético)', /Deadpool/.test(r) && /Hablar con alguien/.test(r))
+check('"Tiene deep pool" → sugiere Deadpool (fonético)', /Deadpool/.test(r) && /Hablar con un asesor/.test(r))
 r = await send('wa', 'Hola buenas tiene disfraz de venimos talla 12')
 check('"…venimos talla 12" (WhatsApp real) → sugiere Venom, repite solo el término', /Venom/.test(r) && /"venimos"/.test(r) && !/hola buenas/.test(r))
 r = await send('msg', 'Woody')
-check('"Woody" (no existe) → sin sugerencias falsas, ofrece categorías y Hablar con alguien', /No tengo \*"woody"\*/.test(r) && /Hablar con alguien/.test(r) && !/Lady Bug/.test(r))
+check('"Woody" (no existe) → sin sugerencias falsas, ofrece categorías y Hablar con un asesor', /La referencia solicitada no está disponible en este momento/.test(r) && /Hablar con un asesor/.test(r) && !/Lady Bug/.test(r))
 r = await send('msg', 'Mario bros talla 14')
-check('"Mario bros talla 14" → sin inventar parecidos (puntaje bajo), Hablar con alguien presente', /Hablar con alguien/.test(r) && !/Mujer Maravilla/.test(r))
+check('"Mario bros talla 14" → sin inventar parecidos (puntaje bajo), Hablar con un asesor presente', /Hablar con un asesor/.test(r) && !/Mujer Maravilla/.test(r))
 const nf = await sql.query(`SELECT canal, texto, termino, motivo FROM bot_busquedas_fallidas WHERE external_id IN ($1,$2) ORDER BY id`, [PSID, WA])
 check('cada búsqueda fallida quedó registrada con canal, texto exacto, término y motivo', nf.length >= 4 && nf.every(x => x.canal && x.texto && x.termino && x.motivo), nf.map(x => `${x.canal}:${x.termino}:${x.motivo}`).join(' · '))
 const login = await fetch(`${BASE}/api/inbox/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ password: env.NUXT_INBOX_PASSWORD }) })
@@ -72,7 +74,7 @@ check('reporte de demanda /api/inbox/demanda agrupa por término', Array.isArray
 // ---------- 4. Ficha que empuja a la venta + ¿Qué talla? ----------
 console.log('— 4. Ficha de producto con botones de venta y sugerencia de talla')
 r = await send('wa', 'buzz lightyear')
-check('ficha: nombre, precio, tallas, enlace y botones Comprar ahora · ¿Qué talla? · Hablar con alguien', /Buzz Lightyear/.test(r) && /\$146\.000/.test(r) && /Tallas:/.test(r) && /producto\/buzz-lightyear/.test(r) && /Comprar ahora/.test(r) && /¿Qué talla\?/.test(r) && /Hablar con alguien/.test(r) && !/Escribe \*MENÚ\*/.test(r))
+check('ficha: nombre, precio, tallas, enlace y botones Comprar ahora · ¿Qué talla? · Hablar con un asesor', /Buzz Lightyear/.test(r) && /\$146\.000/.test(r) && /Tallas:/.test(r) && /producto\/buzz-lightyear/.test(r) && /Comprar ahora/.test(r) && /¿Qué talla\?/.test(r) && /Hablar con un asesor/.test(r) && !/Escribe \*MENÚ\*/.test(r))
 r = await send('wa', 'talla:buzz-lightyear', true)
 check('"¿Qué talla?" pregunta edad o estatura', /edad/.test(r) && /estatura/.test(r))
 r = await send('wa', '5 años')
@@ -102,7 +104,7 @@ r = await send('wa', 'me pueden llamar al 322 317 0651 porfa')
 conv = (await sql.query(`SELECT telefono_lead FROM conversations WHERE external_id = $1`, [WA]))[0]
 check('"322 317 0651" con espacios (WhatsApp) → normalizado a 3223170651', conv?.telefono_lead === '3223170651' && /Guardé tu número/.test(r))
 r = await send('wa', '3')
-check('un "3" suelto NO es teléfono ni búsqueda fallida: vuelve al menú', !/Guardé tu número/.test(r) && !/No tengo/.test(r) && /asistente de/.test(r))
+check('un "3" suelto NO es teléfono ni búsqueda fallida: vuelve al menú', !/Guardé tu número/.test(r) && !/No tengo/.test(r) && /asistente virtual/.test(r))
 
 await cleanup()
 console.log(fails ? `\n❌ ${fails} fallo(s)` : '\n✅ todo OK')

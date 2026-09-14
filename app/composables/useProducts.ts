@@ -21,20 +21,39 @@ interface StockAgotado { enabled: boolean, agotados: string[], tallas: Record<st
 
 /**
  * LÓGICA DE AGOTADO (módulo de inventario, hidratada por app/plugins/stock.ts):
- * producto totalmente agotado → fuera del catálogo; talla agotada → soldOutSizes
- * (la PDP la muestra deshabilitada). Sin stock aplicable, no cambia nada.
+ * producto totalmente agotado → SE QUEDA en el catálogo con la cinta AGOTADO y
+ * todas sus tallas bloqueadas (antes desaparecía del catálogo, así que la cinta
+ * nunca podía verse); talla agotada → soldOutSizes (la PDP la muestra
+ * deshabilitada). Sin stock aplicable, no cambia nada.
  */
 function applyStock(products: Product[], stock: StockAgotado | null): Product[] {
   if (!stock?.enabled) return products
   const agotados = new Set(stock.agotados)
-  return products
-    .filter(p => !p.code || !agotados.has(p.code))
-    .map((p) => {
-      const outs = p.code ? stock.tallas[p.code] : undefined
-      if (!outs?.length) return p
-      const soldOut = p.sizes.filter(s => outs.some(o => String(o) === String(s)))
-      return soldOut.length ? { ...p, soldOutSizes: soldOut } : p
-    })
+  return products.map((p) => {
+    if (p.code && agotados.has(p.code)) {
+      // Referencia agotada: cinta + ninguna talla seleccionable (no se puede añadir al carrito).
+      // AGOTADO va primero y desplaza a NUEVO: si un producto tuviera las dos, gana AGOTADO.
+      const badges = [{ variant: 'soldout' as const, label: 'Agotado' }, ...(p.badges ?? []).filter(b => b.variant !== 'new')]
+      return { ...p, badges, soldOutSizes: [...p.sizes] }
+    }
+    const outs = p.code ? stock.tallas[p.code] : undefined
+    if (!outs?.length) return p
+    const soldOut = p.sizes.filter(s => outs.some(o => String(o) === String(s)))
+    return soldOut.length ? { ...p, soldOutSizes: soldOut } : p
+  })
+}
+
+/** ¿El producto está totalmente agotado? (lleva la cinta AGOTADO) */
+export const isSoldOut = (p: Product): boolean => !!p.badges?.some(b => b.variant === 'soldout')
+
+/**
+ * Los agotados van al FINAL de cualquier listado: siguen visibles (el cliente
+ * interesado puede escribir y preguntar) pero no encabezan. Estable: dentro de
+ * cada grupo se respeta el orden que traía la lista.
+ */
+export function agotadosAlFinal<T extends Product>(list: T[]): T[] {
+  if (!list.some(isSoldOut)) return list
+  return [...list].sort((a, b) => Number(isSoldOut(a)) - Number(isSoldOut(b)))
 }
 
 // memo por identidad de la fuente: la proyección solo se recalcula cuando
@@ -64,12 +83,13 @@ export const useProducts = () => {
   // de carga reales si el catálogo pasa a cargarse en cliente.
   const pending = ref(false)
 
-  const featured = products.filter(p => p.featured)
+  // Los agotados salen al final de cada listado (siguen visibles, con su cinta).
+  const featured = agotadosAlFinal(products.filter(p => p.featured))
 
   // Un producto puede vivir en varias categorías (unisex -> ninos Y ninas)
-  const byCategory = (slug: string) => products.filter(p => (p.categorySlugs ?? [p.categorySlug]).includes(slug))
+  const byCategory = (slug: string) => agotadosAlFinal(products.filter(p => (p.categorySlugs ?? [p.categorySlug]).includes(slug)))
   // Públicos de la taxonomía oficial (la PLP navega por estos; ver useCatalogNav)
-  const byPublico = (slug: string) => products.filter(p => p.publicos?.includes(slug))
+  const byPublico = (slug: string) => agotadosAlFinal(products.filter(p => p.publicos?.includes(slug)))
   const bySlug = (slug: string) => products.find(p => p.slug === slug)
   const categoryBySlug = (slug: string) => categories.find(c => c.slug === slug)
 

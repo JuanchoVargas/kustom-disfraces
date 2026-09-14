@@ -73,9 +73,11 @@ export function toMessengerMessages(m: WaMessage): { messages: MessengerMessage[
   }
   const opts = interactiveOptions(m) ?? []
   // Las filas ya incluyen "⬅️ Volver" y "🏠 Menú" (omnicanal) → se mapean directo.
+  // Los quick replies se cortan a 20 caracteres: si la opción trae título CORTO se
+  // usa ese, para no partir una etiqueta larga a media palabra.
   const quick_replies = opts.slice(0, QR_MAX).map(o => ({
     content_type: 'text' as const,
-    title: cut(o.title, 20),
+    title: cut(o.shortTitle ?? o.title, 20),
     payload: o.id,
   }))
 

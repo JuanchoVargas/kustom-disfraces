@@ -22,6 +22,16 @@ export interface OrderItemInput {
   title: string
   quantity: number
   unitPrice: number
+  /** Talla ya limpia (sin la gama). Se usa para resolver la variación en Woo. */
+  talla?: string | null
+}
+
+/** Una línea que NO se pudo enlazar a su variación: la orden se crea igual, marcada. */
+export interface LineaSinEnlazar {
+  sku?: string
+  title: string
+  talla?: string | null
+  motivo: string
 }
 export interface CreateOrderInput {
   paymentId: string
@@ -93,12 +103,32 @@ export async function findWooOrderByPaymentId(paymentId: string): Promise<WooOrd
   ) ?? null
 }
 
-/** Crea la orden en Woo: estado processing (pagado), pagador y referencia de MP. */
-export async function createWooOrder(input: CreateOrderInput): Promise<WooOrder> {
+/**
+ * Crea la orden en Woo: estado processing (pagado), pagador y referencia de MP.
+ *
+ * ENLACE DE LÍNEAS. Cada línea lleva `product_id` y `variation_id` explícitos,
+ * resueltos desde el SKU del producto + la talla. Es lo que hace que **Woo
+ * descuente el stock de la variación correcta**: `set_paid:true` dispara
+ * `payment_complete()` → `wc_maybe_reduce_stock_levels`, que sin `variation_id`
+ * tomaba el padre (que no gestiona stock) y no bajaba nada. Nuestro código NO toca
+ * stock en ningún punto: descuenta Woo, que además es idempotente
+ * (`_order_stock_reduced`) y lo devuelve solo al cancelar o reembolsar.
+ *
+ * SI NO SE PUEDE RESOLVER: la orden **se crea igual**. Mercado Pago ya cobró y
+ * jamás se bloquea una orden pagada por una búsqueda de inventario. La línea va
+ * sin ids (como antes del cambio, o sea: nadie descuenta y se ajusta a mano), la
+ * orden queda marcada con `_kustom_ajuste_manual`, una nota visible en wp-admin y
+ * el detalle en `lineasSinEnlazar` para que el llamador dispare la alerta.
+ *
+ * El `name` de la línea se deja EXACTAMENTE igual que antes ("Nombre (Talla 4)"),
+ * por si algo aguas abajo —rótulos, exportaciones— lo estuviera leyendo.
+ */
+export async function createWooOrder(input: CreateOrderInput): Promise<WooOrder & { lineasSinEnlazar: LineaSinEnlazar[] }> {
+  const sinEnlazar: LineaSinEnlazar[] = []
   const lineItems = input.items.length
-    ? input.items.map((it) => {
+    ? await Promise.all(input.items.map(async (it) => {
         const total = String(Math.round(it.unitPrice * it.quantity))
-        return {
+        const base = {
           name: it.title,
           quantity: it.quantity,
           subtotal: total,
@@ -107,7 +137,21 @@ export async function createWooOrder(input: CreateOrderInput): Promise<WooOrder>
           // SKU también en meta: queda registrado aunque Woo no lo enlace en la creación.
           ...(it.sku ? { meta_data: [{ key: 'sku', value: it.sku }] } : {}),
         }
-      })
+        // Resolver NUNCA puede tumbar la creación de la orden.
+        let r: Awaited<ReturnType<typeof resolverProductoTalla>>
+        try {
+          r = await resolverProductoTalla(it.sku ?? '', it.talla)
+        }
+        catch (err) {
+          r = { ok: false, sku: it.sku ?? '', motivo: `error resolviendo: ${String((err as Error)?.message ?? err)}` }
+        }
+        if (!r.ok) {
+          sinEnlazar.push({ sku: it.sku, title: it.title, talla: it.talla, motivo: r.motivo ?? 'no se pudo resolver' })
+          console.error(`[woo-orders] ⚠️ línea SIN enlazar (se crea igual, ajuste manual): "${it.title}" sku=${it.sku} talla=${it.talla ?? '—'} — ${r.motivo}`)
+          return base
+        }
+        return { ...base, product_id: r.product_id, variation_id: r.variation_id }
+      }))
     // Respaldo: sin ítems detallados, una sola línea con el total pagado.
     : [{ name: 'Pedido Kustom (Mercado Pago)', quantity: 1, subtotal: String(Math.round(input.amount)), total: String(Math.round(input.amount)) }]
 
@@ -152,12 +196,24 @@ export async function createWooOrder(input: CreateOrderInput): Promise<WooOrder>
   // Documento VISIBLE en la orden (para la factura): en la nota del cliente y en meta.
   const docLine = b?.documento ? `Documento: ${b.tipoDocumento || 'CC'} ${b.documento}` : ''
   const notesLine = b?.notas ? `Notas del cliente: ${b.notas}` : ''
-  const customerNote = b
-    ? [docLine, notesLine].filter(Boolean).join('\n') || '—'
-    : 'Dirección de envío a coordinar por WhatsApp'
+  // Aviso VISIBLE en la orden (wp-admin) cuando hay líneas sin enlazar: quien
+  // despacha tiene que saber que el stock de esas tallas no bajó solo.
+  const avisoAjuste = sinEnlazar.length
+    ? `⚠️ AJUSTE MANUAL DE INVENTARIO: ${sinEnlazar.length} línea(s) sin enlazar a su variación; Woo NO descontó su stock.\n`
+      + sinEnlazar.map(l => `  · ${l.title} (${l.sku ?? 'sin SKU'}${l.talla ? `, talla ${l.talla}` : ''}) — ${l.motivo}`).join('\n')
+    : ''
+  const customerNote = [
+    avisoAjuste,
+    b ? [docLine, notesLine].filter(Boolean).join('\n') : 'Dirección de envío a coordinar por WhatsApp',
+  ].filter(Boolean).join('\n\n') || '—'
 
   const meta_data = [
     { key: MP_PAYMENT_META, value: String(input.paymentId) },
+    // Marca de AJUSTE MANUAL: alguna línea no se pudo enlazar a su variación, así
+    // que Woo no le descontó stock. Queda en la orden para poder filtrarlas luego.
+    ...(sinEnlazar.length
+      ? [{ key: '_kustom_ajuste_manual', value: sinEnlazar.map(l => `${l.sku ?? '?'}${l.talla ? `-T${l.talla}` : ''}: ${l.motivo}`).join(' | ') }]
+      : []),
     ...(b?.documento ? [{ key: '_billing_document_type', value: b.tipoDocumento || 'CC' }, { key: '_billing_document', value: b.documento }] : []),
     ...(b?.departamento ? [{ key: '_departamento', value: b.departamento }] : []),
     ...(b?.localidad ? [{ key: '_localidad', value: b.localidad }] : []),
@@ -179,5 +235,6 @@ export async function createWooOrder(input: CreateOrderInput): Promise<WooOrder>
     meta_data,
   }
 
-  return await wooOrdersFetch<WooOrder>('/orders', { method: 'POST', body })
+  const orden = await wooOrdersFetch<WooOrder>('/orders', { method: 'POST', body })
+  return { ...orden, lineasSinEnlazar: sinEnlazar }
 }

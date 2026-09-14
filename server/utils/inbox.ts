@@ -233,6 +233,27 @@ export async function recordMessage(m: RecordMessageInput): Promise<MessageRow |
 
 /** Asocia (o marca como fallido) el archivo de un mensaje ya guardado; mezcla meta. */
 /** Guarda el celular que el cliente escribió (lead) y deja la conversación como no leída. */
+/**
+ * LISTA DE ESPERA POR STOCK. El cliente preguntó por algo agotado: se guarda el
+ * SKU y la talla pedida y la conversación queda etiquetada "espera stock". Es la
+ * lista de remarketing para avisar cuando se reponga. Nunca lanza: si la BD no
+ * está, el bot igual responde.
+ */
+export async function saveStockEspera(input: { conversationId: number, canal: string, externalId: string, sku: string, producto: string, talla?: string | null }): Promise<void> {
+  if (!await ready()) return
+  await sql().query(
+    `INSERT INTO stock_espera (conversation_id, canal, external_id, sku, producto, talla, updated_at)
+     VALUES ($1,$2,$3,$4,$5,$6, now())
+     ON CONFLICT (conversation_id, sku, COALESCE(talla, '')) DO UPDATE
+       SET producto = EXCLUDED.producto, updated_at = now(), avisado_at = NULL`,
+    [input.conversationId, input.canal, input.externalId, input.sku, input.producto, input.talla ?? null],
+  )
+  await sql().query(
+    `UPDATE conversations SET etiqueta = 'espera stock', no_leidos = GREATEST(no_leidos, 1) WHERE id = $1`,
+    [input.conversationId],
+  )
+}
+
 export async function saveLeadPhone(id: number, phone: string): Promise<void> {
   if (!await ready()) return
   await sql().query(`UPDATE conversations SET telefono_lead = $2, no_leidos = GREATEST(no_leidos, 1) WHERE id = $1`, [id, phone])

@@ -6,10 +6,55 @@ Tienda headless de disfraces (Bogotá). **Nuxt 4 + TypeScript**, SSR/SSG, Pinia,
 
 ```bash
 npm install
-npm run dev      # http://localhost:3000
+npm run dev      # http://localhost:3000  (base de PRODUCCIÓN)
+npm run dev:test # http://localhost:3000  (base de PRUEBAS — obligatorio para los tests)
 npm run build    # build de producción
 npm run generate # SSG estático
 ```
+
+### 🧪 Base de datos de PRUEBAS (obligatoria para todo test que escriba)
+
+El 10/09/2026 `test-inventario.mjs` corrió contra producción y **borró
+sobreescrituras reales del equipo** (se reconstruyeron desde `inventory_changes`).
+Desde entonces ningún script que escriba arranca contra la base de producción.
+
+**Preparación, una sola vez:**
+
+1. Consola de Neon → **Branches → New branch**, desde `production`, nombre `pruebas`.
+   Copia su cadena de conexión (la *pooled*): tendrá **otro endpoint** `ep-…`.
+2. ```bash
+   node scripts/preparar-bd-pruebas.mjs --url "postgresql://…" --confirmar
+   ```
+   Genera `.env.test` (copia de `.env` con **solo** la base cambiada — el resto de
+   llaves se copia tal cual) y crea el marcador `kustom_bd_pruebas` en la rama.
+   Sin `--confirmar` solo comprueba y no escribe nada.
+3. `npm run dev:test` y ya se pueden correr los tests.
+
+**Cómo se reconoce una base de pruebas:** tiene la tabla `kustom_bd_pruebas`.
+Es un marcador **positivo** a propósito — comparar cadenas de conexión falla en
+cuanto alguien copia mal una URL; esto solo da verde si la base fue preparada
+adrede. `GET /api/version` expone `db_test` (solo un booleano) y es lo que
+consultan los scripts, porque quien escribe es el **servidor**, no el script.
+
+**Tres barreras**, en `scripts/lib/guard-bd.mjs`:
+
+| # | Comprueba | Falla si |
+|---|---|---|
+| 1 | `/api/version` del servidor | `db_test !== true` |
+| 2 | Endpoint de `.env.test` vs `.env` | son el mismo `ep-…` |
+| 3 | Marcador en la base | falta `kustom_bd_pruebas` |
+
+`preparar-bd-pruebas.mjs` además **se niega a marcar producción**: poner el
+marcador ahí desarmaría la protección entera.
+
+**Scripts con la guarda puesta** (todos escriben): `test-inventario.mjs`,
+`test-bandeja-v2.mjs`, `test-bot-conversion.mjs`, `test-media-retencion.mjs`,
+`test-wa-webhook.mjs`, `probar-bot.mjs`.
+
+Sin guarda a propósito: `test-wa-db-down.mjs` (corre con la URL de Postgres rota
+adrede, así que no puede escribir en ningún sitio); `informe-cobertura.mjs`,
+`test-textos-bot.mjs`, `test-sincronizacion.mjs`, `test-msg-menu.mjs` y
+`test-wa-menu.mjs` en sus modos locales (**solo lectura** o sin BD).
 
 ### Deploy: verificar qué código corre (paso OBLIGATORIO tras cada push a master)
 

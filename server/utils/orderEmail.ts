@@ -414,6 +414,15 @@ export interface OrderFailureAlert {
   payerEmail?: string
   items: { name: string, talla?: string, quantity: number, unitPrice: number }[]
   reason: string
+  /**
+   * Variante del aviso. 'sin_orden' (default) = pago aprobado y NO se creó la
+   * orden. 'ajuste_manual' = la orden SÍ se creó y el cliente pagó, pero alguna
+   * línea no se enlazó a su variación y Woo no le descontó stock. Son urgencias
+   * muy distintas y el correo no puede decir lo mismo en ambos casos.
+   */
+  variante?: 'sin_orden' | 'ajuste_manual'
+  /** Nº de orden en Woo (solo en 'ajuste_manual'). */
+  orderId?: number
 }
 
 /**
@@ -422,7 +431,11 @@ export interface OrderFailureAlert {
  * NO lanza: registra el fallo y devuelve el estado.
  */
 export async function sendOrderFailureAlert(data: OrderFailureAlert): Promise<{ sent: boolean, deduped?: boolean, reason?: string }> {
-  if (alertedPayments.has(data.paymentId)) return { sent: false, deduped: true }
+  const ajuste = data.variante === 'ajuste_manual'
+  // El dedupe por paymentId es por VARIANTE: un pago puede necesitar el aviso de
+  // ajuste manual aunque ya se hubiera avisado de otra cosa.
+  const claveDedupe = ajuste ? `${data.paymentId}:ajuste` : data.paymentId
+  if (alertedPayments.has(claveDedupe)) return { sent: false, deduped: true }
   if (!mailerConfigured()) {
     console.warn(`[order-alert] SMTP sin configurar — no se envía alerta del pago ${data.paymentId}`)
     return { sent: false, reason: 'smtp_not_configured' }
@@ -450,25 +463,30 @@ export async function sendOrderFailureAlert(data: OrderFailureAlert): Promise<{ 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="x-apple-disable-message-reformatting">
-<title>Pago aprobado sin orden — Kustom Disfraces</title>
+<title>${ajuste ? 'Ajuste manual de inventario' : 'Pago aprobado sin orden'} — Kustom Disfraces</title>
 </head>
 <body style="margin:0;padding:0;background:${C.crema};-webkit-text-size-adjust:100%;">
   <div style="max-width:600px;margin:0 auto;background:${C.white};">
-    <div style="background:#B00020;color:#fff;padding:16px 20px;border-radius:12px 12px 0 0;font-family:Arial,sans-serif;">
-      <div style="font-size:18px;font-weight:800;">⚠️ Pago aprobado SIN orden</div>
-      <div style="font-size:13px;opacity:.92;margin-top:4px;">Un pago se aprobó pero NO se pudo crear la orden en WooCommerce. Revisar y recuperar la venta.</div>
+    <div style="background:${ajuste ? '#9A5B00' : '#B00020'};color:#fff;padding:16px 20px;border-radius:12px 12px 0 0;font-family:Arial,sans-serif;">
+      <div style="font-size:18px;font-weight:800;">${ajuste ? `⚠️ Ajuste manual de inventario — pedido #${data.orderId ?? '?'}` : '⚠️ Pago aprobado SIN orden'}</div>
+      <div style="font-size:13px;opacity:.92;margin-top:4px;">${ajuste
+        ? 'La orden SÍ se creó y el cliente ya pagó. Lo que falló fue enlazar alguna línea con su variación, así que Woo NO descontó ese stock: hay que ajustarlo a mano.'
+        : 'Un pago se aprobó pero NO se pudo crear la orden en WooCommerce. Revisar y recuperar la venta.'}</div>
     </div>
     <div style="border:1px solid ${C.line};border-top:0;border-radius:0 0 12px 12px;padding:18px 20px;">
       <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
         ${row('Pago (MP)', `#${data.paymentId}`)}
+        ${ajuste && data.orderId ? row('Pedido en Woo', `#${data.orderId}`) : ''}
         ${row('Monto', formatCOP(data.amount))}
         ${row('Pagador', `${data.payerName || '—'}${data.payerEmail ? ` · ${data.payerEmail}` : ''}`)}
-        ${row('Causa', data.reason)}
+        ${row(ajuste ? 'Qué ajustar' : 'Causa', data.reason)}
       </table>
       <div style="font-family:Arial,sans-serif;font-size:12px;font-weight:bold;letter-spacing:1px;text-transform:uppercase;color:${C.muted};margin:16px 0 6px;">Ítems</div>
       <table role="presentation" cellpadding="0" cellspacing="0" width="100%">${itemsHtml}</table>
       <div style="margin-top:16px;padding:12px 14px;background:${C.crema};border-radius:8px;font-family:Arial,sans-serif;font-size:12.5px;color:#555;line-height:1.5;">
-        <strong>Cómo recuperar:</strong> corrige la causa (p. ej. credenciales de Woo) y reenvía la notificación desde el panel de Mercado Pago, o re-dispara el webhook con este payment id. El webhook es idempotente (no duplica).
+        ${ajuste
+          ? '<strong>Qué hacer:</strong> abre el pedido en wp-admin (lleva la nota y la meta <code>_kustom_ajuste_manual</code>), descuenta a mano el stock de esas tallas y, si la causa es un SKU mal puesto en Woo, corrígelo para que no vuelva a pasar. <strong>El pedido está bien y el cliente ya pagó</strong>: no hay que rehacerlo.'
+          : '<strong>Cómo recuperar:</strong> corrige la causa (p. ej. credenciales de Woo) y reenvía la notificación desde el panel de Mercado Pago, o re-dispara el webhook con este payment id. El webhook es idempotente (no duplica).'}
       </div>
     </div>
   </div>
@@ -495,12 +513,12 @@ export async function sendOrderFailureAlert(data: OrderFailureAlert): Promise<{ 
     await createMailTransport().sendMail({
       from: `"Alertas Kustom" <${from}>`,
       to,
-      subject: `⚠️ Pago aprobado SIN orden — MP #${data.paymentId} (${formatCOP(data.amount)})`,
+      subject: ajuste ? `⚠️ Ajuste manual de inventario — pedido #${data.orderId ?? "?"} (MP #${data.paymentId})` : `⚠️ Pago aprobado SIN orden — MP #${data.paymentId} (${formatCOP(data.amount)})`,
       text,
       html,
       headers: { 'List-Unsubscribe': LIST_UNSUB },
     })
-    alertedPayments.add(data.paymentId) // marcar SOLO tras enviar OK (si falla, un reintento lo reintenta)
+    alertedPayments.add(claveDedupe) // marcar SOLO tras enviar OK (si falla, un reintento lo reintenta)
     console.info(`[order-alert] alerta enviada a ${to} (pago ${data.paymentId}, causa: ${data.reason})`)
     return { sent: true }
   }

@@ -17,11 +17,11 @@
 //   5. isHumanRequest: frases explícitas disparan handoff; "disfraz de agente
 //      secreto" NO (se valida vía estado de la conversación).
 // Al final limpia las filas de prueba.
-import { neon } from '@neondatabase/serverless'
+import { exigirBdDePruebas } from './lib/guard-bd.mjs'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
-const BASE = process.argv[2] ?? 'http://localhost:3000'
+const __BASE_PEDIDA = process.argv[2] ?? 'http://localhost:3000'
 const FROM = '570000000001' // número ficticio SOLO para pruebas (no es un usuario real)
 
 function loadEnv() {
@@ -34,7 +34,8 @@ function loadEnv() {
   return env
 }
 const env = loadEnv()
-const sql = neon(env.POSTGRES_URL || env.DATABASE_URL)
+// GUARDA: este script ESCRIBE. No arranca si la base no es la rama de pruebas.
+const { sql, BASE } = await exigirBdDePruebas(__BASE_PEDIDA)
 
 function webhook(text, wamid, type = 'text') {
   const msg = { from: FROM, id: wamid, timestamp: String(Date.now() / 1000 | 0), type }

@@ -97,12 +97,13 @@ function waList(body, buttonLabel, rows, sectionTitle = 'Opciones') {
 function mainMenu() {
   // Espejo del bot: lista de 4 opciones (no botones, que topan en 3).
   return waList(
-    '¡Hola! 👋 Soy el asistente de *Kustom Disfraces* 👽\n¿Qué quieres hacer?',
+    '¡Hola! 👋 Bienvenido a Kustom Disfraces, soy Jaime, tu asistente virtual. Estoy aquí para ayudarte a encontrar el disfraz perfecto.\n\n'
+    + '¿Qué disfraz estás buscando? Escríbeme el personaje y la talla. Por ejemplo: «Spiderman talla 6».\n\nO elige una opción del menú 👇',
     'Ver opciones',
     [
       { id: 'main:ver', title: 'Ver disfraces' },
       { id: 'main:como', title: 'Cómo comprar' },
-      { id: 'main:human', title: 'Hablar con alguien' },
+      { id: 'main:human', title: 'Comunícate con un asesor', shortTitle: 'Hablar con un asesor' },
       { id: 'main:catalogo', title: 'Ver catálogo 📖' },
     ],
     'Menú',

@@ -1,7 +1,8 @@
-import type { InvListFilters, InvOperation, InvProduct, InvVariation } from '~~/shared/types/inventory'
+import type { InvListFilters, InvOpIds, InvOperation, InvProduct, InvVariation } from '~~/shared/types/inventory'
 import type { Cell } from './xlsxLite'
 import { InvValidationError, applyFilters, normalizePrice, normalizeStock, stockStatusFor, validatePricePair } from './inventoryCommon'
 import { tallaFromSku } from '~~/shared/utils/tallas'
+import { bloqueoDe } from './inventoryResolve'
 
 /**
  * OPERACIONES MASIVAS e IMPORTACIÓN: calculan la vista previa "antes → después"
@@ -40,13 +41,19 @@ function apply(v: InvVariation, next: { regular?: string, sale?: string, stock?:
 }
 
 function rowFor(p: InvProduct, v: InvVariation, next: { regular?: string, sale?: string, stock?: number, manage?: boolean }, error?: string): PreviewRow {
-  const after = error ? v : apply(v, next)
+  // Los ids de Woo se fijan AQUÍ, en la vista previa, y viajan con la operación
+  // hasta la escritura (ver InvOperation). El bloqueo de un producto con estructura
+  // rota se detecta también aquí, no cuando ya es tarde.
+  const bloqueo = bloqueoDe(p)
+  const err = error ?? bloqueo ?? undefined
+  const after = err ? v : apply(v, next)
   const ops: InvOperation[] = []
-  if (!error) {
-    if (after.regular_price !== v.regular_price || after.sale_price !== v.sale_price) ops.push({ op: 'price', sku: v.sku, regular_price: after.regular_price, sale_price: after.sale_price })
-    if (after.manage_stock !== v.manage_stock || after.stock_quantity !== v.stock_quantity) ops.push({ op: 'stock', sku: v.sku, stock_quantity: after.stock_quantity ?? 0, manage_stock: after.manage_stock })
+  if (!err) {
+    const ids: InvOpIds = { product_id: p.id, variation_id: v.id }
+    if (after.regular_price !== v.regular_price || after.sale_price !== v.sale_price) ops.push({ op: 'price', sku: v.sku, regular_price: after.regular_price, sale_price: after.sale_price, ...ids })
+    if (after.manage_stock !== v.manage_stock || after.stock_quantity !== v.stock_quantity) ops.push({ op: 'stock', sku: v.sku, stock_quantity: after.stock_quantity ?? 0, manage_stock: after.manage_stock, ...ids })
   }
-  return { sku: v.sku, producto: p.name, codigo: p.sku, talla: tallaDe(v), status: p.status, antes: snap(v), despues: snap(after), ops, cambia: ops.length > 0, error }
+  return { sku: v.sku, producto: p.name, codigo: p.sku, talla: tallaDe(v), status: p.status, antes: snap(v), despues: snap(after), ops, cambia: ops.length > 0, error: err }
 }
 
 // ---------- operación masiva ----------

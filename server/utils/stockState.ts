@@ -51,17 +51,77 @@ export function publicStockEnabled(): boolean {
 const tallaDe = (v: InvVariation) => String(v.attributes.find(a => a.name === 'Talla')?.option ?? v.sku.slice(v.sku.lastIndexOf('-T') + 2))
 const agotada = (v: InvVariation) => (v.manage_stock && (v.stock_quantity ?? 0) <= 0) || v.stock_status === 'outofstock'
 
+/**
+ * ⚠️ OVERRIDE TEMPORAL DE AGOTADOS — NUXT_SKUS_AGOTADOS.
+ *
+ * Mientras el stock real no esté cargado en el inventario, esta lista marca
+ * referencias como agotadas a mano. Acepta, separados por coma:
+ *   - código de producto (001011001) → la referencia completa queda agotada
+ *   - SKU de talla     (001011001-T4) → solo esa talla
+ *
+ * Es la ÚNICA fuente del agotado forzado: de aquí salen la cinta AGOTADO de la
+ * web, la exclusión del bot y el bloqueo del carrito y el checkout. No dupliques
+ * la lista en ningún otro sitio.
+ *
+ * ELIMINAR ESTE OVERRIDE (y la variable) CUANDO EL STOCK REAL ESTÉ CARGADO: a
+ * partir de ahí el agotado sale solo de stock = 0 y esto sobra.
+ */
+export function skusAgotadosOverride(): { productos: Set<string>, variaciones: Set<string>, motivos: Map<string, string> } {
+  const productos = new Set<string>()
+  const variaciones = new Set<string>()
+  const motivos = new Map<string, string>()
+  for (const t of String(useRuntimeConfig().skusAgotados || '').split(',').map(s => s.trim()).filter(Boolean)) {
+    // "SKU" o "SKU:motivo" — el motivo queda escrito junto al forzado y se ve en el
+    // panel, para que nadie tenga que adivinar por qué una referencia está agotada
+    // a mano (p. ej. "001011004:dato faltante" = falta cargar el stock de esa talla).
+    const i = t.indexOf(':')
+    const sku = (i >= 0 ? t.slice(0, i) : t).trim()
+    const motivo = i >= 0 ? t.slice(i + 1).trim() : ''
+    if (!sku) continue
+    if (motivo) motivos.set(sku, motivo)
+    if (sku.includes('-T')) variaciones.add(sku)
+    else productos.add(sku)
+  }
+  return { productos, variaciones, motivos }
+}
+
+/** Lo que el panel muestra: qué está forzado a agotado y por qué. */
+export function agotadosForzados(): { sku: string, motivo: string }[] {
+  const { productos, variaciones, motivos } = skusAgotadosOverride()
+  return [...productos, ...variaciones].map(sku => ({ sku, motivo: motivos.get(sku) || 'forzado a mano mientras se carga el stock real' }))
+}
+
 export function computeStockState(products: InvProduct[], enabled: boolean, backend: 'mock' | 'woo'): StockState {
   const umbral = stockBajoUmbral()
+  const ov = skusAgotadosOverride()
+  const forzados = ov.productos.size > 0 || ov.variaciones.size > 0
   const st: StockState = {
-    enabled, backend, agotados: new Set(), tallasAgotadas: new Map(), disponible: new Map(), bajo: [], agotadas: [], umbral, updated_at: new Date().toISOString(),
+    // El override enciende la lógica de agotado aunque el adaptador todavía no se
+    // aplique al sitio, pero SOLO para lo que nombra (ver `disponible` abajo).
+    enabled: enabled || forzados,
+    backend,
+    agotados: new Set(),
+    tallasAgotadas: new Map(),
+    disponible: new Map(),
+    bajo: [],
+    agotadas: [],
+    umbral,
+    updated_at: new Date().toISOString(),
   }
   for (const p of products) {
     const outs: string[] = []
+    const productoForzado = ov.productos.has(p.sku)
     for (const v of p.variations) {
-      st.disponible.set(v.sku, v.manage_stock ? (v.stock_quantity ?? 0) : null)
+      const forzada = productoForzado || ov.variaciones.has(v.sku)
+      // Cantidad que ve el checkout. Con el stock real aún sin aplicar, solo las
+      // referencias del override quedan en 0; el resto va como "sin gestionar"
+      // (null) para no bloquear ninguna venta que antes pasaba.
+      st.disponible.set(v.sku, forzada ? 0 : (enabled ? (v.manage_stock ? (v.stock_quantity ?? 0) : null) : null))
+      // El agotado real solo cuenta si el adaptador SÍ se aplica al sitio: en modo
+      // práctica (mock) sus cantidades son simuladas y no deben salir a la web.
+      if (forzada || (enabled && agotada(v))) outs.push(tallaDe(v))
+      // Los contadores del panel reflejan el inventario REAL, no el override.
       if (agotada(v)) {
-        outs.push(tallaDe(v))
         if (p.status === 'publish') st.agotadas.push({ sku: v.sku, producto: p.name, talla: tallaDe(v) })
       }
       else if (v.manage_stock && (v.stock_quantity ?? 0) <= umbral && p.status === 'publish') {
@@ -71,6 +131,9 @@ export function computeStockState(products: InvProduct[], enabled: boolean, back
     if (outs.length) st.tallasAgotadas.set(p.sku, outs)
     if (p.variations.length && outs.length === p.variations.length) st.agotados.add(p.sku)
   }
+  // Un código del override que el inventario todavía no conozca (sin snapshot, sin
+  // variaciones) igual queda agotado: si no, la cinta no saldría.
+  for (const codigo of ov.productos) st.agotados.add(codigo)
   return st
 }
 

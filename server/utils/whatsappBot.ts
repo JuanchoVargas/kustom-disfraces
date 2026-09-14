@@ -43,8 +43,13 @@ export interface ConvState {
 // (loadBotState / saveBotState). Sin BD configurada cae a un Map en memoria.
 
 // ---------- parseo del webhook entrante ----------
+/** Canal por el que entró el mensaje: algunos textos cambian según el canal. */
+export type BotCanal = 'wa' | 'msg' | 'ig'
+
 export interface WaIncoming {
   from: string
+  /** 'wa' (WhatsApp) por defecto; 'msg' (Messenger) o 'ig' (Instagram). */
+  canal?: BotCanal
   kind: 'text' | 'reply' | 'other'
   text?: string
   replyId?: string
@@ -240,7 +245,32 @@ const BACK_ROW = { id: 'back', title: '⬅️ Volver' }
 const HOME_ROW = { id: 'main:menu', title: '🏠 Menú' }
 const BACK_WORDS = new Set(['volver', 'atras', 'atrás', 'regresar'])
 
-interface MenuOpt { id: string, title: string, description?: string }
+/**
+ * NOMBRE DEL BOT. El cliente lo bautizó "Jaime" (capitalizado, nunca en mayúsculas
+ * sostenidas). Se usa en el saludo y en cualquier mensaje donde se presente.
+ */
+export const BOT_NOMBRE = 'Jaime'
+
+/**
+ * El cliente pidió el saludo SIN el menú de opciones debajo. Se conserva porque
+ * quitarlo rompe el fallback numerado (responder "1", "2"… cuando el mensaje
+ * interactivo no llega) y deja la conversación sin salida. Pon esto en false para
+ * enviar solo el texto de bienvenida, sin deploy de lógica.
+ */
+const MOSTRAR_MENU_BIENVENIDA = true
+
+/**
+ * Etiqueta de la opción de asesor, en dos largos:
+ *  - fila de lista de WhatsApp: 24 caracteres → cabe "Comunícate con un asesor".
+ *  - botón de WhatsApp y quick reply de Messenger/Instagram: 20 → versión corta.
+ * En la práctica los menús de una sección salen como BOTONES en WhatsApp
+ * (toButtonChunks) y como quick replies en Messenger, así que lo que casi siempre
+ * se ve es la corta; la larga sobrevive en el menú numerado de texto.
+ */
+export const ASESOR_TITULO = 'Comunícate con un asesor'
+export const ASESOR_TITULO_CORTO = 'Hablar con un asesor'
+
+interface MenuOpt { id: string, title: string, shortTitle?: string, description?: string }
 
 /**
  * Construye un menú interactivo eligiendo el formato por ergonomía:
@@ -255,25 +285,40 @@ function interactiveMenu(body: string, options: MenuOpt[], opts: { back?: boolea
   const extras = nav ? [BACK_ROW, HOME_ROW] : []
   const total = options.length + extras.length
   if (total <= 3) {
-    return waButtons(body, [...options.map(o => ({ id: o.id, title: o.title })), ...extras])
+    return waButtons(body, [...options.map(o => ({ id: o.id, title: o.shortTitle ?? o.title })), ...extras])
   }
   const rows = nav ? [...options.slice(0, 8), ...extras] : options.slice(0, 10)
   return waList(body, opts.listButton ?? 'Ver opciones', rows, opts.section ?? 'Opciones')
 }
 
-function mainMenu(name?: string): WaMessage {
+/** Texto de bienvenida del cliente (sin el menú). */
+function bienvenidaTexto(name?: string): string {
   const saludo = name ? `¡Hola, ${name}! 👋` : '¡Hola! 👋'
+  return `${saludo} Bienvenido a Kustom Disfraces, soy ${BOT_NOMBRE}, tu asistente virtual. Estoy aquí para ayudarte a encontrar el disfraz perfecto.\n\n`
+    + '¿Qué disfraz estás buscando? Escríbeme el personaje y la talla. Por ejemplo: «Spiderman talla 6».'
+}
+
+const MENU_OPCIONES: MenuOpt[] = [
+  { id: 'main:ver', title: 'Ver disfraces' },
+  { id: 'main:como', title: 'Cómo comprar' },
+  { id: 'main:human', title: ASESOR_TITULO, shortTitle: ASESOR_TITULO_CORTO },
+  { id: 'main:catalogo', title: 'Ver catálogo 📖' },
+]
+
+/**
+ * Menú principal. `bienvenida` = primer contacto o reinicio (lleva el saludo largo);
+ * en false es el "volver al menú" y solo pregunta qué hacer, para no repetir la
+ * presentación en cada toque de 🏠 Menú.
+ */
+function mainMenu(name?: string, bienvenida = true): WaMessage {
+  if (!bienvenida) {
+    return interactiveMenu('¿Qué quieres hacer? 👇', MENU_OPCIONES, { back: false, listButton: 'Ver opciones', section: 'Menú' })
+  }
+  const texto = bienvenidaTexto(name)
+  // Sin menú: solo el texto (el cliente pierde el fallback numerado, ver la constante).
+  if (!MOSTRAR_MENU_BIENVENIDA) return waText(texto, false)
   // Menú principal: sin "Volver" (es la raíz). 4 opciones → lista (no caben en 3 botones).
-  return interactiveMenu(
-    `${saludo} Soy el asistente de *Kustom Disfraces* 👽\n¿Qué quieres hacer?`,
-    [
-      { id: 'main:ver', title: 'Ver disfraces' },
-      { id: 'main:como', title: 'Cómo comprar' },
-      { id: 'main:human', title: 'Hablar con alguien' },
-      { id: 'main:catalogo', title: 'Ver catálogo 📖' },
-    ],
-    { back: false, listButton: 'Ver opciones', section: 'Menú' },
-  )
+  return interactiveMenu(`${texto}\n\nO elige una opción del menú 👇`, MENU_OPCIONES, { back: false, listButton: 'Ver opciones', section: 'Menú' })
 }
 
 /** Enlace al catálogo PDF completo (opción "Ver catálogo" del menú). */
@@ -301,7 +346,7 @@ function subcategoriasList(pubSlug: string): WaMessage {
     const link = `${site()}/categoria/${pub.slug}`
     return interactiveMenu(
       `Estamos cargando más de *${pub.nombre}* 👀\nMíralo en la web 👇\n${link}`,
-      [{ id: 'main:ver', title: 'Ver otros' }, { id: 'main:human', title: 'Hablar con alguien' }],
+      [{ id: 'main:ver', title: 'Ver otros' }, { id: 'main:human', title: ASESOR_TITULO, shortTitle: ASESOR_TITULO_CORTO }],
     )
   }
   const options = pub.subcategorias.map(s => ({
@@ -337,15 +382,18 @@ function comoComprar(): WaMessage {
     + '2️⃣ Págalo con Mercado Pago o pídelo por WhatsApp\n'
     + '3️⃣ Coordinamos el envío 🚚\n\n'
     + `Guía completa: ${site()}/como-comprar`,
-    [{ id: 'main:ver', title: 'Ver disfraces' }, { id: 'main:human', title: 'Hablar con alguien' }],
+    [{ id: 'main:ver', title: 'Ver disfraces' }, { id: 'main:human', title: ASESOR_TITULO, shortTitle: ASESOR_TITULO_CORTO }],
   )
 }
 
+/**
+ * Respuesta al pedir asesor. Texto exacto del cliente. NO toca la lógica de
+ * handoff: quien llama sigue marcando flaggedForHuman y la bandeja lo recoge igual.
+ */
 function handoff(): WaMessage {
   return waText(
-    'Te paso con una persona del equipo 🙌\n'
-    + 'En un momento te escribimos por aquí. Horario: Lunes a sábado, 8:00 a.m. a 7:00 p.m.\n\n'
-    + '(Escribe *menú* si quieres volver a las opciones.)',
+    '¡Perfecto! 🙌 Un asesor de Kustom Disfraces te atenderá personalmente y te ayudará a encontrar la mejor opción. '
+    + '¡Estamos para ayudarte a encontrar el disfraz perfecto! 🎃✨',
     false,
   )
 }
@@ -357,25 +405,53 @@ function handoff(): WaMessage {
  * tres botones — 🛒 Comprar ahora (link directo a la PDP, con la talla si se
  * pidió), 📏 ¿Qué talla? (pregunta edad/estatura y sugiere) y 💬 Hablar con alguien.
  */
+/**
+ * Ficha de un producto AGOTADO por completo. No es un callejón sin salida ni un
+ * "no lo tenemos": se captura la intención pidiendo la talla, que queda en la
+ * bandeja como lista de espera para avisar cuando reponga.
+ */
+function fichaAgotada(p: FoundProduct, requestedSize: string | null): WaMessage {
+  return waButtons(
+    `El disfraz *${p.nombre}* está agotado en este momento 😔\n`
+    + '¿Quieres que te avisemos cuando vuelva a estar disponible? '
+    + (requestedSize
+      ? `Anoto la talla *${requestedSize}* y te escribo apenas llegue.`
+      : 'Dime la talla que necesitas y te escribo apenas llegue.'),
+    [
+      { id: `espera:${p.slug}`, title: '🔔 Avísame' },
+      { id: 'main:ver', title: 'Ver otros' },
+      { id: 'main:human', title: ASESOR_TITULO_CORTO },
+    ],
+  )
+}
+
 function productoFicha(p: FoundProduct, requestedSize: string | null): WaMessage {
+  // Agotado total → ficha de lista de espera, nunca "sin coincidencias".
+  if (p.agotado || !p.tallas.length) return fichaAgotada(p, requestedSize)
   const tallas = p.tallas.join(', ')
   const link = `${site()}/producto/${p.slug}`
+  // Agotado PARCIAL: se ofrecen las disponibles y se dice cuáles no hay. No se
+  // declara agotado el producto entero (requisito del cliente).
+  const faltan = p.tallasAgotadas.length ? `😔 Sin existencias por ahora: ${p.tallasAgotadas.join(', ')}\n` : ''
   let sizeLine = ''
   if (requestedSize) {
-    sizeLine = hasSize(p, requestedSize)
-      ? `✅ Talla *${requestedSize}* disponible\n`
-      : `⚠️ Talla *${requestedSize}* no disponible en este. Tallas: ${tallas}\n`
+    if (hasSize(p, requestedSize)) sizeLine = `✅ Talla *${requestedSize}* disponible\n`
+    else if (p.tallasAgotadas.some(t => String(t).toLowerCase() === requestedSize.toLowerCase())) {
+      sizeLine = `😔 La talla *${requestedSize}* está agotada. ¿Te aviso cuando llegue?\n`
+    }
+    else sizeLine = `⚠️ Talla *${requestedSize}* no disponible en este. Tallas: ${tallas}\n`
   }
   return waButtons(
     `🎭 *${p.nombre}*\n`
     + `💲 ${formatCOP(p.precio)} · envío gratis 🚚\n`
     + `📏 Tallas: ${tallas}\n`
+    + faltan
     + sizeLine
     + `🔗 ${link}`,
     [
       { id: `buyp:${p.slug}`, title: '🛒 Comprar ahora' },
-      { id: `talla:${p.slug}`, title: '📏 ¿Qué talla?' },
-      { id: 'main:human', title: '💬 Hablar con alguien' },
+      { id: faltan ? `espera:${p.slug}` : `talla:${p.slug}`, title: faltan ? '🔔 Avísame' : '📏 ¿Qué talla?' },
+      { id: 'main:human', title: ASESOR_TITULO_CORTO },
     ],
   )
 }
@@ -386,7 +462,7 @@ function comprarAhora(p: FoundProduct, size: string | null): WaMessage {
   return waButtons(
     `¡Vamos! 🛒 Aquí compras *${p.nombre}* en la web:\n${link}\n\n`
     + 'Eliges la talla, pagas con Mercado Pago, Nequi o contra entrega, y el envío es gratis 🚚\n'
-    + 'Si prefieres pedirlo por aquí, toca "Hablar con alguien".',
+    + 'Si prefieres pedirlo por aquí, toca "Hablar con un asesor".',
     [{ id: 'main:human', title: '💬 Pedir por chat' }, { id: 'main:como', title: 'Cómo comprar' }, { id: 'main:menu', title: '🏠 Menú' }],
   )
 }
@@ -433,14 +509,14 @@ function preguntaTalla(p: FoundProduct): WaMessage {
       `📏 *${p.nombre}* viene en tallas *${p.tallas.join(', ')}* (adulto).\n`
       + 'Como referencia: S ≈ 1,55–1,62 m · M ≈ 1,62–1,70 m · L ≈ 1,70–1,78 m · XL ≈ más de 1,78 m.\n'
       + `Guía completa: ${site()}/tallas\n\n¿Quieres que te ayude una persona a elegir?`,
-      [{ id: `buyp:${p.slug}`, title: '🛒 Comprar ahora' }, { id: 'main:human', title: '💬 Hablar con alguien' }, { id: 'main:menu', title: '🏠 Menú' }],
+      [{ id: `buyp:${p.slug}`, title: '🛒 Comprar ahora' }, { id: 'main:human', title: ASESOR_TITULO_CORTO }, { id: 'main:menu', title: '🏠 Menú' }],
     )
   }
   return waButtons(
     `📏 Para sugerirte la talla de *${p.nombre}* dime la *edad* o la *estatura* del niño o la niña 😊\n`
     + 'Ejemplos: *5 años* · *1,10 m* · *110 cm*\n'
     + `(Guía completa: ${site()}/tallas)`,
-    [{ id: `buyp:${p.slug}`, title: '🛒 Comprar ahora' }, { id: 'main:human', title: '💬 Hablar con alguien' }, { id: 'main:menu', title: '🏠 Menú' }],
+    [{ id: `buyp:${p.slug}`, title: '🛒 Comprar ahora' }, { id: 'main:human', title: ASESOR_TITULO_CORTO }, { id: 'main:menu', title: '🏠 Menú' }],
   )
 }
 
@@ -465,7 +541,7 @@ export function sugerirTalla(p: FoundProduct, text: string): WaMessage | null {
     : `Para *${base}* la talla ideal sería la *${sugerida}*, pero *${p.nombre}* ${alternativa !== undefined ? `no la tiene: la más cercana es la *${alternativa}*` : 'no la tiene disponible'} ⚠️\n🔗 ${link}`
   return waButtons(body, [
     { id: `buyp:${p.slug}`, title: '🛒 Comprar ahora' },
-    { id: 'main:human', title: '💬 Hablar con alguien' },
+    { id: 'main:human', title: ASESOR_TITULO_CORTO },
     { id: 'main:menu', title: '🏠 Menú' },
   ])
 }
@@ -522,15 +598,15 @@ function resultadosList(matches: FoundProduct[], requestedSize: string | null): 
   return waListSections(`Encontré ${matches.length} opciones${enc} 👇`, 'Ver opciones', sections)
 }
 
-/** 0 coincidencias: mensaje amable + menú. */
-function sinResultados(query: string): WaMessage[] {
+/** 0 coincidencias: texto del cliente (8C) + enlace al catálogo + menú. */
+function sinResultados(_query: string): WaMessage[] {
   return [
     waText(
-      `No encontré nada para *"${query.trim()}"* 😅\n`
-      + 'Puedo mostrarte el catálogo por categorías o pasarte con una persona.',
+      'La referencia solicitada no está disponible en este momento. '
+      + `Puedes ver nuestro catálogo completo aquí 👇\n${site()}/catalogo-kustom.pdf`,
       false,
     ),
-    mainMenu(),
+    mainMenu(undefined, false),
   ]
 }
 
@@ -547,7 +623,12 @@ function screenFromToken(token: string): { message: WaMessage, step: string, sta
 }
 
 // ---------- árbol de decisión ----------
-export interface BotResult { replies: WaMessage[], patch: Partial<ConvState> }
+export interface BotResult {
+  replies: WaMessage[]
+  patch: Partial<ConvState>
+  /** El cliente pidió aviso por un producto agotado (lista de espera). Transitorio. */
+  stockEspera?: { slug: string, sku: string, producto: string, talla?: string }
+}
 
 export function buildBotReplies(input: WaIncoming, state: ConvState): BotResult {
   let id = input.kind === 'reply' ? (input.replyId ?? '') : ''
@@ -603,6 +684,22 @@ export function buildBotReplies(input: WaIncoming, state: ConvState): BotResult 
   if (id.startsWith('buyp:')) {
     const p = getProductBySlug(id.slice(5))
     if (p) return { replies: [comprarAhora(p, state.askedSize ?? null)], patch: { step: `buyp:${p.slug}`, stack: [] } }
+  }
+  // 🔔 Avísame: el cliente quiere que le escribamos cuando vuelva a haber.
+  if (id.startsWith('espera:')) {
+    const p = getProductBySlug(id.slice(7))
+    if (p) {
+      const talla = state.askedSize
+      return {
+        replies: [waButtons(
+          `¡Listo! 🔔 Te anoto para *${p.nombre}*${talla ? ` talla *${talla}*` : ''} y te escribo apenas llegue.`
+          + (talla ? '' : '\n\nSi me dices la talla que necesitas, la anoto también.'),
+          [{ id: 'main:ver', title: 'Ver otros' }, { id: 'main:menu', title: '🏠 Menú' }],
+        )],
+        patch: { step: `espera:${p.slug}`, stack: [] },
+        stockEspera: { slug: p.slug, sku: p.codigo, producto: p.nombre, talla },
+      }
+    }
   }
   if (id.startsWith('talla:')) {
     const p = getProductBySlug(id.slice(6))

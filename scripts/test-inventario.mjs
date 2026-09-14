@@ -18,14 +18,16 @@
 //   8. Filtro stock bajo/agotado tras poner stock 0.
 //   9. Vista previa "aplicar a Woo": antes → después coherente; NO escribe.
 //  10. Sin sesión → 401.
-import { neon } from '@neondatabase/serverless'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
+import { exigirBdDePruebas } from './lib/guard-bd.mjs'
 
 const args = process.argv.slice(2)
 const KEEP = args.includes('--keep')
 const MODE = args.includes('cleanup') ? 'cleanup' : 'run'
-const BASE = args.find(a => a.startsWith('http')) ?? 'http://localhost:3000'
+const __BASE_PEDIDA = args.find(a => a.startsWith('http')) ?? 'http://localhost:3000'
+// GUARDA: este script ESCRIBE. No arranca si la base no es la rama de pruebas.
+const { sql, BASE } = await exigirBdDePruebas(__BASE_PEDIDA)
 
 function loadEnv() {
   const env = {}
@@ -37,7 +39,7 @@ function loadEnv() {
   return env
 }
 const env = loadEnv()
-const sql = env.POSTGRES_URL || env.DATABASE_URL ? neon(env.POSTGRES_URL || env.DATABASE_URL) : null
+
 
 let fails = 0
 const check = (name, ok, detail = '') => { console.log(`${ok ? '✅' : '❌'} ${name}${detail ? ` — ${detail}` : ''}`); if (!ok) fails++ }
@@ -307,7 +309,10 @@ else {
   const WA_FROM = '570000000016'
   await ops([{ op: 'stock', sku: V_BEBE, stock_quantity: 0 }, { op: 'stock', sku: `${P_BEBE}-T0`, stock_quantity: 0 }, { op: 'stock', sku: V_NUM2, stock_quantity: 0 }, { op: 'stock', sku: V_NUM, stock_quantity: 0 }])
   const st = await fetch(`${BASE}/api/stock`).then(r => r.json())
-  check('15. /api/stock: enabled=false y nada agotado aunque el mock tenga 4 tallas en 0', st.enabled === false && st.agotados.length === 0 && Object.keys(st.tallas).length === 0, JSON.stringify(st).slice(0, 80))
+  // La simulación del mock NO puede llegar al sitio. `enabled` puede venir en true
+  // si NUXT_SKUS_AGOTADOS trae el override temporal de agotados a mano; lo que se
+  // exige aquí es que ESTE producto (agotado solo en la simulación) no salga.
+  check('15. /api/stock: el agotado simulado del mock NO llega al sitio', !st.agotados.includes(P_BEBE) && !st.tallas[P_BEBE], JSON.stringify({ enabled: st.enabled, agotados: st.agotados }).slice(0, 120))
   const pdp = await fetch(`${BASE}/producto/${SLUG}`)
   const html = await pdp.text()
   const btn4 = html.match(/<button[^>]*>\s*4\s*<\/button>/)?.[0] ?? ''

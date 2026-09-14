@@ -110,7 +110,8 @@ const filtered = computed(() => {
   })
   if (sort.value === 'price-asc') list = [...list].sort((a, b) => a.price - b.price)
   if (sort.value === 'price-desc') list = [...list].sort((a, b) => b.price - a.price)
-  return list
+  // Los agotados, al final — también cuando el usuario ordena por precio.
+  return agotadosAlFinal(list)
 })
 
 // ---------- "Cargar más" ----------
