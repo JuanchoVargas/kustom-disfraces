@@ -134,6 +134,13 @@ export default defineNuxtConfig({
     // La cookie de sesión se firma con una clave derivada de ella. Sin valor, la
     // bandeja responde 503. Postgres se lee directo de POSTGRES_URL (Neon↔Vercel).
     inboxPassword: process.env.NUXT_INBOX_PASSWORD || '',    // -> NUXT_INBOX_PASSWORD
+    // ¿QUIÉN ENTRA AL PANEL? Lista fija de nombres, separados por coma. El panel
+    // pide elegir uno al entrar y lo estampa en inventory_changes.autor y en los
+    // mensajes salientes de la bandeja. Es una ETIQUETA, no una identidad: la
+    // contraseña sigue siendo una sola y cualquiera puede elegir cualquier nombre.
+    // Lista fija a propósito: con texto libre acaban conviviendo "Lesly" y "lesly"
+    // y el historial deja de poder agruparse. Añadir gente aquí no exige desplegar.
+    panelAutores: process.env.NUXT_PANEL_AUTORES || 'Lesly,Jaime,Juan Diego', // -> NUXT_PANEL_AUTORES
     // MEDIOS de la bandeja (tabla media, BYTEA en Neon free = 0,5 GB para TODO):
     // retención automática (cron diario /api/cron/keepalive) y tope duro total.
     // Al superar el tope no se guardan más binarios (el mensaje se registra igual).

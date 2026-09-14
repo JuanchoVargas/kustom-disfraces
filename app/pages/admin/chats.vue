@@ -63,6 +63,7 @@ const NO_PHONE = 'Número no disponible (identidad protegida de WhatsApp)'
 
 // ---------- sesión ----------
 const route = useRoute()
+const { autor, iniciar: iniciarAutor } = useAutor()
 const checking = ref(true)
 const authed = ref(false)
 const configured = ref(true)
@@ -73,10 +74,12 @@ const loggingIn = ref(false)
 
 async function checkSession() {
   try {
-    const me = await $fetch<{ configured: boolean, authenticated: boolean, db: boolean }>('/api/inbox/me')
+    const me = await $fetch<{ configured: boolean, authenticated: boolean, db: boolean, autores?: string[] }>('/api/inbox/me')
     configured.value = me.configured
     authed.value = me.authenticated
     dbOk.value = me.db
+
+    if (me.authenticated) iniciarAutor(me.autores ?? [])
   }
   catch { authed.value = false }
   checking.value = false
@@ -291,7 +294,7 @@ async function send() {
   actionError.value = ''
   actionInfo.value = ''
   try {
-    const r = await $fetch<{ ok: boolean, dry_run?: boolean }>(`/api/inbox/conversations/${conv.id}/send`, { method: 'POST', body: { text } })
+    const r = await $fetch<{ ok: boolean, dry_run?: boolean }>(`/api/inbox/conversations/${conv.id}/send`, { method: 'POST', body: autor.value ? { text, por: autor.value } : { text } })
     draft.value = ''
     if (r.dry_run) actionInfo.value = 'Guardado sin enviar: el canal no tiene credenciales en este entorno (solo local).'
     await loadConv(conv.id, true)
@@ -401,6 +404,8 @@ async function sendImage() {
     const form = new FormData()
     form.append('file', p.blob, p.name)
     if (caption.value.trim()) form.append('caption', caption.value.trim())
+    // Quién lo manda: queda en meta.por del mensaje (ver useAutor).
+    if (autor.value) form.append('por', autor.value)
     const r = await $fetch<{ ok: boolean, dry_run?: boolean }>(`/api/inbox/conversations/${conv.id}/media`, { method: 'POST', body: form })
     loadMediaUso()
     cancelPending()
@@ -578,6 +583,7 @@ function windowLeft(c: Conv) {
           <div class="list__right">
             <span v-if="mediaUsoText" class="media-uso" :class="{ 'media-uso--warn': (mediaUso?.pct ?? 0) >= 80, 'media-uso--full': mediaUso?.lleno }" :title="mediaUsoText">{{ mediaUsoText }}</span>
             <NuxtLink class="btn btn--ghost btn--sm" to="/admin/inventario">Inventario</NuxtLink>
+            <AdminAutorChip />
             <button class="btn btn--ghost btn--sm" type="button" @click="logout">Salir</button>
           </div>
         </header>
@@ -740,7 +746,7 @@ function windowLeft(c: Conv) {
                 <div v-if="failNote(m)" class="bubble__note">{{ failNote(m) }}</div>
                 <div class="bubble__meta">
                   <span v-if="m.meta?.dry_run" class="bubble__dry" title="Solo en local: el canal no tiene credenciales">no enviado (local)</span>
-                  <span v-if="m.direccion === 'out'" class="bubble__autor">{{ m.autor === 'bot' ? '🤖 Bot' : '🧑 Tú' }}</span>
+                  <span v-if="m.direccion === 'out'" class="bubble__autor">{{ m.autor === 'bot' ? '🤖 Bot' : m.meta?.por ? `🧑 ${m.meta.por}` : '🧑 Tú' }}</span>
                   {{ timeOf(m.created_at) }}
                 </div>
               </div>

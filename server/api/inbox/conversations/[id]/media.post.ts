@@ -23,6 +23,8 @@ export default defineEventHandler(async (event) => {
   const parts = await readMultipartFormData(event).catch(() => null)
   const file = parts?.find(p => p.name === 'file' && p.data?.length)
   const caption = String(parts?.find(p => p.name === 'caption')?.data?.toString('utf8') ?? '').trim().slice(0, 1024)
+  // Quién lo manda (ver send.post.ts: va en meta.por, no en el rol `autor`).
+  const por = autorValido(parts?.find(p => p.name === 'por')?.data?.toString('utf8'))
   if (!file) throw createError({ statusCode: 400, statusMessage: 'no_file' })
   const mime = (String(file.type || '').split(';')[0] ?? '').trim().toLowerCase()
   if (!ALLOWED.has(mime)) throw createError({ statusCode: 415, statusMessage: 'bad_type' })
@@ -64,7 +66,7 @@ export default defineEventHandler(async (event) => {
     autor: 'agente',
     tipo: 'image',
     mediaId: saved.id,
-    meta: { caption: caption || undefined, filename, mime, bytes: saved.bytes, ...(dryRun.dry ? { dry_run: true } : {}) },
+    meta: { caption: caption || undefined, filename, mime, bytes: saved.bytes, ...(dryRun.dry ? { dry_run: true } : {}), ...(por ? { por } : {}) },
   })
   if (conv.estado !== 'humano') {
     await setEstado(id, 'humano')

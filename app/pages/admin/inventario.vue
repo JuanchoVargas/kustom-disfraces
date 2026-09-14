@@ -43,10 +43,12 @@ async function refreshSinResponder() {
 
 async function checkSession() {
   try {
-    const me = await $fetch<{ configured: boolean, authenticated: boolean, sin_responder?: number }>('/api/inbox/me')
+    const me = await $fetch<{ configured: boolean, authenticated: boolean, sin_responder?: number, autores?: string[] }>('/api/inbox/me')
     configured.value = me.configured
     authed.value = me.authenticated
     sinResponder.value = me.sin_responder ?? 0
+
+    if (me.authenticated) iniciarAutor(me.autores ?? [])
   }
   catch { authed.value = false }
   checking.value = false
@@ -88,6 +90,7 @@ interface Descartado { id: number, nombre: string, sku: string, status: string, 
 const descartados = ref<Descartado[]>([])
 const descartadosAbierto = ref(false)
 const sugerenciaCopiada = ref(false)
+const { autor, iniciar: iniciarAutor, conAutor } = useAutor()
 /** Copia el valor listo para pegar en Vercel. Sin portapapeles (http, permisos), el textarea queda seleccionable a mano. */
 async function copiarSugerencia() {
   try {
@@ -365,7 +368,7 @@ async function save(p: InvProduct, v: InvVariation) {
   drafts.value[v.sku] = draftOf(guess)
   rowState.value[v.sku] = { saving: true }
   try {
-    const r = await $fetch<{ resultados: InvOpResult[] }>('/api/inventario/operaciones', { method: 'POST', body: { operaciones: ops, origen: 'panel' } })
+    const r = await $fetch<{ resultados: InvOpResult[] }>('/api/inventario/operaciones', { method: 'POST', body: conAutor({ operaciones: ops, origen: 'panel' }) })
     const bad = r.resultados.filter(x => !x.ok)
     if (bad.length) {
       // Revertir al valor anterior y dejar el borrador con lo que el usuario había escrito.
@@ -514,7 +517,7 @@ async function applyPreview() {
   try {
     const r = await $fetch<{ ok: number, fallidas: number, resultados: InvOpResult[], variaciones?: InvVariationState[], tallas_ok?: number, tallas_fallidas?: number }>(
       '/api/inventario/operaciones',
-      { method: 'POST', body: { operaciones: ops, origen: bulk.mode === 'import' ? 'importacion' : 'masivo' } },
+      { method: 'POST', body: conAutor({ operaciones: ops, origen: bulk.mode === 'import' ? 'importacion' : 'masivo' }) },
     )
     const estados = r.variaciones ?? []
     bulk.aplicadas = estados
@@ -792,6 +795,7 @@ onBeforeUnmount(() => { if (sinResponderTimer) clearInterval(sinResponderTimer) 
               <span class="btn__full">Mensajes de clientes</span><span class="btn__short">Mensajes</span>
               <span v-if="sinResponder" class="badge-red" :aria-label="`${sinResponder} sin responder`">{{ sinResponder }}</span>
             </NuxtLink>
+            <AdminAutorChip />
             <button class="btn btn--ghost" type="button" @click="logout">Salir</button>
           </div>
         </div>

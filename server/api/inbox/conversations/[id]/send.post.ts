@@ -15,6 +15,9 @@ export default defineEventHandler(async (event) => {
   if (!Number.isInteger(id) || id <= 0) throw createError({ statusCode: 400, statusMessage: 'bad_id' })
   const body = await readBody(event).catch(() => ({}))
   const text = String(body?.text ?? '').trim()
+  // QUIÉN responde. Va en meta.por, no en `autor`: esa columna es el ROL
+  // (cliente|bot|agente) y de ella dependen el estilo y el rótulo de la burbuja.
+  const por = autorValido(body?.por)
   if (!text) throw createError({ statusCode: 400, statusMessage: 'empty_text' })
   if (text.length > 4000) throw createError({ statusCode: 400, statusMessage: 'too_long' })
 
@@ -31,7 +34,7 @@ export default defineEventHandler(async (event) => {
   const ok = await dryRun.send()
   if (!ok) throw createError({ statusCode: 502, statusMessage: 'send_failed' })
 
-  const msg = await recordMessage({ conversationId: id, direccion: 'out', texto: text, autor: 'agente', meta: dryRun.dry ? { dry_run: true } : null })
+  const msg = await recordMessage({ conversationId: id, direccion: 'out', texto: text, autor: 'agente', meta: { ...(dryRun.dry ? { dry_run: true } : {}), ...(por ? { por } : {}) } })
   if (conv.estado !== 'humano') {
     await setEstado(id, 'humano')
     await saveBotState(conv.canal, conv.external_id, { flaggedForHuman: false })

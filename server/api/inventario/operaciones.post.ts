@@ -74,7 +74,12 @@ export default defineEventHandler(async (event) => {
   const origenRaw = String(body?.origen ?? 'panel') as InvChangeOrigin
   const ctx = {
     origen: ORIGENES.includes(origenRaw) ? origenRaw : 'panel' as InvChangeOrigin,
-    autor: typeof body?.autor === 'string' && body.autor.trim() ? body.autor.trim().slice(0, 60) : undefined,
+    // Quién escribe. Solo se acepta un nombre de NUXT_PANEL_AUTORES: un valor
+    // inventado queda en null antes que ensuciar el historial con firmas que no
+    // se pueden agrupar ("Lesly", "lesly", "Lesly "). Los scripts no pasan por
+    // aquí; usan /aplicar-woo, que sí admite texto libre y ya se distingue por
+    // `origen: 'script'`.
+    autor: autorValido(body?.autor),
   }
   const store = getInventoryStore()
 

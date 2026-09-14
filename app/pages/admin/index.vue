@@ -16,7 +16,8 @@ const loginError = ref('')
 const loggingIn = ref(false)
 const sinResponder = ref(0)
 
-interface Me { configured: boolean, authenticated: boolean, sin_responder?: number }
+interface Me { configured: boolean, authenticated: boolean, sin_responder?: number, autores?: string[] }
+const { iniciar: iniciarAutor } = useAutor()
 
 async function checkSession() {
   try {
@@ -24,6 +25,8 @@ async function checkSession() {
     configured.value = me.configured
     authed.value = me.authenticated
     sinResponder.value = me.sin_responder ?? 0
+
+    if (me.authenticated) iniciarAutor(me.autores ?? [])
   }
   catch { authed.value = false }
   checking.value = false
@@ -37,6 +40,7 @@ async function login() {
     // El conteo de sin responder se lee antes de mostrar las tarjetas (así el badge sale de una).
     const me = await $fetch<Me>('/api/inbox/me').catch(() => null)
     sinResponder.value = me?.sin_responder ?? 0
+    iniciarAutor(me?.autores ?? [])
     authed.value = true
   }
   catch (e: any) {
@@ -92,7 +96,10 @@ onBeforeUnmount(() => { if (timer) clearInterval(timer) })
             <p class="hub__sub">Elige a dónde quieres ir</p>
           </div>
         </div>
-        <button class="btn btn--ghost" type="button" @click="logout">Salir</button>
+        <div class="hub__acciones">
+          <AdminAutorChip />
+          <button class="btn btn--ghost" type="button" @click="logout">Salir</button>
+        </div>
       </header>
 
       <nav class="cards" aria-label="Secciones de administración">
@@ -152,6 +159,7 @@ onBeforeUnmount(() => { if (timer) clearInterval(timer) })
 /* hub */
 .hub__app { max-width: 760px; margin: 0 auto; padding: 28px 20px 40px; }
 .hub__top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 26px; }
+.hub__acciones { display: flex; align-items: center; gap: 14px; }
 .hub__brand { display: flex; align-items: center; gap: 12px; }
 .hub__title { margin: 0; font-family: var(--ff-display); font-size: 24px; letter-spacing: .5px; line-height: 1.1; }
 .hub__sub { margin: 2px 0 0; font-size: 14px; color: var(--mut); }

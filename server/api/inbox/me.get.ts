@@ -18,5 +18,6 @@ export default defineEventHandler(async (event) => {
       console.warn('[inbox/me] no se pudo contar sin responder:', String((err as Error)?.message ?? err))
     }
   }
-  return { configured: inboxConfigured(), authenticated, db: dbConfigured(), sin_responder }
+  // La lista de nombres solo sale CON sesión: no tiene por qué verla nadie más.
+  return { configured: inboxConfigured(), authenticated, db: dbConfigured(), sin_responder, autores: authenticated ? panelAutores() : [] }
 })
