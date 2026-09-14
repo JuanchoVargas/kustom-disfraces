@@ -203,4 +203,6 @@ export interface InvStatus {
   public_stock: boolean
   /** referencias forzadas a agotado a mano (NUXT_SKUS_AGOTADOS) con su motivo */
   agotados_forzados: { sku: string, motivo: string }[]
+  /** valores de NUXT_SKUS_AGOTADOS que no corresponden a ningún producto (no se aplican) */
+  agotados_no_encontrados: string[]
 }

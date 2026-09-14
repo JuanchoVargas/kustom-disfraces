@@ -1,6 +1,8 @@
 import type { InvProduct, InvVariation } from '~~/shared/types/inventory'
+import type { ProductoCatalogo } from '~~/shared/types/catalogo'
 import { stockBajoUmbral } from './inventoryCommon'
 import { variationSku } from '~~/shared/utils/tallas'
+import catalogoData from '~~/app/data/catalogo.json'
 
 /**
  * ESTADO DE STOCK para el sitio público, el bot y el checkout (lógica de agotado).
@@ -34,6 +36,11 @@ export interface StockState {
   bajo: { sku: string, producto: string, talla: string, cantidad: number }[]
   /** tallas agotadas (detalle para alertas) */
   agotadas: { sku: string, producto: string, talla: string }[]
+  /**
+   * Entradas de NUXT_SKUS_AGOTADOS cuyo SKU no existe en ningún catálogo. No se
+   * aplican (antes se agotaba un código fantasma en silencio) y el panel las avisa.
+   */
+  forzadosNoEncontrados: string[]
   umbral: number
   updated_at: string
 }
@@ -58,6 +65,12 @@ const agotada = (v: InvVariation) => (v.manage_stock && (v.stock_quantity ?? 0) 
  * referencias como agotadas a mano. Acepta, separados por coma:
  *   - código de producto (001011001) → la referencia completa queda agotada
  *   - SKU de talla     (001011001-T4) → solo esa talla
+ * y cada entrada admite un motivo detrás de ":" ("001011004:falta el dato").
+ *
+ * ⚠️ El motivo NO puede llevar comas: la coma separa entradas, así que
+ * "001011004:falta stock, pregunta a ventas" parte en dos y el trozo
+ * " pregunta a ventas" se lee como otro SKU. Por eso todo SKU se valida contra
+ * el catálogo y lo que no existe se reporta en el panel (ver validarForzados).
  *
  * Es la ÚNICA fuente del agotado forzado: de aquí salen la cinta AGOTADO de la
  * web, la exclusión del bot y el bloqueo del carrito y el checkout. No dupliques
@@ -85,6 +98,54 @@ export function skusAgotadosOverride(): { productos: Set<string>, variaciones: S
   return { productos, variaciones, motivos }
 }
 
+/**
+ * Qué SKU EXISTEN. Unión de catalogo.json (taxonomía estable de la web) y del
+ * inventario cargado (snapshot de Woo), porque a cada fuente le falta algo de la
+ * otra: hay borradores en Woo que no están en la web y productos de la web que el
+ * snapshot todavía no trajo. Solo lo que no aparece en NINGUNA de las dos es un
+ * valor inválido, así que un SKU real nunca se descarta por snapshot incompleto.
+ */
+function catalogoConocido(products: InvProduct[]): { codigos: Set<string>, variaciones: Set<string> } {
+  const codigos = new Set<string>()
+  const variaciones = new Set<string>()
+  for (const l of catalogoData as ProductoCatalogo[]) {
+    codigos.add(l.codigo)
+    for (const t of l.tallas ?? []) variaciones.add(variationSku(l.codigo, t))
+  }
+  for (const p of products) {
+    codigos.add(p.sku)
+    for (const v of p.variations) variaciones.add(v.sku)
+  }
+  return { codigos, variaciones }
+}
+
+/**
+ * Separa el override en lo aplicable y lo que no existe. Un SKU inventado (un
+ * dedazo, o el trozo que queda cuando alguien mete una coma dentro del motivo)
+ * ya NO se agota en silencio: sale reportado para que se corrija la variable.
+ */
+export function validarForzados(products: InvProduct[]): {
+  productos: Set<string>
+  variaciones: Set<string>
+  motivos: Map<string, string>
+  noEncontrados: string[]
+} {
+  const ov = skusAgotadosOverride()
+  const conocido = catalogoConocido(products)
+  const productos = new Set<string>()
+  const variaciones = new Set<string>()
+  const noEncontrados: string[] = []
+  for (const sku of ov.productos) {
+    if (conocido.codigos.has(sku)) productos.add(sku)
+    else noEncontrados.push(sku)
+  }
+  for (const sku of ov.variaciones) {
+    if (conocido.variaciones.has(sku)) variaciones.add(sku)
+    else noEncontrados.push(sku)
+  }
+  return { productos, variaciones, motivos: ov.motivos, noEncontrados }
+}
+
 /** Lo que el panel muestra: qué está forzado a agotado y por qué. */
 export function agotadosForzados(): { sku: string, motivo: string }[] {
   const { productos, variaciones, motivos } = skusAgotadosOverride()
@@ -93,8 +154,11 @@ export function agotadosForzados(): { sku: string, motivo: string }[] {
 
 export function computeStockState(products: InvProduct[], enabled: boolean, backend: 'mock' | 'woo'): StockState {
   const umbral = stockBajoUmbral()
-  const ov = skusAgotadosOverride()
+  const ov = validarForzados(products)
   const forzados = ov.productos.size > 0 || ov.variaciones.size > 0
+  if (ov.noEncontrados.length) {
+    console.warn(`[stock] NUXT_SKUS_AGOTADOS: ${ov.noEncontrados.length} valor(es) sin producto en el catálogo (se ignoran): ${ov.noEncontrados.join(' · ')}`)
+  }
   const st: StockState = {
     // El override enciende la lógica de agotado aunque el adaptador todavía no se
     // aplique al sitio, pero SOLO para lo que nombra (ver `disponible` abajo).
@@ -105,6 +169,7 @@ export function computeStockState(products: InvProduct[], enabled: boolean, back
     disponible: new Map(),
     bajo: [],
     agotadas: [],
+    forzadosNoEncontrados: ov.noEncontrados,
     umbral,
     updated_at: new Date().toISOString(),
   }
@@ -132,7 +197,8 @@ export function computeStockState(products: InvProduct[], enabled: boolean, back
     if (p.variations.length && outs.length === p.variations.length) st.agotados.add(p.sku)
   }
   // Un código del override que el inventario todavía no conozca (sin snapshot, sin
-  // variaciones) igual queda agotado: si no, la cinta no saldría.
+  // variaciones) igual queda agotado: si no, la cinta no saldría. Solo llegan aquí
+  // códigos que SÍ existen en algún catálogo; los inventados ya se apartaron.
   for (const codigo of ov.productos) st.agotados.add(codigo)
   return st
 }

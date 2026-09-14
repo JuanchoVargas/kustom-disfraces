@@ -851,6 +851,18 @@ onBeforeUnmount(() => { if (sinResponderTimer) clearInterval(sinResponderTimer) 
           </li>
         </ul>
       </div>
+      <!-- Valores de NUXT_SKUS_AGOTADOS que no son ningún producto. El caso típico
+           es una coma dentro del motivo, que parte la entrada en dos: antes el
+           trozo sobrante agotaba un código fantasma sin que nadie se enterara. -->
+      <div v-if="estado?.agotados_no_encontrados?.length" class="banner banner--warn">
+        <strong>⚠ NUXT_SKUS_AGOTADOS tiene {{ estado.agotados_no_encontrados.length === 1 ? 'un valor que no existe' : 'valores que no existen' }}</strong>
+        <ul class="descartes">
+          <li v-for="v in estado.agotados_no_encontrados" :key="v">
+            SKU no encontrado en el catálogo: <span class="mono">{{ v }}</span>
+          </li>
+        </ul>
+        <span class="muted small">No se aplican. Revisa la variable en Vercel: el motivo no puede llevar comas.</span>
+      </div>
       <div v-if="estado && !estado.ok" class="banner banner--warn">{{ estado.detail }}</div>
       <div v-if="syncMsg" class="banner banner--info">{{ syncMsg }}</div>
 

@@ -64,7 +64,10 @@ export async function inventoryStatus(): Promise<InvStatus> {
     stock_bajo: stock.bajo.length,
     agotadas: stock.agotadas.length,
     public_stock: publicStockEnabled(),
-    agotados_forzados: agotadosForzados(),
+    // Los forzados que sí existen (con su motivo) y, aparte, los valores de la
+    // variable que no corresponden a ningún producto: el panel los avisa.
+    agotados_forzados: agotadosForzados().filter(f => !stock.forzadosNoEncontrados.includes(f.sku)),
+    agotados_no_encontrados: stock.forzadosNoEncontrados,
     woo_write: wooWriteConfigured(),
     woo_only_drafts: wooOnlyDrafts(),
   }
