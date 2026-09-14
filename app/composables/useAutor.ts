@@ -19,6 +19,8 @@ const CLAVE = 'kustom_panel_autor'
 export const useAutor = () => {
   const autor = useState<string>('panel-autor', () => '')
   const autores = useState<string[]>('panel-autores', () => [])
+  /** Problemas de NUXT_PANEL_AUTORES (vacía, mal separada, repetida). El panel los enseña. */
+  const problemas = useState<string[]>('panel-autores-problemas', () => [])
   // El selector se abre solo cuando hay sesión y todavía no se eligió nombre.
   const pidiendo = useState<boolean>('panel-autor-pidiendo', () => false)
 
@@ -48,8 +50,9 @@ export const useAutor = () => {
    * guardado ya no está en ella (alguien salió del equipo), lo descarta y vuelve
    * a preguntar en vez de seguir firmando con un nombre que ya no existe.
    */
-  function iniciar(lista: string[]) {
+  function iniciar(lista: string[], avisos: string[] = []) {
     autores.value = lista
+    problemas.value = avisos
     cargar()
     if (autor.value && lista.length && !lista.includes(autor.value)) autor.value = ''
     pidiendo.value = !autor.value && lista.length > 0
@@ -58,5 +61,5 @@ export const useAutor = () => {
   /** Cuerpo de una escritura del inventario, con la firma si la hay. */
   const conAutor = <T extends Record<string, unknown>>(body: T) => (autor.value ? { ...body, autor: autor.value } : body)
 
-  return { autor, autores, pidiendo, iniciar, elegir, olvidar, conAutor }
+  return { autor, autores, problemas, pidiendo, iniciar, elegir, olvidar, conAutor }
 }

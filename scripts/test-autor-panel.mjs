@@ -12,7 +12,7 @@ globalThis.useRuntimeConfig = () => ({ panelAutores: LISTA, public: {} })
 
 const { createJiti } = await import('jiti')
 const jiti = createJiti(import.meta.url, { alias: { '~~': root, '~': root, '@@': root, '@': root } })
-const { panelAutores, autorValido } = await jiti.import('../server/utils/panelAutores.ts')
+const { panelAutores, autorValido, panelAutoresDiagnostico } = await jiti.import('../server/utils/panelAutores.ts')
 
 let fails = 0
 const check = (nombre, ok, detalle = '') => {
@@ -35,6 +35,25 @@ check('no-string se descarta', autorValido(123) === undefined && autorValido(nul
 
 LISTA = ''
 check('sin lista configurada no se firma nada (nunca bloquea)', autorValido('Lesly') === undefined && panelAutores().length === 0)
+
+// ---------- diagnóstico: la lista mal puesta tiene que AVISAR ----------
+const diag = (valor) => { LISTA = valor; return panelAutoresDiagnostico() }
+
+check('lista correcta → sin avisos', diag('Lesly,Jaime,Juan Diego').problemas.length === 0)
+check('lista VACÍA → avisa', diag('').problemas.length === 1 && /vacía/.test(diag('').problemas[0]))
+check('solo espacios → avisa', diag('   ').problemas.length === 1)
+check('solo comas → avisa que no hay nombres utilizables',
+  diag(',,,').problemas.length === 1 && /utilizable/.test(diag(',,,').problemas[0]), diag(',,,').problemas[0])
+check('separador equivocado (;) → avisa',
+  diag('Lesly;Jaime').problemas.some(p => /separador/.test(p)), diag('Lesly;Jaime').problemas[0])
+check('separador equivocado (|) → avisa', diag('Lesly|Jaime').problemas.some(p => /separador/.test(p)))
+check('nombre repetido con distinta forma → avisa',
+  diag('Lesly,lesly').problemas.some(p => /repite/.test(p)), diag('Lesly,lesly').problemas[0])
+check('nombre repetido igual → avisa', diag('Jaime,Jaime').problemas.some(p => /repite/.test(p)))
+check('valor absurdamente largo → avisa', diag('L'.repeat(50) + ',Jaime').problemas.some(p => /largo/.test(p)))
+check('una lista con defecto leve SIGUE devolviendo nombres usables',
+  diag('Lesly,lesly').autores.length > 0)
+check('una lista vacía no devuelve ningún nombre', diag('').autores.length === 0)
 
 console.log(fails ? `\n❌ ${fails} comprobación(es) fallida(s)` : '\n✅ todo correcto')
 process.exit(fails ? 1 : 0)

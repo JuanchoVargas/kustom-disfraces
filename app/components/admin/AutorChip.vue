@@ -9,16 +9,20 @@
  *
  * El selector se abre solo si hay sesión y todavía no se eligió nombre.
  */
-const { autor, autores, pidiendo, elegir, olvidar } = useAutor()
+const { autor, autores, problemas, pidiendo, elegir, olvidar } = useAutor()
 </script>
 
 <template>
-  <span v-if="autores.length" class="quien">
-    <template v-if="autor">
+  <span v-if="autores.length || problemas.length" class="quien">
+    <!-- Lista vacía o inservible: nadie puede firmar y sin esto nadie se enteraría. -->
+    <span v-if="!autores.length" class="quien__roto" :title="problemas.join(String.fromCharCode(10))">⚠ Nadie está firmando</span>
+    <template v-else-if="autor">
       <span class="quien__nombre" :title="`Tus cambios quedan firmados como ${autor}`">🧑 {{ autor }}</span>
       <button class="quien__link" type="button" @click="olvidar">no soy yo</button>
     </template>
     <button v-else class="quien__pedir" type="button" @click="pidiendo = true">¿Quién eres?</button>
+    <!-- La lista sirve pero está mal escrita (separador raro, nombre repetido). -->
+    <span v-if="autores.length && problemas.length" class="quien__roto quien__roto--leve" :title="problemas.join(String.fromCharCode(10))">⚠ revisar lista</span>
 
     <!-- Al entrar sin nombre elegido se pide antes de dejar escribir. -->
     <div v-if="pidiendo" class="quien__modal" @click.self="autor ? (pidiendo = false) : null">
@@ -42,6 +46,8 @@ const { autor, autores, pidiendo, elegir, olvidar } = useAutor()
 .quien__nombre { font-weight: 700; white-space: nowrap; }
 .quien__link, .quien__pedir { background: none; border: 0; padding: 0; cursor: pointer; font: inherit; text-decoration: underline; color: var(--mut, #6b6b6b); }
 .quien__pedir { font-weight: 700; color: #8A1C2B; }
+.quien__roto--leve { font-size: 12px; }
+.quien__roto { font-weight: 700; color: #8A1C2B; background: #FDE7E9; border: 1px solid #F3B1B8; border-radius: 999px; padding: 3px 10px; cursor: help; }
 .quien__modal { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: grid; place-items: center; z-index: 60; padding: 16px; }
 .quien__box { background: #fff; border-radius: 16px; padding: 20px; max-width: 420px; width: 100%; box-shadow: 0 12px 40px rgba(0,0,0,.25); }
 .quien__box h3 { margin: 0 0 6px; font-size: 18px; }

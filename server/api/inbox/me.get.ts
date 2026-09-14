@@ -6,6 +6,9 @@ import { dbConfigured, ensureSchema, sql } from '../../utils/db'
  * mensajes del cliente sin leer (badge en /admin y en "Mensajes de clientes").
  */
 export default defineEventHandler(async (event) => {
+  // Diagnóstico de NUXT_PANEL_AUTORES: una lista vacía o mal escrita dejaría a
+  // todos sin firmar en silencio, así que el panel lo avisa en la cabecera.
+  const diag = panelAutoresDiagnostico()
   const authenticated = hasValidSession(event)
   let sin_responder = 0
   if (authenticated && dbConfigured()) {
@@ -19,5 +22,5 @@ export default defineEventHandler(async (event) => {
     }
   }
   // La lista de nombres solo sale CON sesión: no tiene por qué verla nadie más.
-  return { configured: inboxConfigured(), authenticated, db: dbConfigured(), sin_responder, autores: authenticated ? panelAutores() : [] }
+  return { configured: inboxConfigured(), authenticated, db: dbConfigured(), sin_responder, autores: authenticated ? diag.autores : [], autores_problemas: authenticated ? diag.problemas : [] }
 })

@@ -74,12 +74,12 @@ const loggingIn = ref(false)
 
 async function checkSession() {
   try {
-    const me = await $fetch<{ configured: boolean, authenticated: boolean, db: boolean, autores?: string[] }>('/api/inbox/me')
+    const me = await $fetch<{ configured: boolean, authenticated: boolean, db: boolean, autores?: string[], autores_problemas?: string[] }>('/api/inbox/me')
     configured.value = me.configured
     authed.value = me.authenticated
     dbOk.value = me.db
 
-    if (me.authenticated) iniciarAutor(me.autores ?? [])
+    if (me.authenticated) iniciarAutor(me.autores ?? [], me.autores_problemas ?? [])
   }
   catch { authed.value = false }
   checking.value = false

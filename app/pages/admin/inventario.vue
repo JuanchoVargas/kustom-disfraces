@@ -43,12 +43,12 @@ async function refreshSinResponder() {
 
 async function checkSession() {
   try {
-    const me = await $fetch<{ configured: boolean, authenticated: boolean, sin_responder?: number, autores?: string[] }>('/api/inbox/me')
+    const me = await $fetch<{ configured: boolean, authenticated: boolean, sin_responder?: number, autores?: string[], autores_problemas?: string[] }>('/api/inbox/me')
     configured.value = me.configured
     authed.value = me.authenticated
     sinResponder.value = me.sin_responder ?? 0
 
-    if (me.authenticated) iniciarAutor(me.autores ?? [])
+    if (me.authenticated) iniciarAutor(me.autores ?? [], me.autores_problemas ?? [])
   }
   catch { authed.value = false }
   checking.value = false

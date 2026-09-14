@@ -16,7 +16,7 @@ const loginError = ref('')
 const loggingIn = ref(false)
 const sinResponder = ref(0)
 
-interface Me { configured: boolean, authenticated: boolean, sin_responder?: number, autores?: string[] }
+interface Me { configured: boolean, authenticated: boolean, sin_responder?: number, autores?: string[], autores_problemas?: string[] }
 const { iniciar: iniciarAutor } = useAutor()
 
 async function checkSession() {
@@ -26,7 +26,7 @@ async function checkSession() {
     authed.value = me.authenticated
     sinResponder.value = me.sin_responder ?? 0
 
-    if (me.authenticated) iniciarAutor(me.autores ?? [])
+    if (me.authenticated) iniciarAutor(me.autores ?? [], me.autores_problemas ?? [])
   }
   catch { authed.value = false }
   checking.value = false
@@ -40,7 +40,7 @@ async function login() {
     // El conteo de sin responder se lee antes de mostrar las tarjetas (así el badge sale de una).
     const me = await $fetch<Me>('/api/inbox/me').catch(() => null)
     sinResponder.value = me?.sin_responder ?? 0
-    iniciarAutor(me?.autores ?? [])
+    iniciarAutor(me?.autores ?? [], me?.autores_problemas ?? [])
     authed.value = true
   }
   catch (e: any) {
