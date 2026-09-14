@@ -57,8 +57,16 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const body = await readBody<{ items?: RawItem[], buyer?: Record<string, unknown> }>(event)
+  const body = await readBody<{ items?: RawItem[], buyer?: Record<string, unknown>, dry_run?: unknown }>(event)
   const rawItems = Array.isArray(body?.items) ? body!.items : []
+  /**
+   * PRUEBA EN SECO. Recorre TODO el camino —comprador, precios contra el servidor,
+   * stock, armado de la preferencia— y corta justo antes de llamar a Mercado Pago.
+   * Existe porque probar el camino feliz creaba una preferencia real en MP cada vez
+   * (no cobra, pero deja basura y no hay pasarela de pruebas en Preview).
+   * Los errores (422, 409) se comportan igual que en una compra de verdad.
+   */
+  const dryRun = body?.dry_run === true
   if (!rawItems.length) {
     throw createError({ statusCode: 422, message: 'Carrito vacío' })
   }
@@ -210,6 +218,21 @@ export default defineEventHandler(async (event) => {
       installments: 3,
     },
     statement_descriptor: 'KUSTOM',
+  }
+
+  // Aquí acaba la prueba en seco: todo lo de arriba ya se validó y la preferencia
+  // está armada, pero no se envía. No se crea nada en Mercado Pago.
+  if (dryRun) {
+    console.warn(`[mercadopago] dry_run: preferencia NO creada (${items.length} ítem(s), ref ${externalRef})`)
+    return {
+      dry_run: true,
+      id: null,
+      checkout_url: null,
+      external_reference: externalRef,
+      // Lo que se habría mandado, para poder revisarlo sin tocar MP.
+      items: preference.items,
+      total: items.reduce((n, it) => n + it.unit_price * it.quantity, 0),
+    }
   }
 
   try {
