@@ -35,3 +35,6 @@ skills-lock.json
 
 # Guías generadas (scripts/generar-guia-inventario.mjs); la entrega vive fuera del repo
 Kustom_Guia_Panel_Inventario*.docx
+
+# Informe de estado para otros asistentes (no es documentación estable)
+docs/CONTEXTO.md
