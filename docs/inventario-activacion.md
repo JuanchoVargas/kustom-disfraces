@@ -7,10 +7,12 @@ escritura ya está probado desde Vercel sobre borradores (escritura, relectura,
 reversión, batch y guarda). Falta pasarlo a real, con los datos cargados antes.
 
 > ⚠️ **El riesgo que hay que tener presente en todo momento**
-> Con la gestión de stock activa, una talla con cantidad 0 **desaparece del
-> selector** y un producto con todas sus tallas en 0 **sale del catálogo de la
-> web y del bot**. Activar la gestión sin haber cargado las existencias reales
-> equivale a vaciar la tienda. Por eso el orden es **datos primero, activación
+> Con la gestión de stock activa, una talla con cantidad 0 **queda deshabilitada
+> en el selector** y un producto con todas sus tallas en 0 **se muestra AGOTADO**:
+> en la web sigue en el catálogo pero con la cinta "Agotado", sin poder comprar y
+> al final de los listados; el bot lo ofrece como agotado con lista de espera.
+> Activar la gestión sin haber cargado las existencias reales equivale a mostrar
+> toda la tienda agotada. Por eso el orden es **datos primero, activación
 > después**, y cada paso tiene una verificación antes de seguir.
 
 ## A. La clave REST dedicada (lo hace Juan Diego, con acceso a WordPress)
@@ -136,14 +138,15 @@ estén verificados.
          los `agotados` deben ser **solo** los productos que Lesly dejó con
          todas las tallas en 0. Si la lista es larga o inesperada, **revertir**
          (B2) y revisar el Excel.
-      2. Las cuatro PLP muestran los mismos productos que antes salvo los
-         agotados a propósito.
+      2. Las cuatro PLP muestran los mismos productos que antes; los agotados a
+         propósito aparecen con la cinta "Agotado" y al final del listado.
       3. En una PDP, una talla con stock 0 aparece deshabilitada; las demás,
-         seleccionables.
-      4. Desde el celular de pruebas, pedirle al bot un producto con una talla
-         en 0 (por ejemplo "batman talla 12" si la 12 quedó en 0): debe
-         responder "⚠️ Talla 12 no disponible" y listar solo las tallas con
-         existencias.
+         seleccionables. Un producto con todo en 0 abre, marcado agotado y sin
+         botón de compra.
+      4. Desde el celular de pruebas (`WA_TEST_TO`), pedirle al bot un producto
+         con una talla en 0 (por ejemplo "batman talla 12" si la 12 quedó en 0):
+         debe responder "😔 La talla 12 está agotada. ¿Te aviso cuando llegue?"
+         y listar solo las tallas con existencias.
       5. Carrito con una talla en 0 → el checkout responde "Algunas tallas ya
          no tienen existencias" y no crea la preferencia de pago.
 - [ ] **[L]** Desde ese momento el panel escribe directo en Woo: cada cambio
@@ -186,7 +189,7 @@ estén verificados.
 | `aplicar-overrides-woo.mjs --aplicar` | **No probado aún**: usa el mismo `bulkUpdate` del adaptador que sí está probado, pero la primera ejecución real es el paso B3 |
 | Lógica de agotado en web, bot y checkout | Probada en local con stock simulado (60 comprobaciones) |
 | Descuento de inventario al confirmarse un pago | **Pendiente**: paso B7 |
-| Subida de medios a WordPress desde Vercel (`GET /api/admin/test-wp-medios`, temporal) | **Pendiente de que JD lo ejecute** (2026-09-07): autentica, sube, lee, asigna a un borrador, retira y borra. Hasta que no dé todo OK no se usa el panel de imágenes ni la migración |
+| Subida de medios a WordPress desde Vercel (prueba `test-wp-medios`) | **Endpoint retirado; evidencia pendiente.** El código de la prueba (plugin temporal que ejercita `wpMedia.ts` + `inventoryImages.ts`, activado solo con `NUXT_ENABLE_WP_MEDIA_TEST`) vive en la rama local `rescate/test-wp-medios`. Hasta que no haya un resultado con todo OK no se usa el panel de imágenes ni la migración |
 
 ## E. Imágenes (Fase A) — independiente del adaptador de inventario
 
@@ -197,8 +200,10 @@ Tiene guarda propia: `NUXT_IMAGES_ONLY_DRAFTS`, default `true` (solo borradores,
 criterio que `NUXT_INVENTORY_WOO_ONLY_DRAFTS`). Ponerla en `false` es el opt-in
 explícito para imágenes de publicados, sin abrir precios/stock.
 
-- [ ] **[JD]** Ejecutar `https://www.disfraceskustom.com/api/admin/test-wp-medios`
-      con la sesión del panel y pasar el JSON. Si todo es `ok: true`, se borra el
-      endpoint y se puede usar el panel de imágenes.
+- [ ] **[JD]** Prueba de subida de medios: **endpoint retirado; evidencia
+      pendiente; ver rama `rescate/test-wp-medios`** (plugin temporal, se activa
+      solo con `NUXT_ENABLE_WP_MEDIA_TEST`, pensado para un Preview). Cuando se
+      ejecute y todo sea `ok: true`, dejar aquí el resultado y se puede usar el
+      panel de imágenes.
 - [ ] **[JD]** La migración de las 189 fotos (`scripts/migrar-imagenes-woo.mjs`)
       se corre **con JD presente**, primero en vista previa; nunca sin él.

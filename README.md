@@ -386,8 +386,9 @@ compartido `app/components/checkout/PaymentResult.vue`:
 body**: consulta `GET /v1/payments/{id}` en la API de MP con el Access Token para
 leer el estado real (`approved` / `rejected` / `pending`…). Si `MP_WEBHOOK_SECRET`
 está configurado, valida además la firma `x-signature` (HMAC-SHA256) y rechaza lo
-no auténtico (401). Hoy verifica y **registra** el estado; el enganche para
-persistir/confirmar el pedido queda marcado con un `TODO` (falta sistema de pedidos/BD).
+no auténtico (401). Con el pago **aprobado** crea la orden en WooCommerce
+(idempotente por `_mp_payment_id`, ver Fase 3), envía los correos de confirmación
+y, si la orden falla, alerta a ventas@ y responde 5xx para que MP reintente.
 
 El `notification_url` se arma solo con el origen de la request, así que apunta
 automáticamente al dominio donde corre (Preview o prod). **En localhost no se
@@ -848,13 +849,18 @@ respaldo local **permanente**.
   woo, porque el mock es simulación y el panel promete que no toca el sitio;
   `on` = también con mock (local/preview; el panel lo avisa); `off` = nunca.
 - **Sitio**: `GET /api/stock` (público, solo códigos y tallas) → plugin
-  `app/plugins/stock.ts` lo hidrata en SSR → `useProducts` saca del catálogo los
-  productos agotados (PLP/PDP/home; la PDP responde 404) y marca las tallas
-  agotadas como `soldOutSizes` (el SizeSelector las deshabilita).
+  `app/plugins/stock.ts` lo hidrata en SSR → `useProducts` **no oculta** el
+  producto agotado: lo deja en el catálogo con la cinta "Agotado" (`soldout`),
+  todas sus tallas bloqueadas y al final de los listados (`agotadosAlFinal`); la
+  PDP sigue abriendo, sin poder comprar. Las tallas agotadas de un producto con
+  existencias van en `soldOutSizes` (el SizeSelector las deshabilita).
 - **Bot**: los webhooks refrescan `server/utils/botStock.ts` antes de responder;
-  la búsqueda excluye productos agotados, las fichas listan solo tallas con
-  existencias y "talla N" agotada responde ⚠️ no disponible. Los conteos de los
-  menús ("N disfraces") tampoco cuentan agotados.
+  la búsqueda **sigue mostrando** el producto agotado (quien pregunta por algo
+  agotado es justo el cliente que hay que captar): la ficha lo marca como agotado
+  y ofrece lista de espera (`stock_espera`, etiqueta "espera stock" en la
+  bandeja); "talla N" agotada responde "😔 La talla N está agotada. ¿Te aviso
+  cuando llegue?" y lista solo las tallas con existencias. Los conteos de los
+  menús ("N disfraces") sí cuentan los agotados.
 - **Checkout**: `/api/checkout/mercadopago` valida cada ítem (SKU + talla +
   cantidad) contra el adaptador y responde **409 `sin_stock`** con el detalle;
   `useMercadoPago` muestra qué talla ajustar. Tallas sin gestionar pasan.

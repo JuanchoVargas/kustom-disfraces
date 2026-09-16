@@ -2,8 +2,10 @@
  * Precio tachado (gancho de oferta), controlado por flag de configuración.
  * SOLO visual: no toca `product.price` (el que se cobra y se valida en el
  * servidor vía pricing.ts) ni `product.regularPrice` (descuento real, si
- * algún día lo hay). Apagado por defecto (NUXT_PUBLIC_SHOW_DISCOUNT=false);
- * se activa/desactiva sin deploy cambiando la env var en Vercel.
+ * algún día lo hay). ENCENDIDO por defecto (nuxt.config: `showDiscount` es true
+ * salvo NUXT_PUBLIC_SHOW_DISCOUNT=false); se apaga sin deploy poniendo esa env
+ * var en false en Vercel (obligatorio el día que haya sale_price real, si no el
+ * descuento se duplica; ver docs/inventario-activacion.md B6).
  */
 export function useFakeDiscount() {
   const config = useRuntimeConfig().public
