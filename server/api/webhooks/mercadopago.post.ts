@@ -1,4 +1,5 @@
 import { createHmac, timingSafeEqual } from 'node:crypto'
+import { construirLineas, leerAnclaje, verificarMontos, type LineaOrden } from '../../utils/mpAnclaje'
 
 /**
  * Webhook de Mercado Pago (Fase 2, sandbox). MP lo llama server-to-server cuando
@@ -182,29 +183,31 @@ export default defineEventHandler(async (event) => {
     console.warn('[mp-webhook] catálogo no disponible para recalcular precios; se usa el monto pagado:', String((err as Error)?.message ?? err))
   }
 
-  const orderItems = (payment.additional_info?.items ?? []).map((it) => {
-    const sku = it.id ? String(it.id) : undefined
-    const real = sku ? priceMap?.get(sku) : undefined
-    const paidPrice = Number(it.unit_price) || 0
-    if (real && real.price !== paidPrice) {
-      // No debería ocurrir (la preferencia ya usó el precio real); se registra por si acaso.
-      console.warn(`[mp-webhook] precio de ${sku} difiere: pagado=${paidPrice} real=${real.price} — se usa el real`)
-    }
-    const title = String(it.title ?? 'Producto')
-    const m = title.match(/^(.*?)\s*\(Talla\s*(.+?)\)\s*$/) // separa nombre y talla del título compuesto
-    // Talla LIMPIA (sin la gama): el título es "Nombre (Talla 4, Súper Acolchado)" y
-    // el grupo de arriba se tragaba la gama entera. Es la que resuelve la variación.
-    const talla = tallaDesdeTitulo(title)
-    return {
-      sku,
-      title, // nombre+talla (línea de la orden en Woo)
-      name: real?.name ?? (m ? m[1] : title), // nombre limpio (correo)
-      talla: talla ?? '—', // talla (correo y resolución de la variación)
-      slug: real?.slug || undefined, // foto pública (correo)
-      quantity: Math.max(1, Math.trunc(Number(it.quantity) || 1)),
-      unitPrice: real?.price ?? paidPrice, // ← precio REAL del servidor cuando está disponible
-    }
-  })
+  // PRECIO ANCLADO (promociones por fecha): la preferencia guardó en metadata
+  // kustom_lineas tal como se cobró; si viene, manda sobre el recálculo. Las
+  // preferencias anteriores no lo traen y dan exactamente las líneas de antes.
+  // Todo el camino anclado es puro (server/utils/mpAnclaje.ts) y va en try/catch:
+  // un fallo ahí NUNCA cambia la respuesta a MP; cae al comportamiento anterior y
+  // deja motivo de ajuste manual para que ventas lo revise.
+  const itemsMp = payment.additional_info?.items ?? []
+  let orderItems: LineaOrden[]
+  let ajusteMontos: string | null = null
+  try {
+    const anclaje = leerAnclaje(payment.metadata)
+    const r = construirLineas(itemsMp, priceMap, anclaje, tallaDesdeTitulo)
+    orderItems = r.lineas
+    for (const a of r.advertencias) console.info(`[mp-webhook] precio ${a}`)
+    const montos = verificarMontos(orderItems, payment.transaction_amount)
+    const ajustes = montos ? [...r.ajustes, montos] : r.ajustes
+    ajusteMontos = ajustes.length ? ajustes.join(' · ') : null
+  }
+  catch (err) {
+    // Solo el NOMBRE del error: el mensaje puede traer un trozo del texto procesado
+    // (metadata con datos del comprador) y esto va al log y a la nota de Woo.
+    orderItems = construirLineas(itemsMp, priceMap, { estado: 'ausente' }, tallaDesdeTitulo).lineas
+    ajusteMontos = `error leyendo el precio anclado (${(err as Error)?.name || 'Error'}); se recalculó el precio`
+  }
+  if (ajusteMontos) console.error(`[mp-webhook] ⚠️ pago ${payment.id}: ${ajusteMontos} — la orden queda marcada como ajuste manual`)
 
   // Datos del comprador (envío + factura opcional) recuperados de la metadata de
   // la preferencia. Se resuelve ANTES de failWithAlert para que la alerta también
@@ -256,6 +259,7 @@ export default defineEventHandler(async (event) => {
       items: orderItems,
       amount: payment.transaction_amount,
       buyer: buyer ?? undefined,
+      ajusteManual: ajusteMontos ?? undefined,
     })
     console.info(`[mp-webhook] orden creada en Woo #${order.id} (pago ${payment.id}, ${payment.status})`)
 
@@ -264,11 +268,12 @@ export default defineEventHandler(async (event) => {
     // stock. Se avisa a ventas para que lo ajusten a mano. Best-effort: un fallo
     // aquí no puede tumbar el webhook ni provocar un reintento de MP (eso
     // duplicaría correos), por eso va en su propio catch.
-    if (order.lineasSinEnlazar.length) {
+    if (order.lineasSinEnlazar.length || ajusteMontos) {
       const detalle = order.lineasSinEnlazar
         .map(l => `• ${l.title} — SKU ${l.sku ?? 'ausente'}${l.talla ? `, talla ${l.talla}` : ', sin talla'} → ${l.motivo}`)
+        .concat(ajusteMontos ? [`• Montos: ${ajusteMontos}`] : [])
         .join('\n')
-      console.error(`[mp-webhook] ⚠️ AJUSTE MANUAL en Woo #${order.id}: ${order.lineasSinEnlazar.length} línea(s) sin stock descontado\n${detalle}`)
+      console.error(`[mp-webhook] ⚠️ AJUSTE MANUAL en Woo #${order.id}: ${order.lineasSinEnlazar.length} línea(s) sin stock descontado${ajusteMontos ? ' + montos' : ''}\n${detalle}`)
       await sendOrderFailureAlert({
         variante: 'ajuste_manual',
         orderId: order.id,
@@ -277,7 +282,7 @@ export default defineEventHandler(async (event) => {
         payerName: buyer?.nombre || [payment.payer?.first_name, payment.payer?.last_name].filter(Boolean).join(' ') || undefined,
         payerEmail: buyer?.email || payment.payer?.email,
         items: orderItems.map(i => ({ name: i.name, talla: i.talla, quantity: i.quantity, unitPrice: i.unitPrice })),
-        reason: order.lineasSinEnlazar.map(l => `${l.sku ?? '?'}${l.talla ? ` talla ${l.talla}` : ''}: ${l.motivo}`).join(' · '),
+        reason: order.lineasSinEnlazar.map(l => `${l.sku ?? '?'}${l.talla ? ` talla ${l.talla}` : ''}: ${l.motivo}`).concat(ajusteMontos ? [ajusteMontos] : []).join(' · '),
       }).catch(e => console.error('[mp-webhook] no se pudo avisar del ajuste manual:', String((e as Error)?.message ?? e)))
     }
 

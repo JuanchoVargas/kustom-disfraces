@@ -43,6 +43,8 @@ export interface CreateOrderInput {
   amount: number
   /** Datos del comprador capturados en /checkout (Fase 5): billing + shipping + documento. */
   buyer?: CreateOrderBuyer
+  /** Motivo adicional de ajuste manual (p. ej. montos anclados que no cuadran con lo cobrado). */
+  ajusteManual?: string
 }
 
 export interface CreateOrderBuyer {
@@ -198,10 +200,13 @@ export async function createWooOrder(input: CreateOrderInput): Promise<WooOrder 
   const notesLine = b?.notas ? `Notas del cliente: ${b.notas}` : ''
   // Aviso VISIBLE en la orden (wp-admin) cuando hay líneas sin enlazar: quien
   // despacha tiene que saber que el stock de esas tallas no bajó solo.
-  const avisoAjuste = sinEnlazar.length
-    ? `⚠️ AJUSTE MANUAL DE INVENTARIO: ${sinEnlazar.length} línea(s) sin enlazar a su variación; Woo NO descontó su stock.\n`
-      + sinEnlazar.map(l => `  · ${l.title} (${l.sku ?? 'sin SKU'}${l.talla ? `, talla ${l.talla}` : ''}) — ${l.motivo}`).join('\n')
-    : ''
+  const avisoAjuste = [
+    sinEnlazar.length
+      ? `⚠️ AJUSTE MANUAL DE INVENTARIO: ${sinEnlazar.length} línea(s) sin enlazar a su variación; Woo NO descontó su stock.\n`
+        + sinEnlazar.map(l => `  · ${l.title} (${l.sku ?? 'sin SKU'}${l.talla ? `, talla ${l.talla}` : ''}) — ${l.motivo}`).join('\n')
+      : '',
+    input.ajusteManual ? `⚠️ AJUSTE MANUAL DE MONTOS: ${input.ajusteManual}` : '',
+  ].filter(Boolean).join('\n')
   const customerNote = [
     avisoAjuste,
     b ? [docLine, notesLine].filter(Boolean).join('\n') : 'Dirección de envío a coordinar por WhatsApp',
@@ -211,8 +216,8 @@ export async function createWooOrder(input: CreateOrderInput): Promise<WooOrder 
     { key: MP_PAYMENT_META, value: String(input.paymentId) },
     // Marca de AJUSTE MANUAL: alguna línea no se pudo enlazar a su variación, así
     // que Woo no le descontó stock. Queda en la orden para poder filtrarlas luego.
-    ...(sinEnlazar.length
-      ? [{ key: '_kustom_ajuste_manual', value: sinEnlazar.map(l => `${l.sku ?? '?'}${l.talla ? `-T${l.talla}` : ''}: ${l.motivo}`).join(' | ') }]
+    ...(sinEnlazar.length || input.ajusteManual
+      ? [{ key: '_kustom_ajuste_manual', value: sinEnlazar.map(l => `${l.sku ?? '?'}${l.talla ? `-T${l.talla}` : ''}: ${l.motivo}`).concat(input.ajusteManual ? [`montos: ${input.ajusteManual}`] : []).join(' | ') }]
       : []),
     ...(b?.documento ? [{ key: '_billing_document_type', value: b.tipoDocumento || 'CC' }, { key: '_billing_document', value: b.documento }] : []),
     ...(b?.departamento ? [{ key: '_departamento', value: b.departamento }] : []),

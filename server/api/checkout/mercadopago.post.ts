@@ -213,7 +213,16 @@ export default defineEventHandler(async (event) => {
     payer: { name: firstName, surname: restName.join(' '), email: buyer.email },
     // VÍA de los datos a la orden: metadata de la preferencia. El webhook la
     // recupera (payment.metadata o merchant_order -> preference) al crear la orden.
-    metadata: buyer,
+    // PRECIO ANCLADO: kustom_lineas guarda [sku, talla, cantidad, precio unitario,
+    // promo] por línea tal como se COBRÓ (con la promoción por fecha vigente al
+    // crear la preferencia). El webhook usa esos precios para la línea de Woo en vez
+    // de recalcular: si la promoción termina entre el pago y la notificación, la
+    // orden sigue reflejando lo que el cliente pagó (server/utils/mpAnclaje.ts).
+    metadata: {
+      ...buyer,
+      kustom_lineas: JSON.stringify(lineas.map(l => [l.sku, l.size, l.quantity, l.unit_price, l.promo_id ?? ''])),
+      kustom_total: items.reduce((n, it) => n + it.unit_price * it.quantity, 0),
+    },
     external_reference: externalRef,
     back_urls: {
       success: `${origin}/pago-exitoso`,
