@@ -27,3 +27,11 @@ app/insumos/
 .env.*
 !.env.example
 backups/
+
+# Skills de asistentes (locales) y su lock
+.claude/
+.agents/
+skills-lock.json
+
+# Guías generadas (scripts/generar-guia-inventario.mjs); la entrega vive fuera del repo
+Kustom_Guia_Panel_Inventario*.docx
