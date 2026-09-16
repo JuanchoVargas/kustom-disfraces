@@ -74,6 +74,10 @@ export default defineNuxtConfig({
   // salen del .env en build (nuxi lo carga solo); en runtime se pueden
   // sobreescribir con las variables NUXT_* equivalentes.
   runtimeConfig: {
+    // PROMOCIONES POR FECHA (app/data/promociones.json): override de la hora del
+    // servidor SOLO para probar en un Preview (VERCEL_ENV !== 'production'); en
+    // producción se ignora. Con el override activo el checkout solo acepta dry_run.
+    promoAhora: process.env.NUXT_PROMO_AHORA || '',           // -> NUXT_PROMO_AHORA (ISO, p. ej. 2026-09-18T12:00:00-05:00)
     wooBaseUrl: process.env.WOO_API_URL || '',              // -> NUXT_WOO_BASE_URL
     wooConsumerKey: process.env.WOO_CONSUMER_KEY || '',     // -> NUXT_WOO_CONSUMER_KEY (solo LECTURA: catálogo)
     wooConsumerSecret: process.env.WOO_CONSUMER_SECRET || '', // -> NUXT_WOO_CONSUMER_SECRET

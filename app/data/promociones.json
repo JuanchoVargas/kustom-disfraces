@@ -1,0 +1,11 @@
+[
+  {
+    "id": "batman-day-2026",
+    "nombre": "Batman Day",
+    "codigos": ["001001008", "001002010", "001008003"],
+    "pct": 40,
+    "desde": "2026-09-17T00:00:00-05:00",
+    "hasta": "2026-09-19T23:59:59-05:00",
+    "texto": "Batman Day: 40 % de descuento, válido del 17 al 19 de septiembre de 2026"
+  }
+]

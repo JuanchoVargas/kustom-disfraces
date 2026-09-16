@@ -10,6 +10,15 @@ export interface ProductBadge {
   label: string
 }
 
+/** Promoción por fecha vigente para el producto (decidida por el servidor). */
+export interface ProductPromo {
+  id: string
+  nombre: string
+  pct: number
+  /** Texto de condiciones que muestra la PDP. */
+  texto: string
+}
+
 /** Enlace cruzado entre un producto Súper y su versión Línea Entrada */
 export interface ProductPareja {
   slug: string
@@ -28,6 +37,8 @@ export interface Product {
   price: number
   /** Precio anterior tachado, si está en oferta */
   regularPrice?: number
+  /** Promoción por fecha activa (Batman Day…): price ya lleva el descuento y regularPrice el pleno */
+  promo?: ProductPromo
   /** Tallas disponibles (de la gama por defecto) */
   sizes: (number | string)[]
   /** Tallas agotadas (subconjunto de sizes) */

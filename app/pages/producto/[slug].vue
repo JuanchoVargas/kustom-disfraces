@@ -259,6 +259,8 @@ const perks = [
           <s v-if="oldPrice" class="info__old">{{ formatCOP(oldPrice) }}</s>
           <KBadge v-if="savings" variant="sale" size="lg">-{{ discountPct }}%</KBadge>
         </div>
+        <!-- Promoción por fecha (Batman Day): condiciones y vigencia, decididas por el servidor. -->
+        <p v-if="product.promo" class="info__promo" role="note">🦇 {{ product.promo.texto }}</p>
 
         <!-- enlace cruzado discreto a la otra línea (Súper <-> Línea Entrada) -->
         <p v-if="product.pareja" class="info__pareja">
@@ -448,6 +450,17 @@ const perks = [
   font-weight: 600;
   font-size: var(--text-lg);
   color: var(--mut);
+}
+/* condiciones de la promoción por fecha (Batman Day), bajo el precio */
+.info__promo {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--purple);
+  background: rgba(126, 87, 194, 0.08);
+  border: 1px solid rgba(126, 87, 194, 0.25);
+  border-radius: var(--r-md);
+  padding: 8px 12px;
+  margin: calc(var(--space-3) * -1) 0 var(--space-4);
 }
 /* enlace cruzado Súper <-> Línea Entrada (discreto, bajo el precio) */
 .info__pareja {

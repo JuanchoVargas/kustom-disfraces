@@ -14,9 +14,13 @@ const route = useRoute()
 const STORAGE_KEY = 'kustom-promo-descuento-cerrado'
 
 const { enabled, pct } = useFakeDiscount()
+const { bySlug } = useProducts()
 const showOnThisRoute = computed(() => route.path.startsWith('/producto/'))
+// En la PDP de un producto con promoción por fecha (Batman Day) el flotante del
+// 20 % se oculta: esa promoción no se acumula y la PDP ya muestra sus condiciones.
+const productoEnPromo = computed(() => !!bySlug(String(route.params.slug ?? ''))?.promo)
 const dismissed = ref(false)
-const visible = computed(() => enabled.value && showOnThisRoute.value && !dismissed.value)
+const visible = computed(() => enabled.value && showOnThisRoute.value && !productoEnPromo.value && !dismissed.value)
 
 onMounted(() => {
   try {

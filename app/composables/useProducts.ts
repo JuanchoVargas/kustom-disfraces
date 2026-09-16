@@ -1,8 +1,26 @@
 import type { Product, Category } from '~~/shared/types/woo'
 import type { ProductoCatalogo } from '~~/shared/types/catalogo'
 import { catalogoToProducts } from '~~/shared/utils/catalogo'
+import { precioEfectivo, type PromocionActiva } from '~~/shared/utils/promociones'
+import type { PromoState } from '~/plugins/promo'
 import catalogoData from '~/data/catalogo.json'
 import categoriesData from '~/data/categories.json'
+
+/**
+ * PROMOCIONES POR FECHA (hidratadas por app/plugins/promo.ts con la decisión del
+ * SERVIDOR): en los códigos en promoción, price = precio con descuento,
+ * regularPrice = precio pleno (tachado real, sin gancho ficticio encima) y `promo`
+ * lleva el texto para la PDP. La cinta "-N %" la calcula la UI con regularPrice.
+ * Sin promociones activas la lista vuelve intacta.
+ */
+function applyPromos(products: Product[], activas: PromocionActiva[]): Product[] {
+  if (!activas.length) return products
+  return products.map((p) => {
+    const { precio, precioPleno, promo } = precioEfectivo(p.code, p.price, activas)
+    if (!promo) return p
+    return { ...p, price: precio, regularPrice: precioPleno, promo: { id: promo.id, nombre: promo.nombre, pct: promo.pct, texto: promo.texto } }
+  })
+}
 
 /**
  * Fuente de datos del catálogo. El canónico es el shape ProductoCatalogo
@@ -60,20 +78,23 @@ export function agotadosAlFinal<T extends Product>(list: T[]): T[] {
 // cambia el array de origen (local <-> remoto hidratado) o el estado de stock
 let memoSource: ProductoCatalogo[] | null = null
 let memoStock: StockAgotado | null | undefined
+let memoPromo: PromoState | null | undefined
 let memoImagesSource: 'local' | 'woo' | undefined
 let memoProducts: Product[] = []
 
 export const useProducts = () => {
   const remoto = useState<ProductoCatalogo[] | null>('catalogo-remoto', () => null)
   const stock = useState<StockAgotado | null>('stock-agotado', () => null)
+  const promo = useState<PromoState | null>('promo-activas', () => null)
   const source = remoto.value ?? CATALOGO_LOCAL
   // Origen de las imágenes (Fase B): 'woo' solo con NUXT_PUBLIC_IMAGES_SOURCE=woo; default local.
   const imagesSource = useRuntimeConfig().public.imagesSource === 'woo' ? 'woo' : 'local'
-  if (source !== memoSource || stock.value !== memoStock || imagesSource !== memoImagesSource) {
+  if (source !== memoSource || stock.value !== memoStock || promo.value !== memoPromo || imagesSource !== memoImagesSource) {
     memoSource = source
     memoStock = stock.value
+    memoPromo = promo.value
     memoImagesSource = imagesSource
-    memoProducts = applyStock(catalogoToProducts(source, imagesSource), stock.value)
+    memoProducts = applyStock(applyPromos(catalogoToProducts(source, imagesSource), promo.value?.activas ?? []), stock.value)
   }
   const products = memoProducts
   const categories = categoriesData as Category[]
