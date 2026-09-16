@@ -14,7 +14,7 @@
 //      limite_almacenamiento); enviar una imagen desde la bandeja responde 507.
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { exigirBdDePruebas } from './lib/guard-bd.mjs'
+import { cargarEnv, exigirBdDePruebas } from './lib/guard-bd.mjs'
 
 const __BASE_PEDIDA = process.argv.slice(2).find(a => a.startsWith('http')) ?? 'http://localhost:3000'
 // GUARDA: este script ESCRIBE. No arranca si la base no es la rama de pruebas.
@@ -57,7 +57,11 @@ const msgOld = (await sql.query(`INSERT INTO messages (conversation_id, direccio
 const msgNew = (await sql.query(`INSERT INTO messages (conversation_id, direccion, texto, autor, tipo, media_id, meta) VALUES ($1, 'in', '[Imagen recibida]', 'cliente', 'image', $2, '{}'::jsonb) RETURNING id`, [conv.id, fresh.id]))[0]
 const before = await fetch(`${BASE}/api/media/${old.token}`)
 check('2. el medio viejo se sirve antes de la retención', before.status === 200)
-const cron = await fetch(`${BASE}/api/cron/keepalive`).then(r => r.json())
+// Los crons exigen Authorization: Bearer <CRON_SECRET> (fail-closed). Se lee del
+// MISMO archivo que carga `npm run dev:test` (.env.test), no de .env.
+const CRON_SECRET = cargarEnv('.env.test').CRON_SECRET
+if (!CRON_SECRET) { console.error('❌ falta CRON_SECRET en .env.test (los endpoints de cron responden 401 sin ella)'); process.exit(1) }
+const cron = await fetch(`${BASE}/api/cron/keepalive`, { headers: { authorization: `Bearer ${CRON_SECRET}` } }).then(r => r.json())
 check('2. /api/cron/keepalive corre la retención', cron.ok === true && cron.retencion?.borrados >= 1, JSON.stringify(cron.retencion))
 const after = await fetch(`${BASE}/api/media/${old.token}`)
 check('2. el medio de 61 días ya no existe (404)', after.status === 404)

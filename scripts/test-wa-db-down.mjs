@@ -8,8 +8,14 @@
 //
 // (dotenv NO pisa variables ya presentes en el entorno, así que esas URLs rotas
 // ganan sobre las del .env.)
+import { cargarEnv } from './lib/guard-bd.mjs'
+
 const BASE = process.argv[2] ?? 'http://localhost:3000'
 const FROM = '570000000002'
+// Los crons exigen Authorization: Bearer <CRON_SECRET> (fail-closed). Se lee del
+// MISMO archivo que carga `npm run dev:test` (.env.test). Este script no usa la
+// guarda de BD a propósito (la BD está rota adrede).
+const CRON_SECRET = cargarEnv('.env.test').CRON_SECRET ?? ''
 
 function webhook(msg) {
   return {
@@ -56,8 +62,8 @@ const r4 = await post({ type: 'text', text: { body: 'quiero hablar con un asesor
 check('4. BD caída: pedido de humano responde sin reventar', r4.replied >= 1, JSON.stringify(r4))
 
 // 5. keepalive reporta el fallo con ok:false (sin 500)
-const ka = await (await fetch(`${BASE}/api/cron/keepalive`)).json()
-check('5. keepalive con BD caída → ok:false con detalle', ka.ok === false && !!ka.error, JSON.stringify(ka).slice(0, 120))
+const ka = await (await fetch(`${BASE}/api/cron/keepalive`, { headers: { authorization: `Bearer ${CRON_SECRET}` } })).json()
+check('5. keepalive con BD caída → ok:false con detalle', ka.ok === false && !!ka.error, CRON_SECRET ? JSON.stringify(ka).slice(0, 120) : 'falta CRON_SECRET en .env.test')
 
 console.log(fails ? `\n${fails} PRUEBA(S) FALLARON` : '\nTODAS LAS PRUEBAS PASARON')
 // process.exitCode (no process.exit): en Windows, salir con fetches aún drenando

@@ -8,8 +8,10 @@
  * real requiere plan Pro (o un pinger externo tipo cron-job.org apuntando aquí).
  */
 import { mediaStats, purgeExpiredMedia } from '../../utils/media'
+import { requireCron } from '../../utils/cronAuth'
 
-export default defineEventHandler(async () => {
+export default defineEventHandler(async (event) => {
+  requireCron(event) // 401 sin Authorization: Bearer <CRON_SECRET>
   if (!dbConfigured()) return { ok: false, db: 'sin_configurar' }
   const t0 = Date.now()
   try {

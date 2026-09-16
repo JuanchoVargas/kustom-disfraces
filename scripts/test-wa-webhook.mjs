@@ -17,7 +17,7 @@
 //   5. isHumanRequest: frases explícitas disparan handoff; "disfraz de agente
 //      secreto" NO (se valida vía estado de la conversación).
 // Al final limpia las filas de prueba.
-import { exigirBdDePruebas } from './lib/guard-bd.mjs'
+import { cargarEnv, exigirBdDePruebas } from './lib/guard-bd.mjs'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
@@ -148,8 +148,13 @@ const r6b = await post(null, `wamid.TEST-${uid}-6b`, 'sticker')
 check('6b. sticker → responde igual', r6b.replied >= 1, JSON.stringify(r6b))
 
 // --- 7: keepalive con BD viva ---
-const ka = await (await fetch(`${BASE}/api/cron/keepalive`)).json()
-check('7. /api/cron/keepalive responde ok con BD viva', ka.ok === true, JSON.stringify(ka))
+// Los crons exigen Authorization: Bearer <CRON_SECRET> (fail-closed). Se lee del
+// MISMO archivo que carga `npm run dev:test` (.env.test), no de .env.
+const CRON_SECRET = cargarEnv('.env.test').CRON_SECRET ?? ''
+const sinAuth = await fetch(`${BASE}/api/cron/keepalive`)
+check('7a. /api/cron/keepalive sin Authorization → 401', sinAuth.status === 401, `status=${sinAuth.status}`)
+const ka = await (await fetch(`${BASE}/api/cron/keepalive`, { headers: { authorization: `Bearer ${CRON_SECRET}` } })).json()
+check('7. /api/cron/keepalive responde ok con BD viva', ka.ok === true, CRON_SECRET ? JSON.stringify(ka) : 'falta CRON_SECRET en .env.test')
 
 // --- 8: FIXTURE REAL del esquema nuevo de Meta (BSUID/username, sin from ni wa_id) ---
 // Payload capturado con [wa-raw] de un mensaje que el bot ignoraba: contacts trae

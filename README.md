@@ -72,6 +72,29 @@ node scripts/verificar-deploy.mjs https://<preview>.vercel.app feature/x   # un 
 Si el hash no coincide, **el deploy no entró**: mirar el check de Vercel en el
 commit de GitHub y `vercel.json`.
 
+### `CRON_SECRET`: obligatoria en Production ANTES del merge
+
+Los tres endpoints de `vercel.json` (`/api/cron/keepalive`, `/api/cron/stock-alertas`,
+`/api/cron/ventana-24h`) exigen la cabecera `Authorization: Bearer <CRON_SECRET>` y
+responden **401** si falta o no coincide (`server/utils/cronAuth.ts`, fail-closed;
+compara sha256 de ambos valores con `timingSafeEqual`). **Vercel solo ejecuta los
+crons en el deployment de Production** y añade esa cabecera únicamente si la
+variable `CRON_SECRET` existe en ese entorno. Orden obligatorio:
+
+1. Vercel → Settings → Environment Variables → `CRON_SECRET` en **Production** con
+   un valor largo y aleatorio. En Preview es **opcional**: los crons no corren allí;
+   solo sirve para probar a mano con `curl -H "Authorization: Bearer …"`.
+2. Solo entonces merge a `master`. Si se despliega sin la variable, los crons
+   responden 401 y **dejan de correr** (sin keep-alive, sin retención de medios,
+   sin resumen de stock ni aviso de ventana de 24 h) hasta que se cree y se haga
+   redeploy.
+3. Verificar tras el deploy: en Vercel → Cron Jobs, la siguiente ejecución debe
+   quedar en 200; una llamada a mano sin cabecera debe dar 401.
+
+En local el valor va en **`.env.test`** (el archivo que carga `npm run dev:test`;
+lo leen `test-wa-webhook.mjs`, `test-wa-db-down.mjs` y `test-media-retencion.mjs`)
+y es **distinto** del de producción.
+
 ## Estructura
 
 ```
