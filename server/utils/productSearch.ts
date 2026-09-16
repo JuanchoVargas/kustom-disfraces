@@ -1,5 +1,7 @@
 import catalogoData from '~~/app/data/catalogo.json'
+import { precioEfectivo } from '~~/shared/utils/promociones'
 import { productoAgotado, tallasDisponibles } from './botStock'
+import { promocionesActivas } from './promoClock'
 
 /**
  * Búsqueda de productos por texto libre para el bot de WhatsApp. Los clientes que
@@ -24,7 +26,12 @@ export interface FoundProduct {
   codigo: string
   nombre: string
   slug: string
+  /** Precio que se cotiza: con promoción por fecha vigente ya lleva el descuento. */
   precio: number
+  /** Precio pleno cuando hay promoción (para "antes $X"). */
+  precioPleno?: number
+  /** Promoción por fecha vigente (decidida con el reloj del servidor). */
+  promo?: { id: string, nombre: string, pct: number, texto: string }
   /** Tallas DISPONIBLES (las del catálogo menos las agotadas). */
   tallas: Array<number | string>
   /** Tallas SIN existencias. Vacío si la lógica de agotado no aplica. */
@@ -98,12 +105,25 @@ function conEstadoStock(p: FoundProduct): FoundProduct {
   const todas = p.tallas
   const disponibles = tallasDisponibles(p.codigo, todas)
   const agotadas = todas.filter(t => !disponibles.some(d => String(d) === String(t)))
-  return {
+  return conPromo({
     ...p,
     tallas: disponibles,
     tallasAgotadas: agotadas,
     agotado: productoAgotado(p.codigo) || (todas.length > 0 && disponibles.length === 0),
-  }
+  })
+}
+
+/**
+ * PROMOCIÓN POR FECHA (Batman Day): mismo util que el cobro y la web, con el reloj
+ * del servidor en cada respuesta. El bot sigue cotizando sobre el precio de
+ * catalogo.json (no lee Woo en esta rama); solo se le aplica el descuento encima.
+ */
+function conPromo(p: FoundProduct): FoundProduct {
+  const activas = promocionesActivas()
+  if (!activas.length) return p
+  const { precio, precioPleno, promo } = precioEfectivo(p.codigo, p.precio, activas)
+  if (!promo) return p
+  return { ...p, precio, precioPleno, promo: { id: promo.id, nombre: promo.nombre, pct: promo.pct, texto: promo.texto } }
 }
 
 // ---------- tabla de alias (sinónimos → familia de slugs) ----------
@@ -320,7 +340,7 @@ export function similarProducts(query: string, limit = 3): SimilarProduct[] {
 
 /** Rango de precios del catálogo visible (para la respuesta general de "¿precios?"). */
 export function priceRange(): { min: number, max: number } {
-  const precios = buildIndex().map(e => e.p.precio).filter(n => Number.isFinite(n) && n > 0)
+  const precios = buildIndex().map(e => conPromo(e.p).precio).filter(n => Number.isFinite(n) && n > 0)
   if (!precios.length) return { min: 0, max: 0 }
   return { min: Math.min(...precios), max: Math.max(...precios) }
 }

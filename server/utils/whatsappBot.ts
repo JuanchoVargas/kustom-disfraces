@@ -441,9 +441,13 @@ function productoFicha(p: FoundProduct, requestedSize: string | null): WaMessage
     }
     else sizeLine = `⚠️ Talla *${requestedSize}* no disponible en este. Tallas: ${tallas}\n`
   }
+  // Promoción por fecha (Batman Day): precio con descuento, pleno tachado y condiciones.
+  const precioLinea = p.promo && p.precioPleno
+    ? `💲 ${formatCOP(p.precio)} ~${formatCOP(p.precioPleno)}~ (-${p.promo.pct} %) · envío gratis 🚚\n🦇 ${p.promo.texto}\n`
+    : `💲 ${formatCOP(p.precio)} · envío gratis 🚚\n`
   return waButtons(
     `🎭 *${p.nombre}*\n`
-    + `💲 ${formatCOP(p.precio)} · envío gratis 🚚\n`
+    + precioLinea
     + `📏 Tallas: ${tallas}\n`
     + faltan
     + sizeLine
@@ -586,7 +590,7 @@ function resultadosList(matches: FoundProduct[], requestedSize: string | null): 
     g.rows.push({
       id: `prod:${p.slug}`,
       title: p.nombre,
-      description: `${formatCOP(p.precio)} · tallas ${p.tallas.join(', ')}`,
+      description: `${formatCOP(p.precio)}${p.promo ? ` (-${p.promo.pct} % ${p.promo.nombre})` : ''} · tallas ${p.tallas.join(', ')}`,
     })
   }
   const sections = [...groups.values()]
