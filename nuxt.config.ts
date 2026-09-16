@@ -117,6 +117,9 @@ export default defineNuxtConfig({
     // interactivo). Mientras cazamos por qué Meta acepta y descarta el interactivo.
     // Override en runtime (Vercel) sin redeploy de código.
     whatsappForceTextMenu: process.env.NUXT_WHATSAPP_FORCE_TEXT_MENU === 'true', // -> NUXT_WHATSAPP_FORCE_TEXT_MENU ('true' para forzar texto)
+    // Depuración de webhooks SIN datos personales: con 'true' se registra la
+    // ESTRUCTURA del payload (claves y tipos), nunca valores. Ver server/utils/logSafe.ts.
+    debugPayloads: process.env.NUXT_DEBUG_PAYLOADS === 'true', // -> NUXT_DEBUG_PAYLOADS (default false)
     // Promesa comercial que el bot añade al mensaje de precios ("20% de descuento
     // y envío gratis"). Es una PROMOCIÓN: se apaga poniendo la variable VACÍA en
     // Vercel, sin deploy. Sin definir = texto por defecto (el que pidió el cliente).

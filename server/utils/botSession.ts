@@ -9,6 +9,7 @@ import { downloadFromUrl, downloadWaMedia, saveMediaChecked } from './media'
 import { sendHandoffAlert } from './orderEmail'
 import { recordFailedSearch } from './botDemand'
 import { sendTemplateMessage } from './whatsapp'
+import { maskId } from './logSafe'
 
 /**
  * Ciclo de vida de un mensaje entrante compartido por los tres canales (wa/msg/ig):
@@ -96,13 +97,13 @@ export async function openBotSession(canal: Canal, externalId: string, incoming:
       if (conv.estado === 'humano' && await autoReturnToBot(conv.id)) {
         conv.estado = 'bot'
         autoReturned = true
-        console.info(`[${canal}] ⏱️ conversación #${conv.id} (${externalId}) devuelta al BOT (${HUMAN_TIMEOUT_MIN} min sin agente)`)
+        console.info(`[${canal}] ⏱️ conversación #${conv.id} (${maskId(externalId)}) devuelta al BOT (${HUMAN_TIMEOUT_MIN} min sin agente)`)
       }
     }
   }
   catch (err) {
     conv = null // sesión degradada: sin bandeja ni dedupe, pero el bot responde
-    console.error(`[${canal}] ⚠️ BD caída al abrir sesión de ${externalId} — el bot responde igual (estado en memoria):`, String((err as Error)?.message ?? err))
+    console.error(`[${canal}] ⚠️ BD caída al abrir sesión de ${maskId(externalId)} — el bot responde igual (estado en memoria):`, String((err as Error)?.message ?? err))
   }
   // loadBotState nunca lanza: degrada por sí solo al Map en memoria.
   const state = await loadBotState(canal, externalId)
@@ -149,7 +150,7 @@ export async function closeBotSession(input: CloseBotSessionInput): Promise<void
   // SKU y la talla y la conversación queda etiquetada "espera stock" (remarketing al
   // reponer). Best-effort: si la BD falla, el cliente ya recibió su respuesta.
   if (stockEspera && conv) {
-    console.info(`[${canal}] 🔔 ESPERA STOCK: ${externalId} quiere ${stockEspera.producto} (${stockEspera.sku})${stockEspera.talla ? ` talla ${stockEspera.talla}` : ' sin talla'}`)
+    console.info(`[${canal}] 🔔 ESPERA STOCK: ${maskId(externalId)} quiere ${stockEspera.producto} (${stockEspera.sku})${stockEspera.talla ? ` talla ${stockEspera.talla}` : ' sin talla'}`)
     try {
       await saveStockEspera({ conversationId: conv.id, canal, externalId, sku: stockEspera.sku, producto: stockEspera.producto, talla: stockEspera.talla ?? null })
     }
@@ -160,12 +161,13 @@ export async function closeBotSession(input: CloseBotSessionInput): Promise<void
   // LEAD con teléfono: se guarda en la conversación, queda NO LEÍDA y se avisa a ventas
   // (correo + WhatsApp al encargado), sin apagar el bot.
   if (leadPhone) {
-    console.info(`[${canal}] 📲 LEAD: ${externalId}${incoming.profileName ? ` (${incoming.profileName})` : ''} dejó el celular ${leadPhone}`)
+    // Sin nombre ni celular completo: el dato queda en la bandeja, no en el log.
+    console.info(`[${canal}] 📲 LEAD: ${maskId(externalId)} dejó un celular (${maskId(leadPhone)})${conv ? ` conv=#${conv.id}` : ''}`)
     try {
       if (conv) await saveLeadPhone(conv.id, leadPhone)
     }
     catch (err) {
-      console.error(`[${canal}] ⚠️ BD caída guardando el lead ${leadPhone}:`, String((err as Error)?.message ?? err))
+      console.error(`[${canal}] ⚠️ BD caída guardando el lead ${maskId(leadPhone)}:`, String((err as Error)?.message ?? err))
     }
     const nombre = incoming.profileName || conv?.nombre || undefined
     const texto = `📲 Dejó su celular: ${leadPhone} — ${incomingToText(incoming)}`
@@ -182,7 +184,7 @@ export async function closeBotSession(input: CloseBotSessionInput): Promise<void
     if (delivered && incoming.wamid) await markWamidReplied(incoming.wamid)
   }
   catch (err) {
-    console.error(`[${canal}] ⚠️ BD caída al persistir salientes de ${externalId} (la respuesta YA se envió):`, String((err as Error)?.message ?? err))
+    console.error(`[${canal}] ⚠️ BD caída al persistir salientes de ${maskId(externalId)} (la respuesta YA se envió):`, String((err as Error)?.message ?? err))
   }
   // saveBotState nunca lanza: degrada por sí solo al Map en memoria.
   await saveBotState(canal, externalId, patch)
@@ -191,7 +193,7 @@ export async function closeBotSession(input: CloseBotSessionInput): Promise<void
     // Handoff pedido por el cliente: pasa a humano, se marca no leída y se avisa a
     // ventas. Las ALERTAS (correo + WhatsApp al encargado) salen AUNQUE la BD esté
     // caída (conv null): sin bandeja disponible son el único rastro del pedido.
-    console.info(`[${canal}] 🙋 conversación ${conv ? `#${conv.id}` : `(sin BD)`} pasa a ATENCIÓN HUMANA: ${externalId}${incoming.profileName ? ` (${incoming.profileName})` : ''}`)
+    console.info(`[${canal}] 🙋 conversación ${conv ? `#${conv.id}` : `(sin BD)`} pasa a ATENCIÓN HUMANA: ${maskId(externalId)}`)
     try {
       if (conv) {
         await setEstado(conv.id, 'humano', { markUnread: true })
@@ -203,7 +205,7 @@ export async function closeBotSession(input: CloseBotSessionInput): Promise<void
       }
     }
     catch (err) {
-      console.error(`[${canal}] ⚠️ BD caída al marcar handoff de ${externalId} — las alertas salen igual:`, String((err as Error)?.message ?? err))
+      console.error(`[${canal}] ⚠️ BD caída al marcar handoff de ${maskId(externalId)} — las alertas salen igual:`, String((err as Error)?.message ?? err))
     }
     const nombre = incoming.profileName || conv?.nombre || undefined
     const ultimoMensaje = incomingToText(incoming)
@@ -282,8 +284,8 @@ async function notifyManagerWhatsApp(canal: Canal, externalId: string, nombre: s
       templateParam(ultimoMensaje, 200),
     ]
     const ok = await sendTemplateMessage(to, String(c.alertTemplateName || 'alerta_atencion'), params)
-    if (ok) console.info(`[inbox-alert] alerta por WhatsApp enviada a ${to}`)
-    else console.error(`[inbox-alert] alerta por WhatsApp NO enviada a ${to} (ver error de Graph arriba); el correo a ventas@ es el respaldo`)
+    if (ok) console.info(`[inbox-alert] alerta por WhatsApp enviada a ${maskId(to)}`)
+    else console.error(`[inbox-alert] alerta por WhatsApp NO enviada a ${maskId(to)} (ver error de Graph arriba); el correo a ventas@ es el respaldo`)
   }
   catch (err) {
     console.error('[inbox-alert] error inesperado en la alerta por WhatsApp:', String((err as Error)?.message ?? err))

@@ -1,4 +1,5 @@
 import { dbConfigured, ensureSchema, sql } from './db'
+import { maskId } from './logSafe'
 
 /**
  * REGISTRO DE BÚSQUEDAS FALLIDAS del bot (reporte de demanda). Cada "no
@@ -16,7 +17,10 @@ export interface FailedSearch {
 }
 
 export async function recordFailedSearch(f: FailedSearch): Promise<void> {
-  console.warn(`[bot-nf] canal=${f.canal} from=${f.externalId ?? '—'} motivo=${f.motivo} texto=${JSON.stringify(f.texto)} termino=${JSON.stringify(f.termino)} sugerencias=${f.sugerencias.map(s => `${s.slug}(${s.score},${s.motivo})`).join(',') || 'ninguna'}`)
+  // El texto y el término son del cliente: quedan en la tabla (y en /api/inbox/demanda),
+  // no en el log. Aquí solo el evento: canal, remitente enmascarado, motivo y sugerencias.
+  const chars = [...f.texto].length
+  console.warn(`[bot-nf] canal=${f.canal} from=${maskId(f.externalId)} motivo=${f.motivo} chars=${chars} sugerencias=${f.sugerencias.map(s => `${s.slug}(${s.score},${s.motivo})`).join(',') || 'ninguna'}`)
   if (!dbConfigured()) return
   try {
     await ensureSchema()

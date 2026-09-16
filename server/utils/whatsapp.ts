@@ -8,6 +8,8 @@
  *  - texto del cuerpo (body): ≤ 1024
  */
 
+import { maskId, redactDigits } from './logSafe'
+
 const GRAPH_VERSION = 'v21.0'
 
 export interface WaButton { id: string, title: string }
@@ -306,7 +308,9 @@ function recipientFields(to: string): Record<string, string> {
 export async function sendWhatsAppMessage(to: string, message: WaMessage): Promise<boolean> {
   const { whatsappToken, whatsappPhoneId } = useRuntimeConfig()
   if (!whatsappToken || !whatsappPhoneId) {
-    console.warn('[whatsapp] sin token/phone_id — no se envía (mensaje planeado):', JSON.stringify(message))
+    // El mensaje planeado no se imprime (puede citar lo que escribió el cliente):
+    // la bandeja lo guarda igual y ahí se consulta.
+    console.warn(`[whatsapp] sin token/phone_id — no se envía (mensaje planeado: tipo=${message.type})`)
     return false
   }
   try {
@@ -319,9 +323,9 @@ export async function sendWhatsAppMessage(to: string, message: WaMessage): Promi
   }
   catch (err: any) {
     // Detalle REAL de Graph (code/title/details) — clave para depurar destinos
-    // BSUID; se redacta el Bearer por si apareciera en el error.
-    const detail = JSON.stringify(err?.data ?? err?.response?._data ?? err?.message ?? err).replace(/Bearer\s+[^\s"']+/gi, 'Bearer ***')
-    console.error(`[whatsapp] fallo al enviar a ${to} (${/^\d+$/.test(to) ? 'to=teléfono' : 'recipient=BSUID'}):`, detail)
+    // BSUID; se redacta el Bearer y los números largos (el destinatario suele venir).
+    const detail = redactDigits(JSON.stringify(err?.data ?? err?.response?._data ?? err?.message ?? err).replace(/Bearer\s+[^\s"']+/gi, 'Bearer ***'))
+    console.error(`[whatsapp] fallo al enviar a ${maskId(to)} (${/^\d+$/.test(to) ? 'to=teléfono' : 'recipient=BSUID'}):`, detail)
     return false
   }
 }
@@ -363,7 +367,7 @@ export async function uploadWhatsAppMedia(data: Buffer, mime: string, filename: 
 export async function sendTemplateMessage(to: string, templateName: string, params: string[], lang = 'es'): Promise<boolean> {
   const { whatsappToken, whatsappPhoneId } = useRuntimeConfig()
   if (!whatsappToken || !whatsappPhoneId) {
-    console.warn(`[whatsapp] sin token/phone_id — no se envía plantilla ${templateName} a ${to}`)
+    console.warn(`[whatsapp] sin token/phone_id — no se envía plantilla ${templateName} a ${maskId(to)}`)
     return false
   }
   try {
@@ -385,8 +389,8 @@ export async function sendTemplateMessage(to: string, templateName: string, para
   }
   catch (err: any) {
     // Detalle real de Graph en err.data (plantilla no aprobada, params de más, etc.).
-    const detail = JSON.stringify(err?.data ?? err?.response?._data ?? err?.message ?? err).replace(/Bearer\s+[^\s"']+/gi, 'Bearer ***')
-    console.error(`[whatsapp] fallo al enviar plantilla ${templateName} a ${to}:`, detail)
+    const detail = redactDigits(JSON.stringify(err?.data ?? err?.response?._data ?? err?.message ?? err).replace(/Bearer\s+[^\s"']+/gi, 'Bearer ***'))
+    console.error(`[whatsapp] fallo al enviar plantilla ${templateName} a ${maskId(to)}:`, detail)
     return false
   }
 }

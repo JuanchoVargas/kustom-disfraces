@@ -14,18 +14,15 @@
  */
 import type { WaIncoming } from '../utils/whatsappBot'
 import type { WaMessage } from '../utils/whatsapp'
+import { logPayloadShape, maskId } from '../utils/logSafe'
 
 export default defineEventHandler(async (event) => {
   const body = await readBody(event).catch(() => null)
 
-  // ⏳ LOG TEMPORAL (quitar ~24h después de cazar el bot mudo): payload COMPLETO
-  // de TODOS los webhooks, sin recortes ni resúmenes, ANTES de cualquier parseo.
-  // Hay remitentes con dos checks grises (Meta SÍ entregó y disparó el webhook)
-  // que igual no reciben respuesta: con esto queda el JSON exacto que llegó.
-  console.log('[wa-raw]', JSON.stringify(body))
-  // Radiografía del parseo: entries, changes con su field, y messages/statuses
-  // encontrados en cada uno — para ver de un vistazo qué clasificó el parser.
-  console.log('[wa-parse]', parseDebugSummary(body))
+  // Nunca se registra el payload: trae teléfono, nombre y texto del cliente. Con
+  // NUXT_DEBUG_PAYLOADS=true queda solo su ESTRUCTURA (claves y tipos), que es lo
+  // que sirve para ver por qué el parser clasifica mal un webhook.
+  logPayloadShape('wa-webhook', body)
 
   // VISIBILIDAD: los eventos "statuses" (entregado/leído/FALLIDO) no traen mensaje.
   // Un status "failed" es justamente donde muere un interactivo aceptado por Graph
@@ -50,7 +47,7 @@ async function handleIncoming(incoming: WaIncoming): Promise<number> {
   const session = await openBotSession('wa', incoming.from, incoming)
   const conv = session.conv
   const log = (extra: string) => console.info(
-    `[whatsapp] wamid=${incoming.wamid ?? '—'} from=${incoming.from} kind=${incoming.kind}`
+    `[whatsapp] wamid=${incoming.wamid ?? '—'} from=${maskId(incoming.from)} kind=${incoming.kind}`
     + ` conv=${conv ? `#${conv.id}` : 'SIN-BD'} estado=${conv?.estado ?? '—'}`
     + ` flagged=${session.state.flaggedForHuman ? 'sí' : 'no'} dup=${session.duplicate ? 'sí' : 'no'}`
     + `${session.autoReturned ? ' autoReturn=sí' : ''} ${extra}`,
@@ -93,7 +90,7 @@ async function handleIncoming(incoming: WaIncoming): Promise<number> {
   for (const msg of outgoing) {
     const violations = forceText ? [] : validateInteractive(msg)
     if (violations.length) {
-      console.error(`[whatsapp] payload interactivo inválido para ${incoming.from} — degradando a texto:`, violations.join('; '))
+      console.error(`[whatsapp] payload interactivo inválido para ${maskId(incoming.from)} — degradando a texto:`, violations.join('; '))
     }
     const skipInteractive = forceText && msg.type === 'interactive'
     const ok = (skipInteractive || violations.length) ? false : await sendWhatsAppMessage(incoming.from, msg)

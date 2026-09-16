@@ -213,18 +213,21 @@ export default defineEventHandler(async (event) => {
   // la preferencia. Se resuelve ANTES de failWithAlert para que la alerta también
   // incluya los datos de envío si Woo llegara a fallar.
   const buyer = await recoverBuyer(payment, mpAccessToken)
-  if (buyer) console.info(`[mp-webhook] comprador recuperado: ${buyer.nombre} · ${buyer.ciudad}/${buyer.departamento} · ${buyer.direccion}`)
+  // Sin nombre ni dirección en el log: van a la orden de Woo y al correo de ventas.
+  if (buyer) console.info(`[mp-webhook] comprador recuperado para el pago ${payment.id}: destino ${buyer.ciudad}/${buyer.departamento}`)
   else console.warn(`[mp-webhook] sin datos de comprador en la preferencia del pago ${payment.id} (se crea orden con datos del pagador de MP)`)
 
   // Fallo al crear la orden (cualquier causa): registra TODO, ALERTA a ventas@ (una
   // vez por paymentId) y responde 5xx para que MP REINTENTE. Así ningún pago pasa
   // desapercibido y un fallo temporal se recupera solo en el próximo reintento.
   const failWithAlert = async (reason: string): Promise<never> => {
+    // Para recuperar el pago basta el paymentId: con él se consulta el pago en MP
+    // (pagador, envío). Ni el correo ni los datos de envío van al log.
     console.error(
       `[mp-webhook] ⚠️ pago APROBADO SIN orden (${reason}). Recuperar. `
       + `paymentId=${payment.id} monto=$${payment.transaction_amount} `
-      + `pagador=${payment.payer?.email ?? '-'} items=${JSON.stringify(orderItems)} `
-      + `envío=${buyer ? JSON.stringify(buyer) : '-'}`,
+      + `items=${JSON.stringify(orderItems.map(i => ({ sku: i.sku, talla: i.talla, cantidad: i.quantity })))} `
+      + `datosEnvio=${buyer ? 'sí' : 'no'}`,
     )
     const alert = await sendOrderFailureAlert({
       paymentId: String(payment.id),

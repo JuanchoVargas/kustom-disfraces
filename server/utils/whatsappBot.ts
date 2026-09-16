@@ -4,6 +4,7 @@ import type { MediaKind } from './media'
 import { waButtons, waList, waListSections, waText } from './whatsapp'
 import { getPublico, getPublicos, publicoNombre, subNombre } from './catalogNav'
 import { formatCOP, getProductBySlug, hasSize, searchProducts } from './productSearch'
+import { maskId, redactDigits } from './logSafe'
 
 /**
  * Árbol de decisión del bot de WhatsApp (Fase 1). `buildBotReplies` es una función
@@ -83,7 +84,8 @@ function parseWaMessage(msg: any, value: any): WaIncoming | null {
   const rawFrom = msg?.from ?? msg?.from_user_id ?? contacts[0]?.wa_id ?? contacts[0]?.user_id
   if (!rawFrom) {
     // Sin NINGÚN identificador no hay a quién responder — pero jamás en silencio.
-    console.error('[whatsapp] ❌ mensaje SIN identidad de remitente (ni from, ni from_user_id, ni contacts) — msg:', JSON.stringify(msg))
+    // Solo estructura: el mensaje trae el texto del cliente y no va al log.
+    console.error(`[whatsapp] ❌ mensaje SIN identidad de remitente (ni from, ni from_user_id, ni contacts) — tipo=${msg?.type ?? '?'} wamid=${msg?.id ?? '?'} claves=${Object.keys(msg ?? {}).join(',') || 'ninguna'}`)
     return null
   }
   const from = String(rawFrom)
@@ -167,35 +169,10 @@ export function parseIncoming(body: any): WaIncoming | null {
 }
 
 /**
- * Radiografía ESTRUCTURAL del webhook para el log [wa-parse]: cuántos entries,
- * cuántos changes por entry con su `field`, y cuántos messages (con tipos y from)
- * y statuses encontró en cada value. Sirve para comparar contra [wa-raw] y ver en
- * qué paso el parser clasifica mal un payload real de Meta.
- */
-export function parseDebugSummary(body: any): string {
-  const entries: any[] = Array.isArray(body?.entry) ? body.entry : []
-  if (!entries.length) return `entries=0 keys=${Object.keys(body ?? {}).join(',') || 'body vacío'}`
-  const parts: string[] = [`entries=${entries.length}`]
-  entries.forEach((entry, ei) => {
-    const changes: any[] = Array.isArray(entry?.changes) ? entry.changes : []
-    if (!changes.length) parts.push(`e${ei}: changes=0 keys=${Object.keys(entry ?? {}).join(',')}`)
-    changes.forEach((change, ci) => {
-      const value = change?.value
-      const messages: any[] = Array.isArray(value?.messages) ? value.messages : []
-      const statuses: any[] = Array.isArray(value?.statuses) ? value.statuses : []
-      const msgInfo = messages.length
-        ? ` [${messages.map(m => `${m?.type ?? '?'}←${m?.from ?? m?.from_user_id ?? '?'}`).join(', ')}]`
-        : ''
-      parts.push(`e${ei}.c${ci} field=${change?.field ?? '—'} messages=${messages.length}${msgInfo} statuses=${statuses.length}${!messages.length && !statuses.length ? ` valueKeys=${Object.keys(value ?? {}).join(',') || 'ninguna'}` : ''}`)
-    })
-  })
-  return parts.join(' | ')
-}
-
-/**
  * Resumen corto de un webhook SIN mensajes, para el log obligatorio: qué statuses
  * traía (sent/delivered/read/failed) o, si no trae nada reconocible, sus claves.
  * Así un evento con forma inesperada deja rastro en vez de ignorarse a ciegas.
+ * El destinatario de cada status va enmascarado (últimos 4).
  */
 export function webhookSummary(body: any): string {
   const kinds: string[] = []
@@ -204,7 +181,7 @@ export function webhookSummary(body: any): string {
     for (const change of (Array.isArray(entry?.changes) ? entry.changes : [])) {
       const value = change?.value
       const statuses: any[] = Array.isArray(value?.statuses) ? value.statuses : []
-      for (const st of statuses) kinds.push(`status:${st?.status ?? '?'}→${st?.recipient_id ?? '?'}`)
+      for (const st of statuses) kinds.push(`status:${st?.status ?? '?'}→${maskId(st?.recipient_id)}`)
       const errors: any[] = Array.isArray(value?.errors) ? value.errors : []
       for (const e of errors) kinds.push(`error:${e?.code ?? '?'}`)
       if (!statuses.length && !errors.length && !Array.isArray(value?.messages)) {
@@ -227,9 +204,10 @@ export function logFailedStatuses(body: any): void {
   if (!Array.isArray(statuses)) return
   for (const st of statuses) {
     if (st?.status !== 'failed') continue
+    // El detalle de Graph puede repetir el número del destinatario: se redacta.
     console.error(
-      `[whatsapp] ❌ status=failed wamid=${st?.id ?? '?'} to=${st?.recipient_id ?? '?'} — errors:`,
-      JSON.stringify(st?.errors ?? [], null, 2),
+      `[whatsapp] ❌ status=failed wamid=${st?.id ?? '?'} to=${maskId(st?.recipient_id)} — errors:`,
+      redactDigits(JSON.stringify(st?.errors ?? [], null, 2)),
     )
   }
 }

@@ -385,10 +385,10 @@ export async function sendOrderConfirmationEmail(
         headers: { 'List-Unsubscribe': LIST_UNSUB },
       }))
       customerSent = true
-      console.info(`[order-email] confirmación enviada al cliente ${buyer} (pago ${data.paymentId})`)
+      console.info(`[order-email] confirmación enviada al cliente (pago ${data.paymentId})`)
     }
     catch (err) {
-      console.error(`[order-email] fallo al enviar la confirmación al cliente ${buyer} (pago ${data.paymentId}):`, String((err as Error)?.message ?? err))
+      console.error(`[order-email] fallo al enviar la confirmación al cliente (pago ${data.paymentId}):`, String((err as Error)?.message ?? err))
     }
   }
 
@@ -519,7 +519,7 @@ export async function sendOrderFailureAlert(data: OrderFailureAlert): Promise<{ 
       headers: { 'List-Unsubscribe': LIST_UNSUB },
     })
     alertedPayments.add(claveDedupe) // marcar SOLO tras enviar OK (si falla, un reintento lo reintenta)
-    console.info(`[order-alert] alerta enviada a ${to} (pago ${data.paymentId}, causa: ${data.reason})`)
+    console.info(`[order-alert] alerta enviada al buzón de ventas (pago ${data.paymentId}, causa: ${data.reason})`)
     return { sent: true }
   }
   catch (err) {
@@ -609,7 +609,7 @@ export async function sendHandoffAlert(data: HandoffAlert): Promise<{ sent: bool
       html,
       headers: { 'List-Unsubscribe': LIST_UNSUB },
     })
-    console.info(`[inbox-alert] aviso de handoff #${data.conversationId} enviado a ${to}`)
+    console.info(`[inbox-alert] aviso de handoff #${data.conversationId} enviado al buzón de ventas`)
     return { sent: true }
   }
   catch (err) {

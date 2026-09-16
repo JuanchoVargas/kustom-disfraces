@@ -11,9 +11,11 @@
 import type { WaIncoming } from '../utils/whatsappBot'
 import type { MessengerMessage } from '../utils/messenger'
 import type { MediaKind } from '../utils/media'
+import { logPayloadShape, maskId } from '../utils/logSafe'
 
 export default defineEventHandler(async (event) => {
   const body = await readBody(event).catch(() => null)
+  logPayloadShape('msg-webhook', body) // solo estructura y solo con NUXT_DEBUG_PAYLOADS=true
   const object = body?.object
   if (object !== 'page' && object !== 'instagram') {
     return { received: true, ignored: true } // otros objetos (p. ej. verificaciones cruzadas)
@@ -38,7 +40,7 @@ export default defineEventHandler(async (event) => {
       const session = await openBotSession(channel, String(senderId), incoming)
       // Dedupe de reintentos (mismo mid ya respondido o en vuelo) y silencio por humano.
       if (session.skip) {
-        console.info(`[${channel}] mid=${incoming.wamid ?? '—'} from=${senderId} replied=false skip=${session.skip}`)
+        console.info(`[${channel}] mid=${incoming.wamid ?? '—'} from=${maskId(senderId)} replied=false skip=${session.skip}`)
         continue
       }
       if (session.silenced) continue

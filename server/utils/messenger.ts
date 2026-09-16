@@ -1,5 +1,6 @@
 import type { WaMessage } from './whatsapp'
 import { interactiveOptions, waNumberedFallback } from './whatsapp'
+import { maskId, redactDigits } from './logSafe'
 
 /**
  * Adaptador de SALIDA para Messenger e Instagram (Graph Send API). El cerebro del
@@ -130,7 +131,7 @@ export async function sendMessengerAttachment(recipientId: string, type: Messeng
   }
   catch (err: any) {
     const detail = err?.data ?? err?.response?._data ?? err?.message ?? err
-    console.error(`[messenger] fallo al enviar adjunto a ${recipientId}:`, JSON.stringify(detail))
+    console.error(`[messenger] fallo al enviar adjunto a ${maskId(recipientId)}:`, redactDigits(JSON.stringify(detail)))
     return false
   }
 }
@@ -147,7 +148,9 @@ export function messengerConfigured(): boolean {
 export async function sendMessengerMessage(recipientId: string, message: MessengerMessage): Promise<boolean> {
   const { messengerPageToken } = useRuntimeConfig()
   if (!messengerPageToken) {
-    console.warn('[messenger] sin page token — no se envía (mensaje planeado):', JSON.stringify(message))
+    // El mensaje planeado no se imprime (puede citar lo que escribió el cliente):
+    // la bandeja lo guarda igual y ahí se consulta.
+    console.warn(`[messenger] sin page token — no se envía (mensaje planeado: ${message.quick_replies?.length ? `${message.quick_replies.length} opciones, ` : ''}${[...String(message.text ?? '')].length} caracteres)`)
     return false
   }
   try {
@@ -159,9 +162,10 @@ export async function sendMessengerMessage(recipientId: string, message: Messeng
     return true
   }
   catch (err: any) {
-    // El detalle real de Graph viene en err.data (fetch de ofetch). Se loguea completo.
+    // El detalle real de Graph viene en err.data (fetch de ofetch). Se loguea con
+    // los números largos (ids de usuario) enmascarados.
     const detail = err?.data ?? err?.response?._data ?? err?.message ?? err
-    console.error(`[messenger] fallo al enviar a ${recipientId}:`, JSON.stringify(detail))
+    console.error(`[messenger] fallo al enviar a ${maskId(recipientId)}:`, redactDigits(JSON.stringify(detail)))
     return false
   }
 }
