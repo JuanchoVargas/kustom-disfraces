@@ -41,5 +41,24 @@ export const useCartStore = defineStore('cart', () => {
     items.value = []
   }
 
-  return { items, count, subtotal, add, remove, setQty, clear, drawerOpen, openDrawer, closeDrawer }
+  /**
+   * Refresca el precio de cada ítem por SKU contra el catálogo ACTUAL (con la
+   * promoción por fecha ya aplicada por el servidor). El precio de una línea del
+   * carrito es el que el cliente vio al añadirla; si una promoción empieza o
+   * termina con el carrito armado, esta función lo actualiza sin perder líneas.
+   * Devuelve los cambios para poder avisar ("los precios cambiaron").
+   */
+  function refrescarPrecios(precioDe: (sku: string) => number | undefined): { sku: string, antes: number, despues: number }[] {
+    const cambios: { sku: string, antes: number, despues: number }[] = []
+    for (const it of items.value) {
+      if (!it.sku) continue
+      const nuevo = precioDe(it.sku)
+      if (typeof nuevo !== 'number' || !(nuevo > 0) || nuevo === it.price) continue
+      cambios.push({ sku: it.sku, antes: it.price, despues: nuevo })
+      it.price = nuevo
+    }
+    return cambios
+  }
+
+  return { items, count, subtotal, add, remove, setQty, clear, refrescarPrecios, drawerOpen, openDrawer, closeDrawer }
 })

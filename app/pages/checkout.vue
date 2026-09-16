@@ -5,9 +5,32 @@
  * electrónica + envío y, al enviar, crea la preferencia de MP con esos datos
  * (vía metadata) y redirige a la pantalla de pago. WhatsApp NO pasa por aquí.
  */
+import type { Cotizacion } from '~/composables/useMercadoPago'
+
 const cart = useCartStore()
 const router = useRouter()
-const { pay, loading, error: payError } = useMercadoPago()
+const { pay, cotizar, loading, error: payError, aviso } = useMercadoPago()
+
+// PRECIOS VIGENTES: al abrir la página se pide un dry_run al servidor (sin datos
+// del comprador); el carrito se refresca con esos precios y el total que se ve es
+// el que decide el servidor (promoción por fecha incluida). Al pagar se mandan
+// esos mismos precios como unit_price: el cliente paga lo que vio.
+const cotizacion = ref<Cotizacion | null>(null)
+const cotizando = ref(false)
+async function recotizar() {
+  cotizando.value = true
+  cotizacion.value = await cotizar()
+  cotizando.value = false
+}
+onMounted(recotizar)
+// Tras un 422 price_mismatch, pay() ya recotizó; se refleja aquí para las etiquetas.
+watch(aviso, (a) => { if (a) recotizar() })
+const promoDe = (sku?: string) => {
+  const l = sku ? cotizacion.value?.lineas.find(x => x.sku === sku) : undefined
+  return l?.promo_id && l.precio_pleno > l.unit_price
+    ? `${l.promo_nombre ?? 'Promoción'} -${Math.round((1 - l.unit_price / l.precio_pleno) * 100)} %`
+    : ''
+}
 
 useHead({
   title: 'Datos de tu compra — Kustom Disfraces',
@@ -168,6 +191,7 @@ async function onSubmit() {
           </label>
           <span v-if="errors.acepta" class="msg msg--check">{{ errors.acepta }}</span>
 
+          <p v-if="aviso" class="payaviso" role="status">{{ aviso }}</p>
           <p v-if="payError" class="payerr" role="alert">{{ payError }}</p>
 
           <KButton type="submit" variant="primary" size="lg" block :loading="loading">
@@ -187,6 +211,7 @@ async function onSubmit() {
               <div class="si__info">
                 <p class="si__name">{{ it.name }}</p>
                 <p class="si__meta">Talla {{ it.size }}<template v-if="it.gama"> · {{ it.gama }}</template> · x{{ it.quantity }}</p>
+                <p v-if="promoDe(it.sku)" class="si__promo">{{ promoDe(it.sku) }}</p>
               </div>
               <strong class="si__price">{{ formatCOP(it.price * it.quantity) }}</strong>
             </li>
@@ -195,6 +220,7 @@ async function onSubmit() {
             <span>Total</span>
             <strong>{{ formatCOP(cart.subtotal) }}</strong>
           </div>
+          <p v-if="cotizando" class="summary__cot">Verificando precios vigentes…</p>
           <p class="summary__ship">El envío se coordina tras la compra.</p>
           <NuxtLink to="/carrito" class="summary__back">← Volver al carrito</NuxtLink>
         </aside>
@@ -258,6 +284,9 @@ async function onSubmit() {
 .check a { color: var(--purple); text-decoration: underline; }
 .check.err span { color: var(--fucsia); }
 .payerr { font-size: 13px; color: var(--fucsia); text-align: center; }
+.payaviso { font-size: 13px; color: var(--purple); font-weight: 700; text-align: center; }
+.si__promo { font-size: 12px; color: var(--purple); font-weight: 700; margin: 2px 0 0; }
+.summary__cot { font-size: 12px; color: var(--mut-2); text-align: center; }
 .form__note { font-size: 12px; color: var(--mut-2); text-align: center; margin-top: -4px; }
 
 /* doc + número en una fila: 30/70 (el select es corto, el número necesita más espacio) */

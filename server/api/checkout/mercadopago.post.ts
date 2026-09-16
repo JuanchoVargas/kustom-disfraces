@@ -67,9 +67,20 @@ export default defineEventHandler(async (event) => {
    * Los errores (422, 409) se comportan igual que en una compra de verdad.
    */
   const dryRun = body?.dry_run === true
+  // GUARDA DEL OVERRIDE DE HORA (NUXT_PROMO_AHORA, solo Preview): con la hora
+  // simulada solo se admite dry_run. El Preview tiene credenciales de MP y comparte
+  // Woo y Neon con producción: un pago real con precios de otra fecha sería real.
+  if (!dryRun && promoOverrideActivo()) {
+    console.warn('[mercadopago] pago real rechazado: NUXT_PROMO_AHORA activo (solo dry_run)')
+    throw createError({ statusCode: 403, message: 'Este entorno de pruebas no acepta pagos reales', data: { code: 'promo_override' } })
+  }
   if (!rawItems.length) {
     throw createError({ statusCode: 422, message: 'Carrito vacío' })
   }
+  // COTIZACIÓN: un dry_run SIN comprador solo calcula precios y totales vigentes
+  // (lo pide /checkout al cargar y tras un 422 price_mismatch). Con comprador, el
+  // dry_run valida todo el camino como una compra real.
+  const soloCotizacion = dryRun && (body?.buyer === undefined || body?.buyer === null)
 
   // ---------- datos del comprador (envío obligatorio + factura opcional) ----------
   // Se validan en el servidor (no solo en el form): sin ellos no se crea la
@@ -102,7 +113,7 @@ export default defineEventHandler(async (event) => {
   if (!buyer.localidad) missing.push('localidad')
   if (!buyer.barrio) missing.push('barrio')
   if (!buyer.direccion) missing.push('direccion')
-  if (missing.length) {
+  if (missing.length && !soloCotizacion) {
     throw createError({ statusCode: 422, message: 'Datos de envío incompletos', data: { code: 'buyer_invalid', fields: missing } })
   }
 
@@ -124,6 +135,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 502, message: 'No se pudo validar el catálogo' })
   }
 
+  const lineas: { sku: string, size: string, quantity: number, unit_price: number, precio_pleno: number, promo_id: string | null, promo_nombre: string | null }[] = []
   const items: MpPreferenceItem[] = rawItems.map((raw, idx): MpPreferenceItem => {
     const sku = String(raw?.sku ?? '').trim()
     const quantity = Math.trunc(Number(raw?.quantity))
@@ -156,6 +168,8 @@ export default defineEventHandler(async (event) => {
     const gama = String(raw?.gama ?? '').trim().slice(0, 60)
     const detail = size ? ` (Talla ${size}${gama ? `, ${gama}` : ''})` : ''
     const picture_url = pictureFor(real.slug)
+    // Línea cotizada (para el dry_run y el anclaje del precio): lo que se cobra hoy y por qué.
+    lineas.push({ sku, size, quantity, unit_price: real.price, precio_pleno: real.precioPleno, promo_id: real.promoId, promo_nombre: real.promoNombre })
 
     return {
       id: sku,
@@ -223,14 +237,18 @@ export default defineEventHandler(async (event) => {
   // Aquí acaba la prueba en seco: todo lo de arriba ya se validó y la preferencia
   // está armada, pero no se envía. No se crea nada en Mercado Pago.
   if (dryRun) {
-    console.warn(`[mercadopago] dry_run: preferencia NO creada (${items.length} ítem(s), ref ${externalRef})`)
+    console.warn(`[mercadopago] dry_run${soloCotizacion ? ' (cotización)' : ''}: preferencia NO creada (${items.length} ítem(s), ref ${externalRef})`)
     return {
       dry_run: true,
+      cotizacion: soloCotizacion,
       id: null,
       checkout_url: null,
       external_reference: externalRef,
       // Lo que se habría mandado, para poder revisarlo sin tocar MP.
       items: preference.items,
+      // Precio vigente por línea (con la promoción por fecha si aplica): el checkout
+      // lo usa para refrescar el carrito y mandarlo como unit_price al pagar.
+      lineas,
       total: items.reduce((n, it) => n + it.unit_price * it.quantity, 0),
     }
   }
