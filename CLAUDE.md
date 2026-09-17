@@ -106,3 +106,7 @@ en `docs/`; este archivo es el resumen de reglas que no se negocian. Fuente:
   `test-log-seguro`, `test-guarda-woo`, `test-restaurar-woo`, `test-agotado-stock-real`. Los que escriben exigen `npm run dev:test`; `test-pagos-mp` escribe
   directo en la rama de pruebas (candado `pagos_mp`) y no necesita el servidor.
 - `npm run build` es la validación real antes de un push (es lo que corre Vercel).
+- **Verificar el exit code del build antes de commitear, no solo lanzarlo.** El commit va
+  encadenado al resultado (`npm run build && git commit …`, o comprobar `$?` y parar si no
+  es 0); nunca separado con `;`. El 2026-09-17 una cadena cortada por un paso anterior hizo
+  el commit sin que el build llegara a correr. Igual con las suites: se mira su exit code.
