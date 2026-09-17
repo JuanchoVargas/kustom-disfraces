@@ -199,7 +199,8 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  // Origen real de la petición (local, preview o prod) para back_urls / notification_url.
+  // Origen real de la petición (local, preview o prod) para las back_urls: el comprador
+  // vuelve a donde estaba. La notification_url NO sale de aquí (ver más abajo).
   const origin = getRequestURL(event, { xForwardedHost: true }).origin
   const isLocal = /localhost|127\.0\.0\.1/.test(origin)
 
@@ -233,9 +234,13 @@ export default defineEventHandler(async (event) => {
     // En local el comprador vuelve manualmente ("Volver al sitio"); en prod es automático.
     ...(isLocal ? {} : { auto_return: 'approved' }),
     // Webhook de MP: notificación server-to-server del estado real del pago.
-    // MP no puede alcanzar localhost, así que solo se registra en entornos públicos
-    // (Preview/prod). El handler vive en /api/webhooks/mercadopago.
-    ...(isLocal ? {} : { notification_url: `${origin}/api/webhooks/mercadopago` }),
+    // MP no puede alcanzar localhost, así que solo se registra en entornos públicos.
+    // SIEMPRE al dominio CANÓNICO (siteBase), nunca al host de la petición: el
+    // dominio raíz responde 308 hacia www (MP no sigue redirecciones en un POST) y la
+    // URL de un Preview está detrás de la protección de Vercel (MP recibiría 401 y el
+    // pago aprobado se quedaría sin orden). Preview y producción comparten Woo y Neon,
+    // así que quien procesa el pago es siempre el despliegue de producción.
+    ...(isLocal ? {} : { notification_url: `${siteBase}/api/webhooks/mercadopago` }),
     // Máximo 3 cuotas (Fase 3): la pantalla de pago ya no ofrece hasta 36x.
     payment_methods: {
       installments: 3,
