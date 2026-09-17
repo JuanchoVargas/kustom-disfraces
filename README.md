@@ -64,7 +64,8 @@ marcador ahí desarmaría la protección entera.
 
 **Scripts con la guarda puesta** (todos escriben): `test-inventario.mjs`,
 `test-bandeja-v2.mjs`, `test-bot-conversion.mjs`, `test-media-retencion.mjs`,
-`test-wa-webhook.mjs`, `probar-bot.mjs`.
+`test-wa-webhook.mjs`, `probar-bot.mjs`, `test-pagos-mp.mjs` (este escribe él mismo en
+`pagos_mp`, sin pasar por el servidor: usa las barreras 2 y 3).
 
 Sin guarda a propósito: `test-wa-db-down.mjs` (corre con la URL de Postgres rota
 adrede, así que no puede escribir en ningún sitio); `informe-cobertura.mjs`,
@@ -438,13 +439,27 @@ compartido `app/components/checkout/PaymentResult.vue`:
 body**: consulta `GET /v1/payments/{id}` en la API de MP con el Access Token para
 leer el estado real (`approved` / `rejected` / `pending`…). Si `MP_WEBHOOK_SECRET`
 está configurado, valida además la firma `x-signature` (HMAC-SHA256) y rechaza lo
-no auténtico (401). Con el pago **aprobado** crea la orden en WooCommerce
-(idempotente por `_mp_payment_id`, ver Fase 3), envía los correos de confirmación
-y, si la orden falla, alerta a ventas@ y responde 5xx para que MP reintente.
+no auténtico (401). Con el pago **aprobado** crea **una sola** orden en WooCommerce
+(candado por pago en la tabla `pagos_mp`, ver Fase 3), envía los correos de
+confirmación y, si la orden falla, alerta a ventas@ y responde 503 para que MP reintente.
 
-El `notification_url` se arma solo con el origen de la request, así que apunta
-automáticamente al dominio donde corre (Preview o prod). **En localhost no se
-registra** (MP no puede alcanzarlo) → el webhook se prueba en un despliegue público.
+El handler es solo el borde HTTP (firma + dependencias reales); la lógica vive en
+`server/utils/procesarPagoMp.ts`, con MP, Woo y el correo **inyectados**, y se prueba
+con `node scripts/test-pagos-mp.mjs` contra la base de pruebas.
+
+| Respuesta | Cuándo | MP reintenta |
+|---|---|---|
+| 200 | orden creada · pago ya procesado (`duplicate: true`) · pago no aprobado (no deja fila) | no |
+| 409 | otra notificación del mismo pago lo está procesando ahora | sí → encontrará `creada` |
+| 500 | no se pudo consultar el pago en MP | sí |
+| 503 | sin base de datos, o falló Woo (la fila queda `fallida`) | sí → se retoma |
+
+El `notification_url` apunta **siempre al dominio canónico** (`NUXT_PUBLIC_SITE_URL`,
+por defecto `https://www.disfraceskustom.com`), no al host de la petición: el dominio
+raíz responde 308 hacia `www` y la URL de un Preview está detrás de la protección de
+Vercel, así que MP no podría entregar ahí. Preview y producción comparten Woo y Neon:
+quien procesa un pago es siempre el despliegue de producción. **En localhost no se
+registra** (MP no puede alcanzarlo).
 
 ### Cómo probar el webhook (Preview en Vercel)
 
@@ -452,9 +467,10 @@ registra** (MP no puede alcanzarlo) → el webhook se prueba en un despliegue p�
 2. En el entorno **Preview** de Vercel, definir las variables: `MP_ACCESS_TOKEN`,
    `MP_PUBLIC_KEY` (y opcional `MP_WEBHOOK_SECRET`) con credenciales de **prueba**.
    **No tocar producción.**
-3. La preferencia ya manda `notification_url = https://<preview>.vercel.app/api/webhooks/mercadopago`
-   automáticamente. Registrar esa misma URL en **MP → Tus integraciones → Webhooks**
-   (evento *Pagos*) para tener el secreto de firma y las reentregas manuales.
+3. La preferencia manda `notification_url` al **dominio canónico** (producción), no al
+   Preview: un pago hecho desde un Preview lo procesa el webhook de producción. La URL
+   registrada en **MP → Tus integraciones → Webhooks** (evento *Pagos*) es también la de
+   producción; de ahí salen el secreto de firma y las reentregas manuales.
 4. Hacer un pago de prueba desde el Preview y verificar en los logs de Vercel la
    línea `[mp-webhook] pago <id>: approved …`.
 
@@ -498,13 +514,32 @@ Cuando el webhook confirma `status: approved`, crea la orden vía REST de Woo
 - **Pagador**: nombre y email que entrega MP (`payment.payer`).
 - **Referencia**: `transaction_id` = payment id de MP.
 - **Nota**: *"Dirección de envío a coordinar por WhatsApp"*.
-- **Idempotencia**: guarda el payment id en la meta `_mp_payment_id`; antes de crear
-  busca una orden con ese id y **no duplica** si el webhook llega dos veces.
-- **Si Woo falla**: el pago **no se pierde** — se registra en el log con todos los
-  datos (payment id, monto, pagador, ítems) y el webhook responde 500 para que MP
-  **reintente**; al recuperarse Woo, la idempotencia evita duplicar.
+- **Una orden por pago (candado `pagos_mp`)**: MP manda varias notificaciones por pago
+  casi a la vez (`payment.created`, `payment.updated`, reintentos) y llegan como
+  funciones en paralelo; buscar la orden en Woo antes de crear **no** es un candado (así
+  nacieron #770 y #771). Decide la PRIMARY KEY de Postgres: `INSERT … ON CONFLICT DO
+  NOTHING` en `pagos_mp (payment_id, estado, order_id, intentos, created_at, updated_at)`.
+  Estados `procesando → creada | fallida`. Una fila `fallida`, o una `procesando` de más
+  de **10 min** (mayor que los 5 min máximos de la función en Vercel: su dueño murió), se
+  retoma con un `UPDATE` condicional. Solo se toma un pago `approved`. **Sin base → 503**
+  y no se toca Woo. La tabla no guarda datos del comprador.
+- **Segunda barrera**: con el pago ya tomado se sigue buscando en Woo una orden con la
+  meta `_mp_payment_id`; cubre las órdenes anteriores a la tabla y una fila que no se
+  alcanzó a marcar `creada`.
+- **Enlace de la línea**: la línea resuelta envía **solo `variation_id`**. El controlador
+  de Woo (`get_product_id`) mira primero el `sku`, y con el SKU del padre enlazaba el
+  producto variable e ignoraba la variación (todas las órdenes web quedaban con
+  `variation_id: 0` y Woo no descontaba stock). El SKU se conserva en el `meta_data` de
+  la línea. Tras crear, se verifica la respuesta: una línea resuelta que vuelva con otro
+  `variation_id` marca la orden con `_kustom_ajuste_manual`, deja nota y avisa a ventas.
+- **Si Woo falla**: el pago **no se pierde** — la fila queda `fallida`, se registra el
+  `paymentId` con los SKU (sin datos del comprador), se alerta a ventas@ y el webhook
+  responde 503 para que MP **reintente**; el reintento retoma la fila.
+- **Correos**: solo los envía el proceso que creó la orden, después de marcarla
+  `creada`: una notificación repetida ya no duplica la confirmación.
 
-Código: `server/utils/wooOrders.ts` + `server/api/webhooks/mercadopago.post.ts`.
+Código: `server/utils/procesarPagoMp.ts` (lógica) + `server/utils/pagosMp.ts` (candado) +
+`server/utils/wooOrders.ts` + `server/api/webhooks/mercadopago.post.ts` (borde HTTP).
 
 ### Variables de entorno — llave de Woo con ESCRITURA
 

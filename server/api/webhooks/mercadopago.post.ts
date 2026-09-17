@@ -1,23 +1,26 @@
 import { createHmac, timingSafeEqual } from 'node:crypto'
 import { construirLineas, leerAnclaje, verificarMontos, type LineaOrden } from '../../utils/mpAnclaje'
+import { procesarPagoMp, type DepsPagoMp, type PagoMp } from '../../utils/procesarPagoMp'
 
 /**
- * Webhook de Mercado Pago (Fase 2, sandbox). MP lo llama server-to-server cuando
- * cambia el estado de un pago. NO confiamos en el contenido de la notificación:
- * consultamos la API de MP (GET /v1/payments/{id}) con el Access Token para leer
- * el estado REAL del pago.
+ * Webhook de Mercado Pago. MP lo llama server-to-server cuando cambia el estado de
+ * un pago. NO confiamos en el contenido de la notificación: consultamos la API de MP
+ * (GET /v1/payments/{id}) con el Access Token para leer el estado REAL del pago.
  *
  * Seguridad:
  *  1. Si hay MP_WEBHOOK_SECRET, se valida la firma HMAC (x-signature) y se
  *     rechazan notificaciones no auténticas (401).
  *  2. El estado se confirma contra la API de MP, no contra el body recibido.
  *
- * Responde SIEMPRE rápido: 200 cuando se procesó, 500 solo si falló la consulta
- * (para que MP reintente). MP necesita una URL PÚBLICA — en localhost no llega
- * (por eso el endpoint de la preferencia solo registra notification_url fuera de local).
+ * Este archivo es solo el borde HTTP: valida la firma y arma las dependencias
+ * REALES (MP, Woo, correo). La lógica —candado por pago en `pagos_mp`, segunda
+ * barrera en Woo, creación, ajuste manual y correos— vive en
+ * server/utils/procesarPagoMp.ts, que es lo que ejercita scripts/test-pagos-mp.mjs.
  *
- * NOTA: aún no hay sistema de pedidos/BD. Por ahora el webhook VERIFICA y LOGguea
- * el estado; el punto de enganche para persistir/confirmar el pedido queda marcado.
+ * Respuestas: 200 procesado / duplicado / pago no aprobado · 409 otra notificación
+ * tiene el pago ahora · 500 no se pudo consultar MP · 503 sin base o falló Woo.
+ * Con 409, 500 y 503 Mercado Pago reintenta. MP necesita una URL PÚBLICA: en
+ * localhost no llega (el checkout solo registra notification_url fuera de local).
  */
 
 interface MpPaymentItem {
@@ -26,17 +29,7 @@ interface MpPaymentItem {
   quantity?: string | number
   unit_price?: string | number
 }
-interface MpPayment {
-  id: number
-  status: string        // approved | rejected | pending | in_process | cancelled | refunded...
-  status_detail: string
-  transaction_amount: number
-  external_reference?: string
-  payer?: { email?: string, first_name?: string, last_name?: string }
-  additional_info?: { items?: MpPaymentItem[] }
-  metadata?: Record<string, unknown>
-  order?: { id?: number }
-}
+type MpPayment = PagoMp
 
 /** Mapea la metadata (keys snake_case que puso el endpoint) a los datos del comprador. */
 function buyerFromMetadata(md: unknown): CreateOrderBuyer | null {
@@ -148,177 +141,169 @@ export default defineEventHandler(async (event) => {
     return { received: true, verified: false }
   }
 
-  let payment: MpPayment
-  try {
-    payment = await $fetch<MpPayment>(`https://api.mercadopago.com/v1/payments/${dataId}`, {
-      headers: { Authorization: `Bearer ${mpAccessToken}` },
-    })
-  }
-  catch (err) {
-    // Fallo al consultar la API: devolvemos 500 para que MP reintente más tarde.
-    console.error('[mp-webhook] no se pudo consultar el pago en MP:', String((err as Error)?.message ?? err))
-    throw createError({ statusCode: 500, message: 'No se pudo verificar el pago' })
-  }
-
-  // Estado real y confiable del pago.
-  console.info(
-    `[mp-webhook] pago ${payment.id}: ${payment.status} (${payment.status_detail}) — `
-    + `$${payment.transaction_amount} ref=${payment.external_reference ?? '-'}`,
-  )
-
-  // Solo un pago APROBADO genera orden. rejected/cancelled/pending -> solo se registra.
-  if (payment.status !== 'approved') {
-    return { received: true, verified: true, status: payment.status }
-  }
-
-  // ---------- 3) preparar ítems (para la orden Y para la alerta) ----------
-  // SEGURIDAD: los precios se recalculan por SKU desde el catálogo del servidor.
-  // Se construyen ANTES de tocar Woo para que la alerta los incluya aunque Woo
-  // esté caído/sin configurar.
-  let priceMap: Awaited<ReturnType<typeof getPriceMapBySku>> | null = null
-  try {
-    priceMap = await getPriceMapBySku()
-  }
-  catch (err) {
-    console.warn('[mp-webhook] catálogo no disponible para recalcular precios; se usa el monto pagado:', String((err as Error)?.message ?? err))
-  }
-
-  // PRECIO ANCLADO (promociones por fecha): la preferencia guardó en metadata
-  // kustom_lineas tal como se cobró; si viene, manda sobre el recálculo. Las
-  // preferencias anteriores no lo traen y dan exactamente las líneas de antes.
-  // Todo el camino anclado es puro (server/utils/mpAnclaje.ts) y va en try/catch:
-  // un fallo ahí NUNCA cambia la respuesta a MP; cae al comportamiento anterior y
-  // deja motivo de ajuste manual para que ventas lo revise.
-  const itemsMp = payment.additional_info?.items ?? []
-  let orderItems: LineaOrden[]
-  let ajusteMontos: string | null = null
-  try {
-    const anclaje = leerAnclaje(payment.metadata)
-    const r = construirLineas(itemsMp, priceMap, anclaje, tallaDesdeTitulo)
-    orderItems = r.lineas
-    for (const a of r.advertencias) console.info(`[mp-webhook] precio ${a}`)
-    const montos = verificarMontos(orderItems, payment.transaction_amount)
-    const ajustes = montos ? [...r.ajustes, montos] : r.ajustes
-    ajusteMontos = ajustes.length ? ajustes.join(' · ') : null
-  }
-  catch (err) {
-    // Solo el NOMBRE del error: el mensaje puede traer un trozo del texto procesado
-    // (metadata con datos del comprador) y esto va al log y a la nota de Woo.
-    orderItems = construirLineas(itemsMp, priceMap, { estado: 'ausente' }, tallaDesdeTitulo).lineas
-    ajusteMontos = `error leyendo el precio anclado (${(err as Error)?.name || 'Error'}); se recalculó el precio`
-  }
-  if (ajusteMontos) console.error(`[mp-webhook] ⚠️ pago ${payment.id}: ${ajusteMontos} — la orden queda marcada como ajuste manual`)
-
-  // Datos del comprador (envío + factura opcional) recuperados de la metadata de
-  // la preferencia. Se resuelve ANTES de failWithAlert para que la alerta también
-  // incluya los datos de envío si Woo llegara a fallar.
-  const buyer = await recoverBuyer(payment, mpAccessToken)
-  // Sin nombre ni dirección en el log: van a la orden de Woo y al correo de ventas.
-  if (buyer) console.info(`[mp-webhook] comprador recuperado para el pago ${payment.id}: destino ${buyer.ciudad}/${buyer.departamento}`)
-  else console.warn(`[mp-webhook] sin datos de comprador en la preferencia del pago ${payment.id} (se crea orden con datos del pagador de MP)`)
-
-  // Fallo al crear la orden (cualquier causa): registra TODO, ALERTA a ventas@ (una
-  // vez por paymentId) y responde 5xx para que MP REINTENTE. Así ningún pago pasa
-  // desapercibido y un fallo temporal se recupera solo en el próximo reintento.
-  const failWithAlert = async (reason: string): Promise<never> => {
-    // Para recuperar el pago basta el paymentId: con él se consulta el pago en MP
-    // (pagador, envío). Ni el correo ni los datos de envío van al log.
-    console.error(
-      `[mp-webhook] ⚠️ pago APROBADO SIN orden (${reason}). Recuperar. `
-      + `paymentId=${payment.id} monto=$${payment.transaction_amount} `
-      + `items=${JSON.stringify(orderItems.map(i => ({ sku: i.sku, talla: i.talla, cantidad: i.quantity })))} `
-      + `datosEnvio=${buyer ? 'sí' : 'no'}`,
-    )
-    const alert = await sendOrderFailureAlert({
-      paymentId: String(payment.id),
-      amount: payment.transaction_amount,
-      payerName: buyer?.nombre || [payment.payer?.first_name, payment.payer?.last_name].filter(Boolean).join(' ') || undefined,
-      payerEmail: buyer?.email || payment.payer?.email,
-      items: orderItems.map(i => ({ name: i.name, talla: i.talla, quantity: i.quantity, unitPrice: i.unitPrice })),
-      reason,
-    })
-    console.info(`[mp-webhook] alerta a ventas: ${alert.sent ? 'enviada' : alert.deduped ? 'ya enviada antes (dedupe)' : `no enviada (${alert.reason})`}`)
-    throw createError({ statusCode: 503, message: `Pago verificado pero no se pudo crear la orden (${reason})` })
-  }
-
-  // ---------- 4) crear la orden en WooCommerce (idempotente) ----------
-  if (!wooOrdersConfigured()) {
-    await failWithAlert('woo_not_configured') // credenciales de escritura ausentes/mal
-  }
-
-  try {
-    // Idempotencia: si ya existe una orden para este pago, no se crea otra.
-    const existing = await findWooOrderByPaymentId(String(payment.id))
-    if (existing) {
-      console.info(`[mp-webhook] orden ya existía para el pago ${payment.id} (Woo #${existing.id}) — no se duplica`)
-      return { received: true, verified: true, status: payment.status, orderId: existing.id, duplicate: true }
+  // ---------- 3) dependencias reales ----------
+  // El pedido (líneas + comprador) se arma UNA vez por petición y lo comparten la
+  // creación de la orden y los correos. Nunca lanza: cada paso tiene su respaldo.
+  let pedidoMemo: Promise<{ orderItems: LineaOrden[], ajusteMontos: string | null, buyer: CreateOrderBuyer | null }> | null = null
+  const pedidoDe = (payment: MpPayment) => pedidoMemo ??= (async () => {
+    // SEGURIDAD: los precios se recalculan por SKU desde el catálogo del servidor.
+    let priceMap: Awaited<ReturnType<typeof getPriceMapBySku>> | null = null
+    try {
+      priceMap = await getPriceMapBySku()
+    }
+    catch (err) {
+      console.warn('[mp-webhook] catálogo no disponible para recalcular precios; se usa el monto pagado:', String((err as Error)?.message ?? err))
     }
 
-    const order = await createWooOrder({
-      paymentId: String(payment.id),
-      payerFirstName: payment.payer?.first_name,
-      payerLastName: payment.payer?.last_name,
-      payerEmail: payment.payer?.email,
-      items: orderItems,
-      amount: payment.transaction_amount,
-      buyer: buyer ?? undefined,
-      ajusteManual: ajusteMontos ?? undefined,
-    })
-    console.info(`[mp-webhook] orden creada en Woo #${order.id} (pago ${payment.id}, ${payment.status})`)
+    // PRECIO ANCLADO (promociones por fecha): la preferencia guardó en metadata
+    // kustom_lineas tal como se cobró; si viene, manda sobre el recálculo. Las
+    // preferencias anteriores no lo traen y dan exactamente las líneas de antes.
+    // Todo el camino anclado es puro (server/utils/mpAnclaje.ts) y va en try/catch:
+    // un fallo ahí NUNCA cambia la respuesta a MP; cae al comportamiento anterior y
+    // deja motivo de ajuste manual para que ventas lo revise.
+    const itemsMp = (payment.additional_info?.items ?? []) as MpPaymentItem[]
+    let orderItems: LineaOrden[]
+    let ajusteMontos: string | null = null
+    try {
+      const anclaje = leerAnclaje(payment.metadata)
+      const r = construirLineas(itemsMp, priceMap, anclaje, tallaDesdeTitulo)
+      orderItems = r.lineas
+      for (const adv of r.advertencias) console.info(`[mp-webhook] precio ${adv}`)
+      const montos = verificarMontos(orderItems, payment.transaction_amount)
+      const ajustes = montos ? [...r.ajustes, montos] : r.ajustes
+      ajusteMontos = ajustes.length ? ajustes.join(' · ') : null
+    }
+    catch (err) {
+      // Solo el NOMBRE del error: el mensaje puede traer un trozo del texto procesado
+      // (metadata con datos del comprador) y esto va al log y a la nota de Woo.
+      orderItems = construirLineas(itemsMp, priceMap, { estado: 'ausente' }, tallaDesdeTitulo).lineas
+      ajusteMontos = `error leyendo el precio anclado (${(err as Error)?.name || 'Error'}); se recalculó el precio`
+    }
+    if (ajusteMontos) console.error(`[mp-webhook] ⚠️ pago ${payment.id}: ${ajusteMontos} — la orden queda marcada como ajuste manual`)
 
-    // AJUSTE MANUAL DE INVENTARIO. La orden se creó y el cliente ya pagó; lo que
-    // falló es enlazar alguna línea con su variación, así que Woo NO le descontó
-    // stock. Se avisa a ventas para que lo ajusten a mano. Best-effort: un fallo
-    // aquí no puede tumbar el webhook ni provocar un reintento de MP (eso
-    // duplicaría correos), por eso va en su propio catch.
-    if (order.lineasSinEnlazar.length || ajusteMontos) {
-      const detalle = order.lineasSinEnlazar
-        .map(l => `• ${l.title} — SKU ${l.sku ?? 'ausente'}${l.talla ? `, talla ${l.talla}` : ', sin talla'} → ${l.motivo}`)
-        .concat(ajusteMontos ? [`• Montos: ${ajusteMontos}`] : [])
-        .join('\n')
-      console.error(`[mp-webhook] ⚠️ AJUSTE MANUAL en Woo #${order.id}: ${order.lineasSinEnlazar.length} línea(s) sin stock descontado${ajusteMontos ? ' + montos' : ''}\n${detalle}`)
-      await sendOrderFailureAlert({
-        variante: 'ajuste_manual',
-        orderId: order.id,
+    // Datos del comprador (envío + factura opcional) recuperados de la metadata de la
+    // preferencia. Sin nombre ni dirección en el log: van a la orden de Woo y al correo.
+    const buyer = await recoverBuyer(payment, mpAccessToken)
+    if (buyer) console.info(`[mp-webhook] comprador recuperado para el pago ${payment.id}: destino ${buyer.ciudad}/${buyer.departamento}`)
+    else console.warn(`[mp-webhook] sin datos de comprador en la preferencia del pago ${payment.id} (se crea orden con datos del pagador de MP)`)
+    return { orderItems, ajusteMontos, buyer }
+  })()
+
+  const nombreDe = (payment: MpPayment, buyer: CreateOrderBuyer | null) =>
+    buyer?.nombre || [payment.payer?.first_name, payment.payer?.last_name].filter(Boolean).join(' ') || undefined
+
+  const deps: DepsPagoMp = {
+    consultarPago: id => $fetch<MpPayment>(`https://api.mercadopago.com/v1/payments/${id}`, {
+      headers: { Authorization: `Bearer ${mpAccessToken}` },
+    }),
+
+    // Los errores de Woo traen las llaves en la URL: se redactan ANTES de salir de aquí.
+    buscarOrden: async (id) => {
+      if (!wooOrdersConfigured()) throw new Error('woo_not_configured') // credenciales de escritura ausentes/mal
+      try {
+        return await findWooOrderByPaymentId(id)
+      }
+      catch (err) {
+        throw new Error(sanitizeWooOrderError(err))
+      }
+    },
+
+    crearOrden: async (payment) => {
+      const { orderItems, ajusteMontos, buyer } = await pedidoDe(payment)
+      try {
+        const order = await createWooOrder({
+          paymentId: String(payment.id),
+          payerFirstName: payment.payer?.first_name,
+          payerLastName: payment.payer?.last_name,
+          payerEmail: payment.payer?.email,
+          items: orderItems,
+          amount: payment.transaction_amount,
+          buyer: buyer ?? undefined,
+          ajusteManual: ajusteMontos ?? undefined,
+        })
+        const motivo = (l: { sku?: string, talla?: string | null, motivo: string }) => `${l.sku ?? '?'}${l.talla ? ` talla ${l.talla}` : ''}: ${l.motivo}`
+        return {
+          id: order.id,
+          // Ya escritos en la orden al crearla (línea sin enlazar, montos que no cuadran).
+          ajustesRegistrados: order.lineasSinEnlazar.map(motivo).concat(ajusteMontos ? [`montos: ${ajusteMontos}`] : []),
+          // Detectados al leer la respuesta de Woo: línea resuelta guardada sin su variación.
+          ajustesPendientes: order.lineasVariacionPerdida.map(motivo),
+        }
+      }
+      catch (err) {
+        throw new Error(sanitizeWooOrderError(err))
+      }
+    },
+
+    marcarAjuste: async (orderId, motivos) => {
+      try {
+        await marcarAjusteManualWoo(orderId, motivos)
+      }
+      catch (err) {
+        throw new Error(sanitizeWooOrderError(err))
+      }
+    },
+
+    enviarCorreos: async (correo) => {
+      const payment = correo.pago
+      const { orderItems, buyer } = await pedidoDe(payment)
+      const comun = {
         paymentId: String(payment.id),
         amount: payment.transaction_amount,
-        payerName: buyer?.nombre || [payment.payer?.first_name, payment.payer?.last_name].filter(Boolean).join(' ') || undefined,
+        payerName: nombreDe(payment, buyer),
         payerEmail: buyer?.email || payment.payer?.email,
         items: orderItems.map(i => ({ name: i.name, talla: i.talla, quantity: i.quantity, unitPrice: i.unitPrice })),
-        reason: order.lineasSinEnlazar.map(l => `${l.sku ?? '?'}${l.talla ? ` talla ${l.talla}` : ''}: ${l.motivo}`).concat(ajusteMontos ? [ajusteMontos] : []).join(' · '),
-      }).catch(e => console.error('[mp-webhook] no se pudo avisar del ajuste manual:', String((e as Error)?.message ?? e)))
-    }
+      }
 
-    // Correo de confirmación con marca (Fase 4). Idempotente: solo se envía en esta
-    // ruta de orden NUEVA (si el webhook llega otra vez, cae en el `existing` de arriba).
-    // No rompe el flujo: sendOrderConfirmationEmail nunca lanza (registra y sigue).
-    const emailResult = await sendOrderConfirmationEmail({
-      paymentId: String(payment.id),
-      buyerName: buyer?.nombre || [payment.payer?.first_name, payment.payer?.last_name].filter(Boolean).join(' ') || undefined,
-      buyerEmail: buyer?.email || payment.payer?.email,
-      items: orderItems.map(i => ({ name: i.name, talla: i.talla, quantity: i.quantity, unitPrice: i.unitPrice, slug: i.slug })),
-      total: payment.transaction_amount,
-      shipping: buyer
-        ? {
-            documento: buyer.documento ? `${buyer.tipoDocumento || 'CC'} ${buyer.documento}` : undefined,
-            telefono: buyer.telefono,
-            correo: buyer.email,
-            pais: buyer.pais,
-            departamento: buyer.departamento,
-            ciudad: buyer.ciudad,
-            localidad: buyer.localidad,
-            barrio: buyer.barrio,
-            direccion: buyer.direccion,
-            notas: buyer.notas,
-          }
-        : undefined,
-    })
+      if (correo.tipo === 'fallo') {
+        // Para recuperar el pago basta el paymentId: con él se consulta el pago en MP
+        // (pagador, envío). Ni el correo ni los datos de envío van al log.
+        console.error(
+          `[mp-webhook] ⚠️ pago APROBADO SIN orden (${correo.motivo}). Recuperar. `
+          + `paymentId=${payment.id} monto=${payment.transaction_amount} `
+          + `items=${JSON.stringify(orderItems.map(i => ({ sku: i.sku, talla: i.talla, cantidad: i.quantity })))} `
+          + `datosEnvio=${buyer ? 'sí' : 'no'}`,
+        )
+        const alert = await sendOrderFailureAlert({ ...comun, reason: correo.motivo })
+        console.info(`[mp-webhook] alerta a ventas: ${alert.sent ? 'enviada' : alert.deduped ? 'ya enviada antes (dedupe)' : `no enviada (${alert.reason})`}`)
+        return { sent: alert.sent }
+      }
 
-    return { received: true, verified: true, status: payment.status, orderId: order.id, emailSent: emailResult.sent }
+      if (correo.tipo === 'ajuste_manual') {
+        // La orden se creó y el cliente ya pagó; lo que falló es enlazar alguna línea
+        // con su variación (Woo NO le descontó stock) o cuadrar los montos.
+        const alert = await sendOrderFailureAlert({ ...comun, variante: 'ajuste_manual', orderId: correo.orderId, reason: correo.motivos.join(' · ') })
+        return { sent: alert.sent }
+      }
+
+      // Confirmación con marca al cliente. sendOrderConfirmationEmail nunca lanza.
+      const r = await sendOrderConfirmationEmail({
+        paymentId: String(payment.id),
+        buyerName: nombreDe(payment, buyer),
+        buyerEmail: buyer?.email || payment.payer?.email,
+        items: orderItems.map(i => ({ name: i.name, talla: i.talla, quantity: i.quantity, unitPrice: i.unitPrice, slug: i.slug })),
+        total: payment.transaction_amount,
+        shipping: buyer
+          ? {
+              documento: buyer.documento ? `${buyer.tipoDocumento || 'CC'} ${buyer.documento}` : undefined,
+              telefono: buyer.telefono,
+              correo: buyer.email,
+              pais: buyer.pais,
+              departamento: buyer.departamento,
+              ciudad: buyer.ciudad,
+              localidad: buyer.localidad,
+              barrio: buyer.barrio,
+              direccion: buyer.direccion,
+              notas: buyer.notas,
+            }
+          : undefined,
+      })
+      return { sent: r.sent }
+    },
   }
-  catch (err) {
-    // Woo falló (caído, timeout, credenciales mal, error en el idempotency check):
-    // alerta + 5xx para que MP reintente. La idempotencia evita duplicar al recuperarse.
-    await failWithAlert(`woo_error: ${sanitizeWooOrderError(err)}`)
-  }
+
+  // ---------- 4) procesar ----------
+  const r = await procesarPagoMp(dataId, deps)
+  if (r.status === 200) return r.body
+  throw createError({ statusCode: r.status, message: String(r.body.message ?? 'No se pudo procesar el pago') })
 })

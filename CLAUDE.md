@@ -71,6 +71,18 @@ en `docs/`; este archivo es el resumen de reglas que no se negocian. Fuente:
   sin seguir `docs/inventario-activacion.md`. Las pruebas de inventario solo contra
   el adaptador `mock`.
 
+## Pagos (Mercado Pago → Woo)
+
+- La lógica del webhook vive en `server/utils/procesarPagoMp.ts` con dependencias
+  inyectadas; el handler solo valida la firma y las arma. **Nada de "modo simulación"
+  en el camino de producción**: se prueba con dobles (`scripts/test-pagos-mp.mjs`).
+- Una orden por pago la garantiza la tabla `pagos_mp` (PRIMARY KEY), no la búsqueda en
+  Woo. Sin base → 503. El umbral de "procesando vieja" (10 min) debe seguir siendo
+  mayor que la duración máxima de la función en Vercel (5 min).
+- La línea resuelta va a Woo **solo con `variation_id`** (nunca `sku` ni `product_id`:
+  Woo prioriza el `sku` y guardaba `variation_id: 0`).
+- `notification_url` siempre al dominio canónico, nunca al host de la petición.
+
 ## Dominio y catálogo
 
 - DNS: el raíz y `www` apuntan **siempre** a Vercel; WordPress solo en `api.*`.
@@ -87,5 +99,6 @@ en `docs/`; este archivo es el resumen de reglas que no se negocian. Fuente:
 - No hay test runner ni `npm test`; son scripts en `scripts/`. Locales sin red ni
   BD (siempre ejecutables): `test-textos-bot`, `test-agotados-override`,
   `test-autor-panel`, `test-escritura-segura`, `test-sincronizacion`,
-  `test-log-seguro`. Los que escriben exigen `npm run dev:test`.
+  `test-log-seguro`. Los que escriben exigen `npm run dev:test`; `test-pagos-mp` escribe
+  directo en la rama de pruebas (candado `pagos_mp`) y no necesita el servidor.
 - `npm run build` es la validación real antes de un push (es lo que corre Vercel).

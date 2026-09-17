@@ -220,6 +220,17 @@ const MIGRATION = [
   `CREATE INDEX IF NOT EXISTS stock_espera_sku_idx ON stock_espera (sku) WHERE avisado_at IS NULL`,
   // Etiqueta visible en la bandeja ("espera stock") para filtrar esas conversaciones.
   `ALTER TABLE conversations ADD COLUMN IF NOT EXISTS etiqueta TEXT`,
+  // PAGOS DE MERCADO PAGO: candado por pago. MP manda varias notificaciones por pago
+  // casi a la vez; la PRIMARY KEY decide cuál de ellas crea la orden (ver pagosMp.ts).
+  // Sin datos del comprador: solo el id del pago, el estado y el número de orden.
+  `CREATE TABLE IF NOT EXISTS pagos_mp (
+    payment_id TEXT PRIMARY KEY,
+    estado     TEXT NOT NULL DEFAULT 'procesando' CHECK (estado IN ('procesando','creada','fallida')),
+    order_id   BIGINT,
+    intentos   INTEGER NOT NULL DEFAULT 1,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  )`,
 ]
 
 export function ensureSchema(): Promise<void> {
