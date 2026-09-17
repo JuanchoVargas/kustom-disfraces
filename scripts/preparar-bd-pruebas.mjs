@@ -119,6 +119,8 @@ const { randomBytes } = await import('node:crypto')
 const vaciadas = []
 const lineas = []
 let hayMpToken = false
+let hayAutores = false
+const AUTOR_SUITES = 'test-inventario'
 for (const linea of readFileSync(rutaEnv, 'utf8').split(/\r?\n/)) {
   const m = linea.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)$/)
   if (!m) { lineas.push(linea); continue }
@@ -126,9 +128,19 @@ for (const linea of readFileSync(rutaEnv, 'utf8').split(/\r?\n/)) {
   if (ES_BD.test(clave) || ES_SECRETO_LOCAL.test(clave)) continue // se reescriben abajo
   if (ES_MP_TOKEN.test(clave)) { hayMpToken = true; if (valor.trim()) vaciadas.push(clave); lineas.push(`${clave}=${MP_MARCADOR}`); continue }
   if (ES_SALIDA.some(re => re.test(clave))) { if (valor.trim()) vaciadas.push(clave); lineas.push(`${clave}=`); continue }
+  if (clave === 'NUXT_PANEL_AUTORES') {
+    hayAutores = true
+    const lista = valor.split(',').map(s => s.trim()).filter(Boolean)
+    if (!lista.includes(AUTOR_SUITES)) lista.push(AUTOR_SUITES)
+    lineas.push(`${clave}=${lista.join(',')}`)
+    continue
+  }
   lineas.push(linea)
 }
 if (!hayMpToken) lineas.push(`MP_ACCESS_TOKEN=${MP_MARCADOR}`)
+// El panel solo acepta autores de NUXT_PANEL_AUTORES: sin el de las suites, sus cambios
+// quedan sin firma y test-inventario falla en "registro de cambios".
+if (!hayAutores) lineas.push(`NUXT_PANEL_AUTORES=${AUTOR_SUITES}`)
 
 const sinPooler = urlTest.replace('-pooler.', '.')
 const host = new URL(urlTest.replace(/^postgres(ql)?:/, 'http:')).hostname
