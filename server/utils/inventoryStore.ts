@@ -26,6 +26,8 @@ export interface InventoryStore {
   /** true = los cambios NO llegan a Woo ni al sitio (modo simulación) */
   readonly simulation: boolean
   listProducts(filters: InvListFilters): Promise<InvPage<InvProduct>>
+  /** Todo el inventario (sin filtros ni paginación) en UNA sola lectura. */
+  allProducts(): Promise<InvProduct[]>
   /** Por SKU de producto o de variación. null si no existe. */
   getProduct(sku: string): Promise<InvProduct | null>
   updateVariationPrice(skuTalla: string, regularPrice: string | number | null, salePrice: string | number | null, ctx: WriteContext): Promise<InvOpResult>

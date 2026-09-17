@@ -239,12 +239,13 @@ export function computeStockState(products: InvProduct[], enabled: boolean, back
   return st
 }
 
+/**
+ * TODO el inventario en UNA sola lectura. Antes se paginaba de 100 en 100 con
+ * listProducts(), y cada página recargaba el snapshot y los overrides completos: con
+ * 109 productos eran dos lecturas de todo (~800 kB de Neon) por cálculo.
+ */
 async function allProducts(): Promise<InvProduct[]> {
-  const store = getInventoryStore()
-  const first = await store.listProducts({ page: 1, per_page: 100 })
-  const out = [...first.items]
-  for (let page = 2; page <= first.total_pages; page++) out.push(...(await store.listProducts({ page, per_page: 100 })).items)
-  return out
+  return await getInventoryStore().allProducts()
 }
 
 /** Estado de stock (cacheado 2 min). `force` recalcula ya (tras una escritura del panel). */

@@ -176,6 +176,11 @@ export function createMockStore(): InventoryStore {
       return applyFilters(products.map(p => applyOverridesToProduct(p, overrides)), filters)
     },
 
+    async allProducts(): Promise<InvProduct[]> {
+      const [{ products }, overrides] = await Promise.all([loadInventory(), getOverrides()])
+      return products.map(p => applyOverridesToProduct(p, overrides))
+    },
+
     async getProduct(sku: string): Promise<InvProduct | null> {
       const p = await loadProductBySku(sku)
       return p ? applyOverridesToProduct(p, await getOverrides()) : null

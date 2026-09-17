@@ -170,6 +170,10 @@ export function createWooStore(): InventoryStore {
       return applyFilters(products, filters)
     },
 
+    async allProducts(): Promise<InvProduct[]> {
+      return (await loadInventory()).products
+    },
+
     getProduct(sku: string) {
       return loadProductBySku(sku)
     },
