@@ -123,6 +123,12 @@ export function useMercadoPago() {
       // El servidor ya eligió la URL correcta según el token (prod vs sandbox).
       const url = res.checkout_url || res.init_point || res.sandbox_init_point
       if (!url) throw new Error('sin_init_point')
+      // Meta Pixel: se guarda lo que el servidor ACEPTÓ cobrar (los unit_price ya
+      // validados) para el Purchase de /pago-exitoso. Solo códigos, cantidades y montos.
+      useMetaPixel().guardarCompra(
+        items.map(i => ({ code: i.sku, price: i.unit_price, quantity: i.quantity })),
+        items.reduce((n, i) => n + i.unit_price * i.quantity, 0),
+      )
       window.location.href = url
     }
     catch (err: unknown) {

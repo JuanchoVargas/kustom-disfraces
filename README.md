@@ -475,6 +475,58 @@ Igual que Fase 2, añadiendo al entorno **Preview** las dos vars de arriba. Lueg
 pago de prueba con titular `APRO` → en Woo aparece **una** orden `processing` con
 los ítems y el pagador; reenviar el webhook desde MP **no** crea una segunda.
 
+## 📈 Meta Pixel (fase 1 — navegador)
+
+Implementado desde cero, sin dependencias: `app/plugins/meta-pixel.client.ts` (carga
+e inicio) y `app/composables/useMetaPixel.ts` (única puerta para disparar eventos).
+
+| Variable | Dónde | Para qué |
+|---|---|---|
+| `NUXT_PUBLIC_META_PIXEL_ID` | **Solo Production** en Vercel | ID del conjunto de datos (es público). **Vacía = pixel apagado**: no se carga `fbevents.js`, no existe `window.fbq` y no sale ninguna petición a Meta. |
+| `NUXT_PUBLIC_META_DOMAIN_VERIFICATION` | Opcional | Si tiene valor, añade `<meta name="facebook-domain-verification">` al head (SSR). Independiente del pixel. |
+
+Reglas:
+
+- **Nunca en `/admin/*`**: ni carga, ni `PageView`, ni eventos.
+- **Sin advanced matching**: `init` va sin datos del usuario y con `autoConfig`
+  apagado; los eventos solo llevan códigos de referencia, cantidades y montos en
+  COP. En Events Manager → Configuración, dejar **desactivada** la "coincidencia
+  avanzada automática". Nada se escribe en la consola.
+- `PageView` al cargar y en cada cambio de **ruta** (no de query); el primero no se
+  duplica y el `PageView` automático de Meta por `history.pushState` está apagado.
+
+| Evento | Dónde | Datos |
+|---|---|---|
+| `ViewContent` | PDP (al abrir y al cambiar de producto) | `content_ids` = código de referencia, `content_type: product`, `currency: COP`, `value` = precio **efectivo** (con promoción por fecha si aplica) |
+| `AddToCart` | botón de la PDP | igual, con la cantidad |
+| `InitiateCheckout` | `/checkout`, una vez por visita | `value` y `num_items` de la **cotización del servidor** (dry_run) |
+| `Purchase` | `/pago-exitoso` | solo si MP devolvió `status=approved`; `eventID` = `payment_id` (para deduplicar con la futura Conversions API); `value` = total guardado en `sessionStorage` al iniciar el pago (los precios que el servidor aceptó); no se repite al recargar |
+
+`InitiateCheckout` **no se envía si la cotización del servidor falla**: sus montos
+salen siempre del `dry_run`, nunca del navegador.
+
+> ⚠️ **`Purchase` que se pierde — navegador interno de Instagram / Facebook.** La
+> mayoría del tráfico de anuncios abre el sitio en el navegador embebido de esas
+> apps. Al pagar, Mercado Pago puede sacar al cliente a su app o al navegador del
+> sistema y devolverlo en **otra** pestaña o navegador: ahí no existe el
+> `sessionStorage` donde se guardó la compra y el `Purchase` de navegador **no se
+> dispara** (tampoco si el cliente cierra la pestaña antes de volver, o si bloquea
+> el almacenamiento). Es una limitación conocida y aceptada de la fase 1: esas
+> compras las registrará la **Conversions API** (fase 2) desde el servidor, con el
+> mismo `eventID` = `payment_id` para que Meta no las cuente dos veces. Hasta
+> entonces, el `Purchase` que muestra Events Manager es un **piso**, no el total:
+> las ventas reales son las órdenes de Woo.
+
+**Cómo validar en Events Manager**: Orígenes de datos → el conjunto de datos →
+**Probar eventos** → abrir el sitio en otra pestaña del mismo navegador y recorrer
+home → producto → "Agregar al carrito" → "Pagar con Mercado Pago" → `/checkout`.
+Deben aparecer `PageView` (uno por página), `ViewContent`, `AddToCart` e
+`InitiateCheckout` con moneda COP y el código de la referencia. `Purchase` aparece
+al volver de un pago aprobado. La extensión **Meta Pixel Helper** muestra lo mismo
+por página y confirma que en `/admin` no hay pixel.
+
+---
+
 ## 🔒 Seguridad de precios (server-side)
 
 El precio **nunca** se confía al cliente. Fuente de verdad: `server/utils/pricing.ts`

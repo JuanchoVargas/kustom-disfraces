@@ -219,6 +219,12 @@ export default defineNuxtConfig({
       //                     automáticamente a la local. El respaldo local es PERMANENTE.
       // Cambiar SOLO con la medición de docs/imagenes-woo-medicion.md en la mano.
       imagesSource: process.env.NUXT_PUBLIC_IMAGES_SOURCE || 'local', // -> NUXT_PUBLIC_IMAGES_SOURCE (local | woo)
+      // META PIXEL (fase 1, navegador). El ID del conjunto de datos es público. Vacío =
+      // pixel apagado: no se carga fbevents.js ni sale ninguna petición a Meta. Se
+      // configura SOLO en Production. Ver app/plugins/meta-pixel.client.ts.
+      metaPixelId: process.env.NUXT_PUBLIC_META_PIXEL_ID || '', // -> NUXT_PUBLIC_META_PIXEL_ID
+      // Opcional: código de verificación de dominio de Meta (meta tag en el head).
+      metaDomainVerification: process.env.NUXT_PUBLIC_META_DOMAIN_VERIFICATION || '', // -> NUXT_PUBLIC_META_DOMAIN_VERIFICATION
     },
   },
 })

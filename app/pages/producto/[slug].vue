@@ -153,7 +153,17 @@ function addToCart() {
   needsSize.value = false
   setTimeout(() => (added.value = false), 2200)
   cart.openDrawer() // feedback inmediato: el drawer muestra lo agregado
+  // Meta Pixel: precio efectivo (con promoción por fecha si aplica). Sin datos del usuario.
+  pixel.addToCart({ code: product.value.code, price: currentPrice.value, quantity: 1, name: product.value.name })
 }
+
+// Meta Pixel — ViewContent al abrir la PDP y al cambiar de producto sin recargar.
+const pixel = useMetaPixel()
+function pixelViewContent() {
+  if (product.value) pixel.viewContent({ code: product.value.code, price: currentPrice.value, name: product.value.name })
+}
+onMounted(pixelViewContent)
+watch(slug, pixelViewContent)
 
 const waLink = computed(() => `${contact.whatsapp}?text=${encodeURIComponent(`Hola, me interesa el disfraz "${product.value?.name}". ¿Me ayudan?`)}`)
 

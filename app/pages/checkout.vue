@@ -22,7 +22,21 @@ async function recotizar() {
   cotizacion.value = await cotizar()
   cotizando.value = false
 }
-onMounted(recotizar)
+// Meta Pixel — InitiateCheckout una vez por visita, SOLO con el total y las
+// cantidades de la cotización del SERVIDOR. Si la cotización falla no se envía: un
+// evento con montos del navegador sería un dato que el servidor no respaldó.
+const pixel = useMetaPixel()
+let checkoutEnviado = false
+function pixelInitiateCheckout() {
+  const c = cotizacion.value
+  if (checkoutEnviado || !c || !c.lineas.length) return
+  checkoutEnviado = true
+  pixel.initiateCheckout(c.lineas.map(l => ({ code: l.sku, price: l.unit_price, quantity: l.quantity })), c.total)
+}
+onMounted(async () => {
+  await recotizar()
+  pixelInitiateCheckout()
+})
 // Tras un 422 price_mismatch, pay() ya recotizó; se refleja aquí para las etiquetas.
 watch(aviso, (a) => { if (a) recotizar() })
 const promoDe = (sku?: string) => {
