@@ -42,6 +42,9 @@ export const camposVariacion = v => ({
   regular_price: v.regular_price, sale_price: v.sale_price, price: v.price,
   manage_stock: v.manage_stock === true, stock_quantity: v.stock_quantity ?? null, stock_status: v.stock_status, backorders: v.backorders,
   attributes: (v.attributes || []).map(a => ({ name: a.name, option: a.option })),
+  // Imagen propia de la variación (id de la biblioteca de medios). Ninguna escritura de
+  // stock o precio la toca; se guarda para poder DEMOSTRARLO comparando contra el respaldo.
+  image: v.image?.id ? { id: v.image.id, src: v.image.src } : null,
   date_modified_gmt: v.date_modified_gmt,
 })
 

@@ -4,7 +4,8 @@
 //
 // Lee directo de Woo TODOS los productos (cualquier estado) y TODAS sus variaciones, y
 // los guarda en backups/woo-productos-variaciones-<fecha>.json: precio, oferta,
-// manage_stock, stock_quantity, stock_status e ids. Es la foto de "cómo estaba Woo"
+// manage_stock, stock_quantity, stock_status, imagen de cada variación (e imágenes del
+// producto) e ids. Es la foto de "cómo estaba Woo"
 // antes de aplicar el inventario; scripts/restaurar-woo.mjs devuelve el stock a esa foto.
 //
 // Complementa a respaldo-inventario.mjs, que respalda lo que vive en Neon
@@ -24,6 +25,7 @@ try {
     id: p.id, sku: p.sku, name: p.name, type: p.type, status: p.status,
     regular_price: p.regular_price, sale_price: p.sale_price, price: p.price,
     manage_stock: p.manage_stock, stock_quantity: p.stock_quantity ?? null, stock_status: p.stock_status,
+    images: (p.images || []).map(i => ({ id: i.id, src: i.src })),
     date_modified_gmt: p.date_modified_gmt,
     variaciones: vars.get(p.id) ?? [],
   })).sort((a, b) => a.id - b.id)
@@ -37,10 +39,10 @@ try {
   const leido = JSON.parse(readFileSync(root + rel, 'utf8')).productos
   const vs = leido.flatMap(p => p.variaciones)
   const esperadas = [...vars.values()].reduce((n, a) => n + a.length, 0)
-  const ok = leido.length === productos.length && vs.length === esperadas && vs.every(v => v.id > 0)
+  const ok = leido.length === productos.length && vs.length === esperadas && vs.every(v => v.id > 0 && 'image' in v)
   console.log(`\n${ok ? '✅' : '❌'} ${rel} (${Math.round(statSync(root + rel).size / 1024)} KB) en ${((Date.now() - t0) / 1000).toFixed(0)} s`)
   console.log(`   productos  : ${leido.length} (publish ${leido.filter(p => p.status === 'publish').length} · draft ${leido.filter(p => p.status === 'draft').length} · otros ${leido.filter(p => !['publish', 'draft'].includes(p.status)).length})`)
-  console.log(`   variaciones: ${vs.length} · con manage_stock: ${vs.filter(v => v.manage_stock).length} · outofstock: ${vs.filter(v => v.stock_status === 'outofstock').length} · sin precio: ${vs.filter(v => !v.regular_price).length}`)
+  console.log(`   variaciones: ${vs.length} · con manage_stock: ${vs.filter(v => v.manage_stock).length} · outofstock: ${vs.filter(v => v.stock_status === 'outofstock').length} · sin precio: ${vs.filter(v => !v.regular_price).length} · con imagen propia: ${vs.filter(v => v.image).length}`)
   if (!ok) { console.error('\n❌ El respaldo NO es fiable (los conteos no cuadran). No apliques nada.'); process.exit(1) }
   console.log('\nPara volver a esta foto:  node scripts/restaurar-woo.mjs ' + rel)
 }
