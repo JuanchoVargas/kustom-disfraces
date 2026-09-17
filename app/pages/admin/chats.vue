@@ -473,10 +473,16 @@ function fmtBytes(n: number) {
 }
 
 // ---------- polling ----------
+// La conversación ABIERTA se refresca cada 5 s (POLL_MS); la LISTA cada 15 s (cada
+// tercer tick): es la consulta cara y no cambia tan rápido. Con la pestaña oculta no
+// se consulta nada; al volver a verla se refresca todo de inmediato.
 let timer: ReturnType<typeof setInterval> | undefined
+const LISTA_CADA = 3
+let ticks = 0
 async function tick() {
   if (!authed.value || document.hidden) return
-  await refreshList()
+  ticks++
+  if (ticks % LISTA_CADA === 0) await refreshList()
   if (selected.value) {
     try { await loadConv(selected.value.id) }
     catch (e) { onUnauthorized(e) }
@@ -490,9 +496,18 @@ onMounted(async () => {
     if (c) await openConv(c)
   }
   timer = setInterval(tick, POLL_MS)
+  document.addEventListener('visibilitychange', alVolver)
 })
+// Al volver a la pestaña: refresco inmediato (no esperar hasta 15 s con datos viejos).
+function alVolver() {
+  if (document.hidden || !authed.value) return
+  ticks = 0
+  refreshList()
+  if (selected.value) loadConv(selected.value.id).catch(onUnauthorized)
+}
 onBeforeUnmount(() => {
   clearInterval(timer)
+  document.removeEventListener('visibilitychange', alVolver)
   if (pending.value) URL.revokeObjectURL(pending.value.previewUrl)
 })
 

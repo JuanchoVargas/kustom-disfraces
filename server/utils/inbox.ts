@@ -370,13 +370,23 @@ export interface ListOptions {
  * Lista de conversaciones (más recientes arriba). Nunca se ocultan por antigüedad:
  * sin filtros devuelve TODAS las activas (hasta `limit`, 500 por defecto).
  */
-export async function listConversations(opts: ListOptions = {}): Promise<ConversationRow[]> {
+/**
+ * Columnas que PINTA la lista de la bandeja. La lista se refresca por polling: traer
+ * `c.*` arrastraba bot_state (JSONB) y columnas internas de TODAS las conversaciones
+ * en cada refresco (268 kB con 341 conversaciones). ultimo_mensaje se recorta: la lista
+ * solo muestra un renglón.
+ */
+const COLUMNAS_LISTA = `c.id, c.canal, c.external_id, c.nombre, c.telefono, c.telefono_lead, c.bsuid, c.username,
+            left(c.ultimo_mensaje, 200) AS ultimo_mensaje, c.ultima_actividad, c.ultimo_cliente_at, c.estado, c.no_leidos, c.archivada_at`
+export type ConversationListRow = Pick<ConversationRow, 'id' | 'canal' | 'external_id' | 'nombre' | 'telefono' | 'telefono_lead' | 'bsuid' | 'username' | 'ultimo_mensaje' | 'ultima_actividad' | 'ultimo_cliente_at' | 'estado' | 'no_leidos' | 'archivada_at'>
+
+export async function listConversations(opts: ListOptions = {}): Promise<ConversationListRow[]> {
   if (!await ready()) return []
   const q = (opts.q ?? '').trim()
   const filter: ListFilter = opts.filter ?? 'activas'
   const limit = Math.min(Math.max(Number(opts.limit) || 500, 1), 2000)
   const rows = await sql().query(
-    `SELECT c.* FROM conversations c
+    `SELECT ${COLUMNAS_LISTA} FROM conversations c
      WHERE ($1 = 'todas' OR ($1 = 'archivadas' AND c.estado = 'cerrado') OR ($1 = 'activas' AND c.estado <> 'cerrado'))
        AND ($2::timestamptz IS NULL OR c.ultima_actividad >= $2::timestamptz)
        AND ($3::timestamptz IS NULL OR c.ultima_actividad <  $3::timestamptz)
@@ -386,7 +396,7 @@ export async function listConversations(opts: ListOptions = {}): Promise<Convers
      LIMIT $6`,
     [filter, opts.desde || null, opts.hasta || null, q, `%${q}%`, limit],
   ) as any[]
-  return rows.map(normConv)
+  return rows.map(r => ({ ...r, id: Number(r.id), no_leidos: Number(r.no_leidos) }) as ConversationListRow)
 }
 
 export async function listMessages(conversationId: number, limit = 500): Promise<MessageRow[]> {
