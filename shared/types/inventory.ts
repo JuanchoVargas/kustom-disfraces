@@ -203,6 +203,8 @@ export interface InvStatus {
   agotadas: number
   /** el stock del adaptador se aplica al sitio, bot y checkout (NUXT_INVENTORY_PUBLIC_STOCK) */
   public_stock: boolean
+  /** valor literal de NUXT_INVENTORY_PUBLIC_STOCK: con adaptador mock, `auto` y `off` dan el mismo public_stock=false */
+  public_stock_mode: 'auto' | 'on' | 'off'
   /** referencias forzadas a agotado a mano (NUXT_SKUS_AGOTADOS) con su motivo */
   agotados_forzados: { sku: string, motivo: string }[]
   /** valores de NUXT_SKUS_AGOTADOS que no corresponden a ningún producto (no se aplican) */

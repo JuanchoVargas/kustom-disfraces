@@ -6,7 +6,7 @@ import { wooWriteConfigured } from './wooWrite'
 import { loadInventory, snapshotStats } from './inventorySnapshot'
 import type { WriteContext } from './inventoryCommon'
 import { stockBajoUmbral } from './inventoryCommon'
-import { agotadosForzados, getStockState, publicStockEnabled, sugerenciaSkusAgotados } from './stockState'
+import { agotadosForzados, getStockState, publicStockEnabled, publicStockMode, sugerenciaSkusAgotados } from './stockState'
 
 export type { WriteContext } from './inventoryCommon'
 
@@ -66,6 +66,7 @@ export async function inventoryStatus(): Promise<InvStatus> {
     stock_bajo: stock.bajo.length,
     agotadas: stock.agotadas.length,
     public_stock: publicStockEnabled(),
+    public_stock_mode: publicStockMode(),
     // Los forzados que sí existen (con su motivo) y, aparte, los valores de la
     // variable que no corresponden a ningún producto: el panel los avisa.
     agotados_forzados: agotadosForzados().filter(f => !stock.forzadosNoEncontrados.includes(f.sku)),

@@ -55,8 +55,14 @@ export interface StockState {
 const TTL_MS = 2 * 60 * 1000
 let cache: { at: number, state: StockState } | null = null
 
+/** Valor literal de NUXT_INVENTORY_PUBLIC_STOCK (cualquier otra cosa cuenta como auto). */
+export function publicStockMode(): 'auto' | 'on' | 'off' {
+  const mode = String(useRuntimeConfig().inventoryPublicStock || 'auto').trim().toLowerCase()
+  return mode === 'on' || mode === 'off' ? mode : 'auto'
+}
+
 export function publicStockEnabled(): boolean {
-  const mode = String(useRuntimeConfig().inventoryPublicStock || 'auto')
+  const mode = publicStockMode()
   if (mode === 'on') return true
   if (mode === 'off') return false
   return getInventoryStore().backend === 'woo'
