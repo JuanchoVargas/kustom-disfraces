@@ -1,4 +1,4 @@
-import type { InvChangeOrigin, InvOpResult, InvOperation, InvVariationState } from '~~/shared/types/inventory'
+import type { InvChangeOrigin, InvOpIds, InvOpResult, InvOperation, InvVariationState } from '~~/shared/types/inventory'
 
 /**
  * Escrituras: una o varias operaciones sobre variaciones (por SKU de talla).
@@ -56,6 +56,16 @@ export default defineEventHandler(async (event) => {
     const ids = {
       ...(Number(r?.product_id) > 0 ? { product_id: Number(r.product_id) } : {}),
       ...(Number(r?.variation_id) > 0 ? { variation_id: Number(r.variation_id) } : {}),
+    }
+    // Lo que el panel mostraba al decidir (ver InvOpIds.esperado). Solo tipos simples.
+    const e = r?.esperado && typeof r.esperado === 'object' ? r.esperado as Record<string, unknown> : null
+    if (e) {
+      (ids as InvOpIds).esperado = {
+        ...(typeof e.manage_stock === 'boolean' ? { manage_stock: e.manage_stock } : {}),
+        ...(e.stock_quantity === null || Number.isFinite(Number(e.stock_quantity)) ? { stock_quantity: e.stock_quantity === null ? null : Number(e.stock_quantity) } : {}),
+        ...(typeof e.regular_price === 'string' ? { regular_price: e.regular_price } : {}),
+        ...(typeof e.sale_price === 'string' ? { sale_price: e.sale_price } : {}),
+      }
     }
     if (r?.op === 'price') {
       // NUNCA escribir un precio normal en 0: en Woo eso publica el producto como

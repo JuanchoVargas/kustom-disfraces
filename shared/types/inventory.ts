@@ -128,6 +128,19 @@ export interface InvPage<T> {
 export interface InvOpIds {
   product_id?: number
   variation_id?: number
+  /**
+   * Lo que el PANEL estaba MOSTRANDO cuando el usuario decidió escribir. El adaptador woo
+   * compara Woo en vivo contra esto (y no solo contra el snapshot): si no coincide, rechaza.
+   * Sin ello, tras un primer rechazo el snapshot ya queda al día y un segundo clic con la
+   * pantalla vieja pasaría. Los scripts no lo envían: para ellos la base es el snapshot.
+   */
+  esperado?: InvEsperado
+}
+export interface InvEsperado {
+  manage_stock?: boolean
+  stock_quantity?: number | null
+  regular_price?: string
+  sale_price?: string
 }
 export type InvOperation =
   | ({ op: 'price', sku: string, regular_price: string | number | null, sale_price: string | number | null } & InvOpIds)
@@ -142,6 +155,8 @@ export interface InvOpResult {
   error?: string
   before?: Partial<InvVariation>
   after?: Partial<InvVariation>
+  /** Rechazada porque Woo cambió respecto a lo que el panel mostraba: el panel debe recargar la fila. */
+  conflicto?: boolean
 }
 
 /**

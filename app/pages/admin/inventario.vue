@@ -358,9 +358,11 @@ async function save(p: InvProduct, v: InvVariation) {
   const ops: any[] = []
   // Los ids de Woo viajan con la operación: la escritura NO vuelve a resolver por SKU.
   const ids = { product_id: p.id, variation_id: v.id }
-  if (d.regular_price !== v.regular_price || d.sale_price !== v.sale_price) ops.push({ op: 'price', sku: v.sku, regular_price: d.regular_price, sale_price: d.sale_price, ...ids })
+  // `esperado` = lo que esta fila MOSTRABA al decidir. Con el adaptador woo el servidor lo
+  // compara con Woo en vivo: si hubo una venta de por medio, rechaza en vez de inflar el stock.
+  if (d.regular_price !== v.regular_price || d.sale_price !== v.sale_price) ops.push({ op: 'price', sku: v.sku, regular_price: d.regular_price, sale_price: d.sale_price, ...ids, esperado: { regular_price: v.regular_price, sale_price: v.sale_price } })
   const stockNow = v.manage_stock ? String(v.stock_quantity ?? 0) : ''
-  if (d.stock_quantity !== stockNow && d.stock_quantity !== '') ops.push({ op: 'stock', sku: v.sku, stock_quantity: Number(d.stock_quantity), ...ids })
+  if (d.stock_quantity !== stockNow && d.stock_quantity !== '') ops.push({ op: 'stock', sku: v.sku, stock_quantity: Number(d.stock_quantity), ...ids, esperado: { manage_stock: v.manage_stock, stock_quantity: v.manage_stock ? (v.stock_quantity ?? 0) : null } })
   if (!ops.length) return
   const before = v
   const guess = optimistic(v, d)
@@ -371,6 +373,18 @@ async function save(p: InvProduct, v: InvVariation) {
     const r = await $fetch<{ resultados: InvOpResult[] }>('/api/inventario/operaciones', { method: 'POST', body: conAutor({ operaciones: ops, origen: 'panel' }) })
     const bad = r.resultados.filter(x => !x.ok)
     if (bad.length) {
+      if (bad.some(b => b.conflicto)) {
+        // Woo cambió (una venta): se trae el valor REAL y se DESCARTA lo que el usuario
+        // había escrito. Con el dato viejo en pantalla, un segundo clic inflaría el stock;
+        // así tiene que decidir de nuevo viendo lo que hay de verdad.
+        await refreshProduct(p.sku)
+        const fresca = items.value.find(x => x.sku === p.sku)?.variations.find(x => x.sku === v.sku)
+        if (fresca) drafts.value[v.sku] = draftOf(fresca)
+        else replaceVariation(p, before)
+        untouch(v.sku)
+        rowState.value[v.sku] = { ok: false, msg: bad.map(b => b.error).join(' · ') }
+        return
+      }
       // Revertir al valor anterior y dejar el borrador con lo que el usuario había escrito.
       replaceVariation(p, before)
       drafts.value[v.sku] = d

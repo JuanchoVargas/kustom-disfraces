@@ -905,6 +905,17 @@ estado). La llave de escritura no existe en local: con `--aplicar` escribe el **
 otra escritura, sea cual sea `NUXT_INVENTORY_BACKEND`, y al final relee Woo para confirmar.
 `backups/` está ignorado por git. `node scripts/test-restaurar-woo.mjs` lo cubre.
 
+**Releer antes de escribir (adaptador woo).** El panel muestra el snapshot y Woo descuenta
+cada venta sin avisarle; como el stock se escribe en absoluto, "corregir" con un dato viejo
+inflaría el inventario real. Antes de escribir, el adaptador lee la variación EN VIVO (una
+lectura por producto padre en los lotes) y la compara con el snapshot **solo en los campos
+que va a tocar** (`conflictoConWoo`): si cambió, esa talla se **rechaza** con los dos
+valores en el mensaje, no se escribe, y el snapshot queda al día para que el panel enseñe
+lo real; el resto del lote sigue. Una venta no impide corregir un precio. Si Woo no se
+puede leer, no se escribe. La única excepción es `restaurarStockWoo` (volver a un respaldo
+es absoluto a propósito). `node scripts/test-releer-woo.mjs` lo cubre contra la base de
+pruebas con un Woo falso en memoria.
+
 Un producto con estructura rota en Woo (`PRODUCTOS_BLOQUEADOS`) no se escribe en ningún
 caso. El botón **Probar escritura en Woo** solo escribe en un borrador (sube $1 y
 revierte); sobre un publicado primero consulta la guarda y, si no bloquea, se detiene

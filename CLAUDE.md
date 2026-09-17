@@ -70,6 +70,9 @@ en `docs/`; este archivo es el resumen de reglas que no se negocian. Fuente:
   `NUXT_INVENTORY_WOO_ALLOW`, códigos de producto) se decide en `guardDraft()`. Ninguna
   prueba ni botón de diagnóstico escribe en un producto publicado. La llave de
   escritura de Woo solo vive en Vercel: nunca en `.env` local.
+- El adaptador woo **relee Woo antes de escribir** y rechaza lo que cambió desde el snapshot
+  (`conflictoConWoo`): el stock se escribe en absoluto y una venta intermedia lo inflaría.
+  No añadir caminos de escritura a Woo que se salten `escribirLoteWoo`/`single`.
 - Nunca correr `scripts/migrar-imagenes-woo.mjs` ni `scripts/aplicar-overrides-woo.mjs
   --aplicar` sin el usuario presente. No cambiar `NUXT_INVENTORY_BACKEND` a `woo`
   sin seguir `docs/inventario-activacion.md`. Las pruebas de inventario solo contra
@@ -103,7 +106,8 @@ en `docs/`; este archivo es el resumen de reglas que no se negocian. Fuente:
 - No hay test runner ni `npm test`; son scripts en `scripts/`. Locales sin red ni
   BD (siempre ejecutables): `test-textos-bot`, `test-agotados-override`,
   `test-autor-panel`, `test-escritura-segura`, `test-sincronizacion`,
-  `test-log-seguro`, `test-guarda-woo`, `test-restaurar-woo`, `test-agotado-stock-real`. Los que escriben exigen `npm run dev:test`; `test-pagos-mp` escribe
+  `test-log-seguro`, `test-guarda-woo`, `test-restaurar-woo`, `test-agotado-stock-real`. `test-releer-woo` escribe en la rama de pruebas (snapshot y
+  registro con SKU ficticios) y no necesita el servidor. Los que escriben exigen `npm run dev:test`; `test-pagos-mp` escribe
   directo en la rama de pruebas (candado `pagos_mp`) y no necesita el servidor.
 - `npm run build` es la validación real antes de un push (es lo que corre Vercel).
 - **Verificar el exit code del build antes de commitear, no solo lanzarlo.** El commit va

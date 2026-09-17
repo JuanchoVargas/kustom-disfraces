@@ -1,4 +1,4 @@
-import type { InvListFilters, InvOpIds, InvOpResult, InvOperation, InvPage, InvProduct, InvVariation } from '~~/shared/types/inventory'
+import type { InvEsperado, InvListFilters, InvOpIds, InvOpResult, InvOperation, InvPage, InvProduct, InvVariation } from '~~/shared/types/inventory'
 import type { InventoryStore } from './inventoryStore'
 import type { WriteContext } from './inventoryCommon'
 import {
@@ -162,6 +162,41 @@ async function writeThrough(product: InvProduct, updated: InvVariation[]): Promi
   return next
 }
 
+const txtStock = (v: Pick<InvVariation, 'manage_stock' | 'stock_quantity' | 'stock_status'>) =>
+  v.manage_stock ? `${v.stock_quantity ?? 0} ${(v.stock_quantity ?? 0) === 1 ? 'unidad' : 'unidades'}` : `sin gestionar (${v.stock_status === 'outofstock' ? 'agotado' : 'disponible'})`
+const txtPrecio = (v: Pick<InvVariation, 'regular_price' | 'sale_price'>) =>
+  `${v.regular_price || 'sin precio'}${v.sale_price ? ` / oferta ${v.sale_price}` : ''}`
+
+/**
+ * RELEER ANTES DE ESCRIBIR. El panel muestra el SNAPSHOT, y Woo descuenta cada venta sin
+ * avisarle. Como el stock se escribe en ABSOLUTO, si la encargada ve 5, en Woo ya hay 4 y
+ * "corrige" a 5, infla el inventario real. Antes de escribir se lee la variación EN VIVO
+ * y se compara con lo que el panel mostraba (`panel` = snapshot), SOLO en los campos
+ * que esta escritura va a tocar: una venta cambia el stock, no impide corregir un precio.
+ * Devuelve null si coinciden, o el texto del rechazo. Pura: la cubre test-releer-woo.
+ */
+export function conflictoConWoo(body: Record<string, unknown>, panel: InvVariation, woo: InvVariation): string | null {
+  const tocaStock = 'manage_stock' in body || 'stock_quantity' in body || 'stock_status' in body
+  const tocaPrecio = 'regular_price' in body || 'sale_price' in body
+  if (tocaStock) {
+    const igual = panel.manage_stock === woo.manage_stock
+      && (woo.manage_stock ? (panel.stock_quantity ?? 0) === (woo.stock_quantity ?? 0) : panel.stock_status === woo.stock_status)
+    if (!igual) return `el stock cambió en Woo desde que se cargó el panel: ahora hay ${txtStock(woo)} y el panel mostraba ${txtStock(panel)}. NO se escribió; la fila ya trae el valor de Woo: revísalo y vuelve a guardar.`
+  }
+  if (tocaPrecio && ((panel.regular_price || '') !== (woo.regular_price || '') || (panel.sale_price || '') !== (woo.sale_price || ''))) {
+    return `el precio cambió en Woo desde que se cargó el panel: ahora es ${txtPrecio(woo)} y el panel mostraba ${txtPrecio(panel)}. NO se escribió; la fila ya trae el valor de Woo: revísalo y vuelve a guardar.`
+  }
+  return null
+}
+
+/** Lo que el panel mostraba: el snapshot, corregido con lo que la operación dice haber visto. */
+const vistaDelPanel = (snapshot: InvVariation, esperado?: InvEsperado): InvVariation => (esperado ? { ...snapshot, ...esperado } : snapshot)
+
+/** ¿El snapshot de esta variación ya no coincide con Woo (en lo que el panel enseña)? */
+const desfasada = (panel: InvVariation, woo: InvVariation) =>
+  panel.manage_stock !== woo.manage_stock || (panel.stock_quantity ?? null) !== (woo.stock_quantity ?? null) || panel.stock_status !== woo.stock_status
+  || (panel.regular_price || '') !== (woo.regular_price || '') || (panel.sale_price || '') !== (woo.sale_price || '')
+
 /**
  * Varias operaciones sobre la MISMA variación (p. ej. precio + stock de una sobreescritura)
  * viajan como UNA sola actualización con los cuerpos fusionados. Enviadas por separado,
@@ -169,11 +204,14 @@ async function writeThrough(product: InvProduct, updated: InvVariation[]): Promi
  * snapshot quedaba sin el segundo cambio y el registro repetía el primero y perdía el otro.
  * Conserva el orden de llegada y el `before` de la primera.
  */
-export function fusionarPorVariacion<T extends { id: number, body: Record<string, unknown> }>(updates: T[]): T[] {
+export function fusionarPorVariacion<T extends { id: number, body: Record<string, unknown>, esperado?: InvEsperado }>(updates: T[]): T[] {
   const porId = new Map<number, T>()
   for (const u of updates) {
     const prev = porId.get(u.id)
-    if (prev) prev.body = { ...prev.body, ...u.body }
+    if (prev) {
+      prev.body = { ...prev.body, ...u.body }
+      if (prev.esperado || u.esperado) prev.esperado = { ...prev.esperado, ...u.esperado }
+    }
     else porId.set(u.id, { ...u, body: { ...u.body } })
   }
   return [...porId.values()]
@@ -190,7 +228,7 @@ interface EscrituraWoo { sku: string, ids?: InvOpIds, cuerpo: () => Record<strin
  */
 async function escribirLoteWoo(escrituras: EscrituraWoo[], ctx: WriteContext): Promise<InvOpResult[]> {
   const results = new Map<string, InvOpResult>()
-  const groups = new Map<number, { product: InvProduct, updates: { id: number, before: InvVariation, sku: string, body: Record<string, unknown> }[] }>()
+  const groups = new Map<number, { product: InvProduct, updates: { id: number, before: InvVariation, sku: string, body: Record<string, unknown>, esperado?: InvEsperado }[] }>()
   for (const e of escrituras) {
     try {
       const body = e.cuerpo()
@@ -200,7 +238,7 @@ async function escribirLoteWoo(escrituras: EscrituraWoo[], ctx: WriteContext): P
       if (blocked) { results.set(e.sku, { sku: e.sku, ok: false, error: blocked }); continue }
       let g = groups.get(r.product.id)
       if (!g) { g = { product: r.product, updates: [] }; groups.set(r.product.id, g) }
-      g.updates.push({ id: r.variation.id, before: r.variation, sku: e.sku, body })
+      g.updates.push({ id: r.variation.id, before: r.variation, sku: e.sku, body, esperado: e.ids?.esperado })
     }
     catch (err) {
       results.set(e.sku, { sku: e.sku, ok: false, error: err instanceof InvValidationError ? err.message : String((err as Error)?.message ?? err) })
@@ -208,6 +246,35 @@ async function escribirLoteWoo(escrituras: EscrituraWoo[], ctx: WriteContext): P
   }
   for (const g of groups.values()) {
     g.updates = fusionarPorVariacion(g.updates)
+
+    // RELEER ANTES DE ESCRIBIR (una lectura por producto padre). Lo que cambió en Woo
+    // desde el snapshot se RECHAZA por SKU; el resto del lote sigue. Si no se puede leer
+    // Woo no se escribe nada de ese producto: sin comprobar, no se pisa.
+    if (!ctx.sinReleer) {
+      let vivas: InvVariation[]
+      try {
+        vivas = (await fetchWooVariations(g.product.id)).map(v => fromRaw(v as WooVariationRaw, v.sku))
+      }
+      catch (err) {
+        const msg = `no se pudo leer el estado actual en Woo (${sanitizeWooError(err)}): NO se escribió. Vuelve a intentarlo.`
+        for (const u of g.updates) results.set(u.sku, { sku: u.sku, ok: false, error: msg })
+        continue
+      }
+      const viva = new Map(vivas.map(v => [v.id, v]))
+      g.updates = g.updates.filter((u) => {
+        const v = viva.get(u.id)
+        const conflicto = v ? conflictoConWoo(u.body, vistaDelPanel(u.before, u.esperado), v) : 'la variación ya no existe en Woo: NO se escribió. Sincroniza con Woo.'
+        if (conflicto) results.set(u.sku, { sku: u.sku, ok: false, error: conflicto, conflicto: true })
+        return !conflicto
+      })
+      // El snapshot se pone al día con lo leído (también las tallas que no se iban a
+      // tocar): al recargar, el panel ya enseña lo que hay de verdad en Woo.
+      const alDia = g.product.variations.map(pv => viva.get(pv.id)).filter((v): v is InvVariation => !!v)
+      if (g.product.variations.some(pv => { const v = viva.get(pv.id); return v && desfasada(pv, v) })) {
+        g.product = await writeThrough(g.product, alDia)
+      }
+    }
+
     for (let i = 0; i < g.updates.length; i += WOO_BATCH) {
       const slice = g.updates.slice(i, i + WOO_BATCH)
       try {
@@ -248,6 +315,8 @@ export interface StockRespaldado { sku: string, manage_stock: boolean, stock_qua
  * estado: una talla que llegó a 0 seguiría "agotada" para siempre.
  */
 export async function restaurarStockWoo(items: StockRespaldado[], ctx: WriteContext): Promise<InvOpResult[]> {
+  // Restaurar es ABSOLUTO a propósito (volver a la foto) y restaurar-woo.mjs ya calculó
+  // las diferencias contra Woo en vivo: aquí no se relee ni se rechaza por "cambió".
   return await escribirLoteWoo(items.map(it => ({
     sku: it.sku,
     cuerpo: () => {
@@ -258,7 +327,7 @@ export async function restaurarStockWoo(items: StockRespaldado[], ctx: WriteCont
         ? { manage_stock: true, stock_quantity: normalizeStock(it.stock_quantity), stock_status: it.stock_status }
         : { manage_stock: false, stock_status: it.stock_status }
     },
-  })), ctx)
+  })), { ...ctx, sinReleer: true })
 }
 
 export function createWooStore(): InventoryStore {
@@ -269,6 +338,20 @@ export function createWooStore(): InventoryStore {
       if (!r) return { sku: op.sku, ok: false, error: 'SKU de variación inexistente en Woo' }
       const blocked = guardDraft(r.product)
       if (blocked) return { sku: op.sku, ok: false, error: blocked }
+      // RELEER ANTES DE ESCRIBIR (ver conflictoConWoo): si Woo cambió desde el snapshot,
+      // se rechaza y el snapshot queda con el valor real para que el panel lo enseñe.
+      if (!ctx.sinReleer) {
+        let viva: InvVariation
+        try {
+          viva = fromRaw(await wooFetch<WooVariationRaw>(`/products/${r.product.id}/variations/${r.variation.id}`), op.sku)
+        }
+        catch (err) {
+          return { sku: op.sku, ok: false, error: `no se pudo leer el estado actual en Woo (${sanitizeWooError(err)}): NO se escribió. Vuelve a intentarlo.` }
+        }
+        const conflicto = conflictoConWoo(body, vistaDelPanel(r.variation, op.esperado), viva)
+        if (desfasada(r.variation, viva)) await writeThrough(r.product, [viva])
+        if (conflicto) return { sku: op.sku, ok: false, error: conflicto, conflicto: true }
+      }
       // ESCRITURA PRIMERO A WOO; el snapshot se actualiza solo si Woo aceptó.
       const raw = await wooWrite<WooVariationRaw>(`/products/${r.product.id}/variations/${r.variation.id}`, { method: 'PUT', body })
       const after = fromRaw(raw, op.sku)

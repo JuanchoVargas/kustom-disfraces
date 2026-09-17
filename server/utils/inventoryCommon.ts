@@ -13,6 +13,12 @@ import { dbConfigured, ensureSchema, sql } from './db'
 export interface WriteContext {
   origen: InvChangeOrigin
   autor?: string
+  /**
+   * Solo adaptador woo: NO releer Woo antes de escribir (ver conflictoConWoo en
+   * inventoryWoo.ts). Únicamente para restaurar un respaldo, donde el valor a escribir
+   * es absoluto a propósito y ya se calculó contra Woo en vivo. El panel nunca lo usa.
+   */
+  sinReleer?: boolean
 }
 
 /** Umbral de "stock bajo" por talla (NUXT_INVENTORY_STOCK_BAJO, default 5). */
