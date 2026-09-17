@@ -22,12 +22,27 @@ Desde entonces ningún script que escriba arranca contra la base de producción.
 
 1. Consola de Neon → **Branches → New branch**, desde `production`, nombre `pruebas`.
    Copia su cadena de conexión (la *pooled*): tendrá **otro endpoint** `ep-…`.
-2. ```bash
-   node scripts/preparar-bd-pruebas.mjs --url "postgresql://…" --confirmar
+2. Crea `.env.test` con una sola línea, `POSTGRES_URL=<cadena pooled de la rama>`, y corre:
+   ```bash
+   node scripts/preparar-bd-pruebas.mjs --confirmar
    ```
-   Genera `.env.test` (copia de `.env` con **solo** la base cambiada — el resto de
-   llaves se copia tal cual) y crea el marcador `kustom_bd_pruebas` en la rama.
-   Sin `--confirmar` solo comprueba y no escribe nada.
+   (También acepta `--url "postgresql://…"`, pero así la cadena queda en el historial
+   de la terminal.) Reescribe `.env.test` completo y crea el marcador
+   `kustom_bd_pruebas` en la rama. Sin `--confirmar` solo comprueba y no escribe nada.
+
+   `.env.test` **no es una copia de `.env`**: un entorno de pruebas no debe poder
+   hablar con el mundo real. El script:
+   - quita **todo** lo de Postgres de producción (también usuario y contraseña) y deja
+     solo la rama de pruebas;
+   - **vacía** las credenciales de salida (WhatsApp, Messenger, SMTP/Resend, Mercado
+     Pago, llaves de **escritura** de Woo, WordPress, alertas, pixel, contraseña del
+     panel de producción) e imprime la lista de las que vació (solo nombres);
+   - **nunca copia** `NUXT_META_APP_SECRET` ni `CRON_SECRET`: genera valores aleatorios
+     locales (los webhooks y los crons son fail-closed) y los conserva entre corridas;
+   - deja `MP_ACCESS_TOKEN` con el marcador `TEST-local-sin-credenciales`: el checkout
+     valida precios y stock, pero jamás crea una preferencia real;
+   - conserva la llave de **solo lectura** de Woo (las suites leen el catálogo),
+     `NUXT_INBOX_PASSWORD`, `NUXT_SKUS_AGOTADOS` y las variables públicas.
 3. `npm run dev:test` y ya se pueden correr los tests.
 
 **Cómo se reconoce una base de pruebas:** tiene la tabla `kustom_bd_pruebas`.
