@@ -12,6 +12,7 @@
 //   3. Tope total: con una fila "gorda" (bytes = tope) un adjunto que llega por
 //      Messenger se registra como mensaje pero NO se guarda (download_failed =
 //      limite_almacenamiento); enviar una imagen desde la bandeja responde 507.
+import './lib/firma-meta.mjs' // firma X-Hub-Signature-256 en los webhooks simulados (secreto local de .env.test)
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { cargarEnv, exigirBdDePruebas } from './lib/guard-bd.mjs'

@@ -113,6 +113,12 @@ export default defineNuxtConfig({
     whatsappToken: process.env.NUXT_WHATSAPP_TOKEN || '',              // -> NUXT_WHATSAPP_TOKEN (token de la app de Meta)
     whatsappPhoneId: process.env.NUXT_WHATSAPP_PHONE_ID || '',         // -> NUXT_WHATSAPP_PHONE_ID (phone number id)
     whatsappVerifyToken: process.env.NUXT_WHATSAPP_VERIFY_TOKEN || '', // -> NUXT_WHATSAPP_VERIFY_TOKEN (verificación del webhook)
+    // App Secret de la app de Meta: valida la firma X-Hub-Signature-256 de los POST de
+    // /api/whatsapp y /api/messenger (server/utils/metaFirma.ts). FAIL-CLOSED: sin él
+    // esos webhooks responden 401. Debe existir en Production ANTES del deploy.
+    metaAppSecret: process.env.NUXT_META_APP_SECRET || '',            // -> NUXT_META_APP_SECRET
+    // Solo si Messenger/Instagram cuelgan de OTRA app de Meta; vacío = se usa el de arriba.
+    messengerAppSecret: process.env.NUXT_MESSENGER_APP_SECRET || '',  // -> NUXT_MESSENGER_APP_SECRET (opcional)
     // Kill-switch temporal: fuerza TODOS los menús a texto numerado (sin intentar
     // interactivo). Mientras cazamos por qué Meta acepta y descarta el interactivo.
     // Override en runtime (Vercel) sin redeploy de código.

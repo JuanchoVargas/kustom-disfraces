@@ -12,9 +12,16 @@ import type { WaIncoming } from '../utils/whatsappBot'
 import type { MessengerMessage } from '../utils/messenger'
 import type { MediaKind } from '../utils/media'
 import { logPayloadShape, maskId } from '../utils/logSafe'
+import { jsonDeCrudo, verificarFirmaMeta } from '../utils/metaFirma'
 
 export default defineEventHandler(async (event) => {
-  const body = await readBody(event).catch(() => null)
+  // PRIMERA LÍNEA: firma de Meta sobre el cuerpo CRUDO (X-Hub-Signature-256), en MODO
+  // OBSERVACIÓN: no se pudo confirmar que Messenger/Instagram usen la misma app de
+  // Meta que WhatsApp, así que una firma que no cuadre solo deja un log [meta-firma]
+  // y el mensaje se procesa igual. Pasar soloObservar a false cuando esté confirmado.
+  const crudo = await verificarFirmaMeta(event, 'messenger', { soloObservar: true })
+  // El JSON se parsea desde esos mismos bytes ya verificados.
+  const body = jsonDeCrudo<any>(crudo)
   logPayloadShape('msg-webhook', body) // solo estructura y solo con NUXT_DEBUG_PAYLOADS=true
   const object = body?.object
   if (object !== 'page' && object !== 'instagram') {

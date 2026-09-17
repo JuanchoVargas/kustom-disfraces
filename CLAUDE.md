@@ -38,9 +38,19 @@ en `docs/`; este archivo es el resumen de reglas que no se negocian. Fuente:
 - `CRON_SECRET` debe existir en Vercel **Production antes** de mergear código que la
   exija: los endpoints de cron son fail-closed (401 sin ella) y Vercel solo ejecuta
   los crons en el deployment de Production. En Preview es opcional (pruebas manuales).
+- `NUXT_META_APP_SECRET` es obligatoria en Vercel **Production**; el orden es
+  **variable primero, merge después**. El POST de `/api/whatsapp` valida la firma
+  `X-Hub-Signature-256` y es fail-closed (401 sin la variable): sin ella el bot deja
+  de contestar. `/api/messenger` está en modo observación (no rechaza, solo loguea
+  `[meta-firma] … observación`) hasta confirmar si usa la misma app de Meta; si es
+  otra, su secreto va en `NUXT_MESSENGER_APP_SECRET`.
 
 ## Seguridad y datos
 
+- **Webhooks de Meta firmados**: todo POST a `/api/whatsapp` y `/api/messenger` pasa
+  primero por `verificarFirmaMeta()` (`server/utils/metaFirma.ts`), que verifica el
+  HMAC del cuerpo CRUDO; el handler parsea el JSON desde esos mismos bytes. Nunca
+  usar `readBody` antes de verificar. `node scripts/test-firma-meta.mjs` lo cubre.
 - Claves de Woo, Mercado Pago, Meta y SMTP **nunca al cliente**: viven en
   `runtimeConfig` server-only. Los precios se recalculan siempre en el servidor.
 - **Logs sin datos personales**: ningún `console.*` imprime teléfono completo, nombre,

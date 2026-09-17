@@ -95,6 +95,43 @@ En local el valor va en **`.env.test`** (el archivo que carga `npm run dev:test`
 lo leen `test-wa-webhook.mjs`, `test-wa-db-down.mjs` y `test-media-retencion.mjs`)
 y es **distinto** del de producción.
 
+### `NUXT_META_APP_SECRET`: obligatoria en Production ANTES del merge
+
+**Orden obligatorio: primero la variable en Vercel Production, después el merge.**
+
+El POST de `/api/whatsapp` valida la firma **`X-Hub-Signature-256`** que Meta pone en
+cada webhook: HMAC-SHA256 del **cuerpo crudo** con el App Secret de la app
+(`server/utils/metaFirma.ts`). Sin eso, cualquiera que conociera la URL podía inyectar
+mensajes falsos en la bandeja y hacer que el bot escribiera por WhatsApp al número que
+pusiera como remitente.
+
+> ⚠️ **`/api/messenger` (Messenger e Instagram) está en MODO OBSERVACIÓN**: calcula la
+> firma pero **no rechaza**. No se pudo confirmar que ese canal cuelgue de la misma app
+> de Meta que WhatsApp; con el secreto equivocado, rechazar lo apagaría. Si la firma no
+> cuadra deja el log `[meta-firma] /api/messenger observación: <motivo> (no se rechaza)`.
+> Cuando el primer mensaje real de Messenger pase **sin** ese log (misma app), o se
+> defina `NUXT_MESSENGER_APP_SECRET` (otra app), se pasa `soloObservar` a `false` en
+> `server/api/messenger.post.ts` y ese canal también queda fail-closed.
+
+- **Fail-closed (WhatsApp)**: sin firma, con firma inválida o **sin la variable** →
+  **401** y no se procesa nada. Si se despliega sin `NUXT_META_APP_SECRET`, **el bot
+  de WhatsApp deja de contestar** hasta crearla y hacer redeploy. El log solo dice ruta
+  y motivo — `[meta-firma] /api/whatsapp rechazado (401): sin_cabecera | firma_distinta
+  | sin_variable | cuerpo_vacio` —, nunca el cuerpo ni la firma.
+- Dónde está: developers.facebook.com → la app → Configuración → Básica → *Clave
+  secreta de la app*. Va en Vercel **Production** como variable sensible.
+- Si Messenger/Instagram cuelgan de **otra** app de Meta distinta a la de WhatsApp,
+  su secreto va en `NUXT_MESSENGER_APP_SECRET`; vacía = se usa el mismo para ambos.
+- El GET de verificación del webhook (`hub.verify_token`) no cambia.
+- La firma se calcula sobre los bytes tal como llegan: **nunca** usar `readBody` y
+  re-serializar (Meta escapa los no ASCII como `\uXXXX`; cualquier diferencia rompe
+  el HMAC). El handler parsea el JSON desde ese mismo cuerpo crudo.
+- Pruebas: `node scripts/test-firma-meta.mjs` (sin red externa). Los scripts que
+  simulan webhooks firman solos (`scripts/lib/firma-meta.mjs`) con el
+  `NUXT_META_APP_SECRET` de **`.env.test`**, que es un valor local de pruebas.
+- Verificar tras el deploy: un POST sin firma a `/api/whatsapp` debe dar 401 y un
+  mensaje real desde el número de prueba (`WA_TEST_TO`) debe recibir respuesta.
+
 ## Estructura
 
 ```

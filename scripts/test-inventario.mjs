@@ -18,6 +18,7 @@
 //   8. Filtro stock bajo/agotado tras poner stock 0.
 //   9. Vista previa "aplicar a Woo": antes → después coherente; NO escribe.
 //  10. Sin sesión → 401.
+import './lib/firma-meta.mjs' // firma X-Hub-Signature-256 en los webhooks simulados (secreto local de .env.test)
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { exigirBdDePruebas } from './lib/guard-bd.mjs'

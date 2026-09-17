@@ -1,5 +1,6 @@
 // Manda frases al bot (webhook simulado de Messenger o WhatsApp) y muestra la respuesta.
 //   node scripts/probar-bot.mjs msg|wa "frase" "@id-de-boton" ...   (el prefijo @ envía un tap de botón/quick reply)
+import './lib/firma-meta.mjs' // firma X-Hub-Signature-256 en los webhooks simulados (secreto local de .env.test)
 import { readFileSync } from 'node:fs'
 import { exigirBdDePruebas } from './lib/guard-bd.mjs'
 const env = {}; for (const l of readFileSync('E:/Trabajo/KustomDisfracez/.env','utf8').split(/\r?\n/)) { const m = l.match(/^([A-Z_]+)=(.*)$/); if (m) env[m[1]] = m[2].trim() }

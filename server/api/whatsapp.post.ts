@@ -15,9 +15,14 @@
 import type { WaIncoming } from '../utils/whatsappBot'
 import type { WaMessage } from '../utils/whatsapp'
 import { logPayloadShape, maskId } from '../utils/logSafe'
+import { jsonDeCrudo, verificarFirmaMeta } from '../utils/metaFirma'
 
 export default defineEventHandler(async (event) => {
-  const body = await readBody(event).catch(() => null)
+  // PRIMERA LÍNEA: firma de Meta sobre el cuerpo CRUDO (X-Hub-Signature-256). Sin
+  // firma, con firma inválida o sin NUXT_META_APP_SECRET → 401 y no se procesa nada.
+  const crudo = await verificarFirmaMeta(event, 'whatsapp')
+  // El JSON se parsea desde esos mismos bytes ya verificados.
+  const body = jsonDeCrudo<any>(crudo)
 
   // Nunca se registra el payload: trae teléfono, nombre y texto del cliente. Con
   // NUXT_DEBUG_PAYLOADS=true queda solo su ESTRUCTURA (claves y tipos), que es lo

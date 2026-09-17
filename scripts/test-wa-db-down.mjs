@@ -8,6 +8,7 @@
 //
 // (dotenv NO pisa variables ya presentes en el entorno, así que esas URLs rotas
 // ganan sobre las del .env.)
+import './lib/firma-meta.mjs' // firma X-Hub-Signature-256 en los webhooks simulados (secreto local de .env.test)
 import { cargarEnv } from './lib/guard-bd.mjs'
 
 const BASE = process.argv[2] ?? 'http://localhost:3000'

@@ -17,6 +17,7 @@
 //   5. isHumanRequest: frases explícitas disparan handoff; "disfraz de agente
 //      secreto" NO (se valida vía estado de la conversación).
 // Al final limpia las filas de prueba.
+import './lib/firma-meta.mjs' // firma X-Hub-Signature-256 en los webhooks simulados (secreto local de .env.test)
 import { cargarEnv, exigirBdDePruebas } from './lib/guard-bd.mjs'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'

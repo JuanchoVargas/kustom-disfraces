@@ -4,6 +4,7 @@
 // webhook simulado del canal donde ocurrió y se comprueba la respuesta del bot.
 //
 //   node scripts/test-bot-conversion.mjs [baseUrl]
+import './lib/firma-meta.mjs' // firma X-Hub-Signature-256 en los webhooks simulados (secreto local de .env.test)
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { exigirBdDePruebas } from './lib/guard-bd.mjs'

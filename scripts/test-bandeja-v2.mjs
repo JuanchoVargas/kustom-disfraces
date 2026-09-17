@@ -22,6 +22,7 @@
 //      por fecha, archivar/desarchivar (nunca se borra), envío de imagen desde la
 //      bandeja (en seco, multipart) y envío de texto en seco.
 // Con --keep NO limpia (para tomar capturas en /admin/chats). Sin él limpia al final.
+import './lib/firma-meta.mjs' // firma X-Hub-Signature-256 en los webhooks simulados (secreto local de .env.test)
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { exigirBdDePruebas } from './lib/guard-bd.mjs'
