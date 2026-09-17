@@ -16,6 +16,9 @@ import { loadProductBySku } from '../../utils/inventorySnapshot'
  *   estado: 'draft' | 'publish'            → solo productos en ese estado
  *   limite: N                              → como mucho N sobreescrituras
  * Los filtros aplican a la vista previa y a la aplicación por igual.
+ *   retirarHuerfanas: true (solo al aplicar) → BORRA las sobreescrituras seleccionadas
+ *           cuyo SKU ya no existe en el snapshot (p. ej. una variación eliminada en Woo).
+ *           Sin esto quedan para siempre como fila con error. Se devuelven en `huerfanas`.
  * Lo llama scripts/aplicar-overrides-woo.mjs; también se puede usar desde el panel.
  */
 interface Fila {
@@ -34,7 +37,7 @@ const pick = (v: InvVariation | null | undefined): Partial<InvVariation> => v
 
 export default defineEventHandler(async (event) => {
   requireInbox(event)
-  const body = await readBody<{ preview?: unknown, autor?: unknown, solo?: unknown, estado?: unknown, limite?: unknown }>(event).catch(() => ({} as any))
+  const body = await readBody<{ preview?: unknown, autor?: unknown, solo?: unknown, estado?: unknown, limite?: unknown, retirarHuerfanas?: unknown }>(event).catch(() => ({} as any))
   const preview = body?.preview !== false
   const solo = Array.isArray(body?.solo) ? body.solo.map((s: unknown) => String(s).trim()).filter(Boolean) : []
   const estado = body?.estado === 'draft' || body?.estado === 'publish' ? body.estado : null
@@ -84,13 +87,17 @@ export default defineEventHandler(async (event) => {
   // Sin cambio pendiente (Woo ya coincide) o aplicadas con éxito → se retira la sobreescritura.
   const aplicadas = filas.filter(f => !f.error && (f.sin_cambio || okBySku.get(f.sku) === true)).map(f => f.sku)
   await deleteOverrides(aplicadas)
+  // Huérfanas: la variación ya no existe en el snapshot. Solo se retiran si se pide.
+  const huerfanas = body?.retirarHuerfanas === true ? filas.filter(f => f.error && f.producto === '?').map(f => f.sku) : []
+  if (huerfanas.length) await deleteOverrides(huerfanas)
   return {
+    huerfanas,
     preview: false,
     total: filas.length,
     aplicadas: aplicadas.length,
     fallidas: resultados.filter(r => !r.ok).length,
     resultados,
-    pendientes_restantes: filas.length - aplicadas.length,
+    pendientes_restantes: filas.length - aplicadas.length - huerfanas.length,
     filtro,
   }
 })

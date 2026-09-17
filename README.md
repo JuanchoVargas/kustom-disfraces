@@ -916,6 +916,18 @@ puede leer, no se escribe. La única excepción es `restaurarStockWoo` (volver a
 es absoluto a propósito). `node scripts/test-releer-woo.mjs` lo cubre contra la base de
 pruebas con un Woo falso en memoria.
 
+**Estructura rota en Woo.** Además de la lista fija `PRODUCTOS_BLOQUEADOS` (Vaquerito Woody),
+`estructuraRota()` bloquea por lo que hay HOY en el snapshot: una variación con el SKU del
+propio producto (típico de una variación sobrante "Cualquier talla" sin SKU: Woo le muestra
+el del producto) o dos variaciones con el mismo SKU. Se levanta sola al corregirlo en Woo y
+sincronizar. Caso Spider-Man Negro Línea Entrada (producto 22, variación 729), en orden:
+1. wp-admin → el producto → Variaciones → eliminar la fila "Cualquier Talla" (#729) → Guardar → Actualizar.
+2. Panel → **Sincronizar con Woo** (el producto queda con 6 tallas y deja de salir bloqueado).
+3. `POST /api/inventario/aplicar-woo` con `{ preview: true, solo: ['001002001'] }`: deben salir 6
+   filas de stock y 1 con error "SKU de variación inexistente" (la sobreescritura huérfana de la 729).
+4. Lo mismo con `{ preview: false, autor, solo: ['001002001'], retirarHuerfanas: true }`: aplica las 6
+   y BORRA la huérfana (vuelve en `huerfanas`). Lectura de vuelta en Woo y `restaurar-woo` en seco.
+
 Un producto con estructura rota en Woo (`PRODUCTOS_BLOQUEADOS`) no se escribe en ningún
 caso. El botón **Probar escritura en Woo** solo escribe en un borrador (sube $1 y
 revierte); sobre un publicado primero consulta la guarda y, si no bloquea, se detiene

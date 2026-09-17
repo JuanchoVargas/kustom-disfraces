@@ -55,7 +55,7 @@ const BLOQUEADO = 'bloqueado: el adaptador woo solo escribe en BORRADORES (y en 
  * La lista compara el código del PRODUCTO (SKU del padre), exacto y sin distinguir
  * mayúsculas; un SKU de variación ("…-T12") no abre nada.
  */
-export function bloqueoEscrituraWoo(product: Pick<InvProduct, 'id' | 'sku' | 'status'>, cfg: { onlyDrafts: boolean, allow: string[] }): string | null {
+export function bloqueoEscrituraWoo(product: Pick<InvProduct, 'id' | 'sku' | 'status'> & { name?: string, variations?: { id: number, sku: string }[] }, cfg: { onlyDrafts: boolean, allow: string[] }): string | null {
   // Estructura rota en Woo (SKU duplicado / padre con SKU de variación): no se
   // escribe ni en borradores ni en permitidos, porque no se sabe en qué variación se escribiría.
   const roto = bloqueoDe(product)
@@ -65,7 +65,7 @@ export function bloqueoEscrituraWoo(product: Pick<InvProduct, 'id' | 'sku' | 'st
   return codigo && cfg.allow.some(a => a.toLowerCase() === codigo) ? null : BLOQUEADO
 }
 /** La guarda con la configuración real del servidor. También la consulta probar-woo. */
-export function guardDraft(product: Pick<InvProduct, 'id' | 'sku' | 'status'>): string | null {
+export function guardDraft(product: Pick<InvProduct, 'id' | 'sku' | 'status'> & { name?: string, variations?: { id: number, sku: string }[] }): string | null {
   return bloqueoEscrituraWoo(product, { onlyDrafts: wooOnlyDrafts(), allow: wooAllowList() })
 }
 

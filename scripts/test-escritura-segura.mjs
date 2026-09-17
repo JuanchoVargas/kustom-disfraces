@@ -20,7 +20,7 @@ globalThis.createError = (e) => { const x = new Error(e?.statusMessage ?? e?.mes
 const { createJiti } = await import('jiti')
 const jiti = createJiti(import.meta.url, { alias: { '~~': root, '~': root, '@@': root, '@': root } })
 const resolveMod = await jiti.import('../server/utils/inventoryResolve.ts')
-const { tallaDesdeTitulo, PRODUCTOS_BLOQUEADOS, SKUS_BLOQUEADOS, bloqueoDe } = resolveMod
+const { tallaDesdeTitulo, PRODUCTOS_BLOQUEADOS, SKUS_BLOQUEADOS, bloqueoDe, estructuraRota } = resolveMod
 
 let fails = 0
 const check = (nombre, ok, detalle = '') => {
@@ -70,7 +70,16 @@ check('un SKU inexistente no resuelve', !resultados[3][1].ok, resultados[3][1].m
 
 console.log('\n— Bloqueo de escritura —')
 check('el producto 747 está bloqueado', !!PRODUCTOS_BLOQUEADOS[747] && !!SKUS_BLOQUEADOS['005001001-T12'])
-check('el producto 22 (SKU 001002001) está bloqueado', !!PRODUCTOS_BLOQUEADOS[22] && !!SKUS_BLOQUEADOS['001002001'])
+// Spider-Man Negro (22) ya NO está en la lista fija: lo bloquea su ESTRUCTURA mientras exista
+// la variación 729 (una sobrante "Cualquier talla" con el SKU del producto) y se desbloquea
+// solo cuando se elimina en Woo y se sincroniza.
+const negroRoto = CATALOGO[1]
+const negroSano = { id: 22, sku: '001002001', name: 'Spider-Man Negro Línea Entrada', variations: [2, 4, 6, 8, 10, 12].map((t, i) => ({ id: 223 + i, sku: `001002001-T${t}` })) }
+check('el producto 22 ya no está en la lista fija', !PRODUCTOS_BLOQUEADOS[22] && !SKUS_BLOQUEADOS['001002001'])
+check('…pero sigue BLOQUEADO mientras la variación 729 lleve el SKU del producto', (bloqueoDe(negroRoto) ?? '').includes('la variación 729 lleva el SKU del propio producto (001002001)'), bloqueoDe(negroRoto) ?? 'null')
+check('…y se DESBLOQUEA solo cuando esa variación ya no está (6 tallas sanas)', bloqueoDe(negroSano) === null)
+check('estructuraRota() detecta dos variaciones con el mismo SKU', (estructuraRota({ id: 1, sku: 'X', variations: [{ id: 1, sku: 'X-T4' }, { id: 2, sku: 'X-T4' }, { id: 3, sku: 'X-T6' }] }) ?? '').includes('comparten SKU (X-T4 ×2)'))
+check('estructuraRota() no marca un producto sin variaciones ni uno sano', estructuraRota({ id: 1, sku: 'X' }) === null && estructuraRota(CATALOGO[0]) === null)
 check('bloqueoDe() marca el 747 por id', bloqueoDe({ id: 747, sku: 'lo-que-sea' }) !== null)
 check('bloqueoDe() NO marca un producto sano', bloqueoDe({ id: 130, sku: '001011001' }) === null)
 

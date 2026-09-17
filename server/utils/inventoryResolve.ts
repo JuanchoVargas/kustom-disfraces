@@ -33,25 +33,45 @@ export interface VariacionResuelta {
 
 /**
  * PRODUCTOS BLOQUEADOS PARA ESCRITURA. Estructura rota en Woo: escribir ahí es
- * escribir en la variación equivocada. Se levanta cuando el catálogo se corrija.
+ * escribir en la variación equivocada. Dos mecanismos:
  *
- *  747 "Vaquerito Woody": 8 variaciones con el MISMO SKU (005001001-T12), tallas 4
- *      y 6 repetidas, una variación sin talla, y el padre con un SKU de talla.
- *  22  "Spider-Man Negro Línea Entrada": su variación 729 lleva el SKU del padre
- *      (001002001), así que ese SKU es ambiguo entre padre y variación.
+ *  1. LISTA FIJA, para lo que no se va a arreglar pronto:
+ *     747 "Vaquerito Woody": 8 variaciones con el MISMO SKU (005001001-T12), tallas 4
+ *         y 6 repetidas, una variación sin talla, y el padre con un SKU de talla.
+ *  2. DETECCIÓN POR ESTRUCTURA (estructuraRota), sobre lo que hay HOY en el snapshot:
+ *     una variación con el SKU del propio producto, o dos variaciones con el mismo SKU.
+ *     Se levanta SOLA cuando el catálogo se corrige en Woo y se sincroniza: así se
+ *     desbloquea "Spider-Man Negro Línea Entrada" (producto 22), cuya variación 729 es
+ *     una sobrante "Cualquier talla" sin SKU propio, a la que Woo le muestra el SKU del
+ *     producto (001002001). Hasta el 2026-09-17 ese producto estaba en la lista fija.
  */
 export const PRODUCTOS_BLOQUEADOS: Record<number, string> = {
   747: 'Vaquerito Woody: 8 variaciones comparten el SKU 005001001-T12 (tallas 4 y 6 repetidas, una sin talla, y el padre con SKU de talla). Corregir en Woo antes de escribir.',
-  22: 'Spider-Man Negro Línea Entrada: la variación 729 lleva el SKU de su propio padre (001002001). Corregir el SKU de la variación antes de escribir.',
 }
 export const SKUS_BLOQUEADOS: Record<string, string> = {
   '005001001-T12': PRODUCTOS_BLOQUEADOS[747]!,
-  '001002001': PRODUCTOS_BLOQUEADOS[22]!,
+}
+
+type ProductoConVariaciones = Pick<InvProduct, 'id' | 'sku'> & { name?: string, variations?: { id: number, sku: string }[] }
+
+/** Estructura rota detectable con los datos del propio producto, o null. Pura. */
+export function estructuraRota(p: ProductoConVariaciones): string | null {
+  const vs = p.variations ?? []
+  const nombre = p.name ?? p.sku
+  const comoElProducto = vs.filter(v => v.sku && v.sku === p.sku)
+  if (comoElProducto.length) {
+    return `${nombre}: la variación ${comoElProducto.map(v => v.id).join(', ')} lleva el SKU del propio producto (${p.sku}); suele ser una variación sobrante "Cualquier talla" sin SKU. Eliminarla (o corregirla) en Woo y sincronizar.`
+  }
+  const cuenta = new Map<string, number>()
+  for (const v of vs) if (v.sku) cuenta.set(v.sku, (cuenta.get(v.sku) ?? 0) + 1)
+  const repetidos = [...cuenta].filter(([, n]) => n > 1).map(([sku, n]) => `${sku} ×${n}`)
+  if (repetidos.length) return `${nombre}: varias variaciones comparten SKU (${repetidos.join(', ')}). Corregir en Woo y sincronizar.`
+  return null
 }
 
 /** Motivo de bloqueo de un producto, o null. */
-export function bloqueoDe(p: Pick<InvProduct, 'id' | 'sku'>): string | null {
-  return PRODUCTOS_BLOQUEADOS[p.id] ?? SKUS_BLOQUEADOS[p.sku] ?? null
+export function bloqueoDe(p: ProductoConVariaciones): string | null {
+  return PRODUCTOS_BLOQUEADOS[p.id] ?? SKUS_BLOQUEADOS[p.sku] ?? estructuraRota(p)
 }
 
 /**
