@@ -169,6 +169,9 @@ export default defineNuxtConfig({
     // productos EN BORRADOR; cualquier escritura a un publicado se rechaza sin
     // tocar Woo. Poner 'false' cuando se validen las operaciones masivas.
     inventoryWooOnlyDrafts: process.env.NUXT_INVENTORY_WOO_ONLY_DRAFTS ?? 'true', // -> NUXT_INVENTORY_WOO_ONLY_DRAFTS (true | false)
+    // Lista de permitidos de esa guarda: códigos de PRODUCTO publicados en los que SÍ
+    // se puede escribir con ONLY_DRAFTS=true (piloto). Separados por coma. Vacío = ninguno.
+    inventoryWooAllow: process.env.NUXT_INVENTORY_WOO_ALLOW || '', // -> NUXT_INVENTORY_WOO_ALLOW (ej: 001006004-P)
     // ¿El stock del adaptador se aplica al SITIO, al BOT y al CHECKOUT? (lógica de
     // agotado: talla en 0 no seleccionable, producto en 0 fuera del catálogo).
     //   auto (default) = solo cuando el adaptador es woo (el mock es simulación).

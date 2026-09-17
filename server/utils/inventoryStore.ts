@@ -1,7 +1,7 @@
 import type { InvListFilters, InvOpResult, InvOperation, InvPage, InvProduct, InvStatus, InventoryBackend } from '~~/shared/types/inventory'
 import { dbConfigured } from './db'
 import { createMockStore, countOverrides } from './inventoryMock'
-import { createWooStore, wooOnlyDrafts } from './inventoryWoo'
+import { createWooStore, wooAllowList, wooOnlyDrafts } from './inventoryWoo'
 import { wooWriteConfigured } from './wooWrite'
 import { loadInventory, snapshotStats } from './inventorySnapshot'
 import type { WriteContext } from './inventoryCommon'
@@ -75,5 +75,6 @@ export async function inventoryStatus(): Promise<InvStatus> {
     agotados_sugerencia: sugerenciaSkusAgotados(stock),
     woo_write: wooWriteConfigured(),
     woo_only_drafts: wooOnlyDrafts(),
+    woo_allow: wooAllowList(),
   }
 }

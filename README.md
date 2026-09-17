@@ -879,6 +879,21 @@ El panel solo habla con la interfaz `InventoryStore` (`listProducts`,
 | `mock` (default) | Snapshot de Woo (llave de lectura) + `inventory_overrides` encima | `inventory_overrides` (Postgres) — **NO toca Woo ni el sitio**; el panel muestra "Modo simulación" | Mientras no haya llave de escritura probada |
 | `woo` | Snapshot de Woo | REST API wc/v3 con la llave de escritura (`NUXT_WOO_WRITE_*`, respaldo legado `NUXT_WOO_ORDERS_*`; guarda `NUXT_INVENTORY_WOO_ONLY_DRAFTS=true` = solo borradores hasta validar las masivas): PUT por variación o `variations/batch` de 100, agrupado por producto padre; write-through al snapshot | Tras el checklist `docs/inventario-activacion.md` |
 
+**Guarda de escritura del adaptador woo** (`guardDraft` en `inventoryWoo.ts`; la cumplen
+la escritura simple, las masivas, la importación y `aplicar-woo`). Se decide ANTES de
+llamar a Woo. `node scripts/test-guarda-woo.mjs` cubre los tres casos:
+
+| `NUXT_INVENTORY_WOO_ONLY_DRAFTS` | `NUXT_INVENTORY_WOO_ALLOW` | Se puede escribir en |
+|---|---|---|
+| `true` (default) | vacía | solo borradores |
+| `true` | `001006004-P` (códigos de PRODUCTO, por comas) | borradores + esos códigos y nada más (piloto) |
+| `false` | (no se usa) | todo |
+
+Un producto con estructura rota en Woo (`PRODUCTOS_BLOQUEADOS`) no se escribe en ningún
+caso. El botón **Probar escritura en Woo** solo escribe en un borrador (sube $1 y
+revierte); sobre un publicado primero consulta la guarda y, si no bloquea, se detiene
+y falla sin tocar precios.
+
 Ambos devuelven **el shape de Woo** (`shared/types/inventory.ts`: `sku`,
 `regular_price` como texto, `stock_quantity`, `stock_status`,
 `attributes[{name:'Talla', option}]`…) y dejan en `inventory_changes` una fila

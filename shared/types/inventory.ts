@@ -195,6 +195,8 @@ export interface InvStatus {
   woo_write: boolean
   /** guarda activa: el adaptador woo solo escribe en borradores */
   woo_only_drafts: boolean
+  /** publicados en los que la guarda SÍ deja escribir (NUXT_INVENTORY_WOO_ALLOW) */
+  woo_allow: string[]
   /** tallas (de publicados) con 0 < cantidad ≤ umbral */
   stock_bajo: number
   /** tallas (de publicados) agotadas */

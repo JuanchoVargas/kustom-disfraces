@@ -32,18 +32,41 @@ const wooWrite = wooWriteFetch
  * GUARDA DE VALIDACIÓN (NUXT_INVENTORY_WOO_ONLY_DRAFTS, default true): mientras
  * no se validen las operaciones masivas, el adaptador woo SOLO escribe en
  * productos EN BORRADOR. Una escritura a un publicado se rechaza ANTES de
- * llamar a Woo, con mensaje claro. Los 66 publicados no se tocan.
+ * llamar a Woo, con mensaje claro.
+ *
+ * LISTA DE PERMITIDOS (NUXT_INVENTORY_WOO_ALLOW, códigos de PRODUCTO separados por
+ * coma, p. ej. "001006004-P"): con la guarda activa se puede escribir en borradores
+ * + esos códigos y en nada más. Sirve para el piloto: abrir UN publicado sin abrir
+ * los demás. Con ONLY_DRAFTS=false la lista no hace falta: se escribe en todo.
  */
 export function wooOnlyDrafts(): boolean {
   return String(useRuntimeConfig().inventoryWooOnlyDrafts ?? 'true') !== 'false'
 }
-const BLOQUEADO = 'bloqueado: el adaptador woo solo escribe en BORRADORES mientras se validan las operaciones masivas (NUXT_INVENTORY_WOO_ONLY_DRAFTS)'
-function guardDraft(product: InvProduct): string | null {
+/** "001006004-P, 001001008" → ['001006004-P', '001001008'] (sin vacíos ni espacios). */
+export function parseWooAllow(crudo: unknown): string[] {
+  return String(crudo ?? '').split(',').map(s => s.trim()).filter(Boolean)
+}
+export function wooAllowList(): string[] {
+  return parseWooAllow(useRuntimeConfig().inventoryWooAllow)
+}
+const BLOQUEADO = 'bloqueado: el adaptador woo solo escribe en BORRADORES (y en los códigos de NUXT_INVENTORY_WOO_ALLOW) mientras se validan las operaciones masivas (NUXT_INVENTORY_WOO_ONLY_DRAFTS)'
+/**
+ * Decisión PURA de la guarda: null = se puede escribir; texto = motivo del bloqueo.
+ * La lista compara el código del PRODUCTO (SKU del padre), exacto y sin distinguir
+ * mayúsculas; un SKU de variación ("…-T12") no abre nada.
+ */
+export function bloqueoEscrituraWoo(product: Pick<InvProduct, 'id' | 'sku' | 'status'>, cfg: { onlyDrafts: boolean, allow: string[] }): string | null {
   // Estructura rota en Woo (SKU duplicado / padre con SKU de variación): no se
-  // escribe ni en borradores, porque no se sabe en qué variación se escribiría.
+  // escribe ni en borradores ni en permitidos, porque no se sabe en qué variación se escribiría.
   const roto = bloqueoDe(product)
   if (roto) return `bloqueado — ${roto}`
-  return wooOnlyDrafts() && product.status === 'publish' ? BLOQUEADO : null
+  if (!cfg.onlyDrafts || product.status !== 'publish') return null
+  const codigo = String(product.sku ?? '').trim().toLowerCase()
+  return codigo && cfg.allow.some(a => a.toLowerCase() === codigo) ? null : BLOQUEADO
+}
+/** La guarda con la configuración real del servidor. También la consulta probar-woo. */
+export function guardDraft(product: Pick<InvProduct, 'id' | 'sku' | 'status'>): string | null {
+  return bloqueoEscrituraWoo(product, { onlyDrafts: wooOnlyDrafts(), allow: wooAllowList() })
 }
 
 interface WooVariationRaw {

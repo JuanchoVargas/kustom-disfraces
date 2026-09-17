@@ -836,6 +836,7 @@ onBeforeUnmount(() => { if (sinResponderTimer) clearInterval(sinResponderTimer) 
       </div>
       <div v-if="estado && !estado.simulation && estado.woo_only_drafts" class="banner banner--info">
         <strong>Woo en vivo, solo borradores</strong> — la guarda de validación rechaza cualquier escritura a un producto publicado hasta que se validen las operaciones masivas.
+        <template v-if="estado.woo_allow?.length"> Publicados permitidos (piloto): <strong>{{ estado.woo_allow.join(', ') }}</strong>.</template>
       </div>
       <div v-if="estado && (estado.stock_bajo || estado.agotadas)" class="banner banner--alert">
         <strong>⚠ Alertas de stock:</strong>

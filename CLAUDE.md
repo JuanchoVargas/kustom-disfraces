@@ -66,6 +66,10 @@ en `docs/`; este archivo es el resumen de reglas que no se negocian. Fuente:
 - WhatsApp: el único destino de pruebas es `WA_TEST_TO` (`.env.example`); la línea
   real del negocio **nunca** es destino de pruebas. Ningún número de teléfono va
   literal en código, docs ni commits.
+- Escritura en Woo: la guarda `NUXT_INVENTORY_WOO_ONLY_DRAFTS` (+ lista de permitidos
+  `NUXT_INVENTORY_WOO_ALLOW`, códigos de producto) se decide en `guardDraft()`. Ninguna
+  prueba ni botón de diagnóstico escribe en un producto publicado. La llave de
+  escritura de Woo solo vive en Vercel: nunca en `.env` local.
 - Nunca correr `scripts/migrar-imagenes-woo.mjs` ni `scripts/aplicar-overrides-woo.mjs
   --aplicar` sin el usuario presente. No cambiar `NUXT_INVENTORY_BACKEND` a `woo`
   sin seguir `docs/inventario-activacion.md`. Las pruebas de inventario solo contra

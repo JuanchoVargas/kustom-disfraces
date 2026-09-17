@@ -1,5 +1,5 @@
 import type { InvProduct } from '~~/shared/types/inventory'
-import { createWooStore, wooOnlyDrafts } from '../../utils/inventoryWoo'
+import { createWooStore, guardDraft, wooAllowList, wooOnlyDrafts } from '../../utils/inventoryWoo'
 import { loadInventory, loadProductBySku } from '../../utils/inventorySnapshot'
 import { sanitizeWooWriteError, wooWriteCredentials, wooWriteFetch } from '../../utils/wooWrite'
 
@@ -11,7 +11,11 @@ import { sanitizeWooWriteError, wooWriteCredentials, wooWriteFetch } from '../..
  *   2. relectura directa en Woo (llave de escritura) confirma el valor
  *   3. revierte con updateVariationPrice(original) → confirma
  *   4. bulkUpdate (batch) en 2 tallas del mismo borrador (+1) → revierte en batch
- *   5. guarda: intenta escribir en un PUBLICADO y espera el bloqueo (sin tocar Woo)
+ *   5. guarda: sobre un PUBLICADO que no esté en la lista de permitidos. PRIMERO se
+ *      pregunta a la guarda (función pura, sin escribir): solo si bloquea se intenta la
+ *      escritura por el adaptador, que la rechaza antes de llamar a Woo. Si la guarda
+ *      NO bloquea (ONLY_DRAFTS=false), el paso se detiene y falla SIN tocar precios:
+ *      esta prueba nunca escribe en un publicado.
  * Cada paso queda en inventory_changes con origen 'prueba'. Devuelve JSON por paso.
  *   { sku?: '001003001' }  para elegir el borrador.
  */
@@ -24,7 +28,7 @@ export default defineEventHandler(async (event) => {
   const t0 = Date.now()
   const cred = wooWriteCredentials()
   if (!cred) return { ok: false, conclusion: 'Sin llave de escritura en este entorno', steps: [{ paso: 'config', ok: false, detalle: 'faltan NUXT_WOO_WRITE_CONSUMER_KEY/_SECRET (ni respaldo NUXT_WOO_ORDERS_*)' }] }
-  steps.push({ paso: 'llave de escritura', ok: true, detalle: { origen: cred.origen === 'write' ? 'NUXT_WOO_WRITE_*' : 'respaldo NUXT_WOO_ORDERS_*', solo_borradores: wooOnlyDrafts() } })
+  steps.push({ paso: 'llave de escritura', ok: true, detalle: { origen: cred.origen === 'write' ? 'NUXT_WOO_WRITE_*' : 'respaldo NUXT_WOO_ORDERS_*', solo_borradores: wooOnlyDrafts(), permitidos: wooAllowList() } })
 
   const store = createWooStore()
   const ctx = { origen: 'prueba' as const, autor: 'probar-woo' }
@@ -72,18 +76,30 @@ export default defineEventHandler(async (event) => {
     ], ctx)
     const [w0, w1] = await Promise.all([readWoo(draft.id, v0.id), readWoo(draft.id, v1.id)])
     steps.push({ paso: '4b. revertir en batch y confirmar en Woo', ok: r4b.every(r => r.ok) && w0 === orig0 && w1 === orig1, detalle: { woo: [w0, w1], esperado: [orig0, orig1] } })
-    // 5. guarda sobre un publicado
-    const pub = products.find(p => p.status === 'publish' && p.variations.length && p.variations[0]!.id > 0)
+    // 5. guarda sobre un publicado. NUNCA se escribe en un publicado: primero se le
+    // pregunta a la guarda (sin escribir) y solo si BLOQUEA se intenta la escritura,
+    // que el adaptador rechaza con esa misma guarda antes de llamar a Woo.
+    const permitidos = wooAllowList().map(a => a.toLowerCase())
+    const pub = products.find(p => p.status === 'publish' && p.variations.length && p.variations[0]!.id > 0 && !permitidos.includes(p.sku.toLowerCase()))
     if (pub) {
       const pv = pub.variations[0]!
-      const r5 = await store.updateVariationPrice(pv.sku, plus(pv.regular_price), pv.sale_price || null, ctx)
-      const stillWoo = await readWoo(pub.id, pv.id).catch(err => `error al leer: ${sanitizeWooWriteError(err)}`)
-      const expectBlock = wooOnlyDrafts()
-      steps.push({
-        paso: expectBlock ? '5. guarda: escribir en un PUBLICADO se bloquea sin tocar Woo' : '5. guarda desactivada (NUXT_INVENTORY_WOO_ONLY_DRAFTS=false): no se prueba publicados',
-        ok: expectBlock ? (!r5.ok && /bloqueado/.test(r5.error ?? '') && stillWoo === pv.regular_price) : true,
-        detalle: expectBlock ? { sku: pv.sku, respuesta: r5.error, woo_sigue_en: stillWoo } : 'omitido',
-      })
+      const bloqueo = guardDraft(pub)
+      if (!bloqueo) {
+        steps.push({
+          paso: '5. guarda: la guarda NO bloquea los publicados — prueba detenida, no se escribió nada',
+          ok: false,
+          detalle: { sku: pv.sku, motivo: wooOnlyDrafts() ? 'la guarda devolvió "permitido" para un publicado fuera de la lista' : 'NUXT_INVENTORY_WOO_ONLY_DRAFTS=false: la escritura a publicados está abierta', precios: 'sin tocar' },
+        })
+      }
+      else {
+        const r5 = await store.updateVariationPrice(pv.sku, plus(pv.regular_price), pv.sale_price || null, ctx)
+        const stillWoo = await readWoo(pub.id, pv.id).catch(err => `error al leer: ${sanitizeWooWriteError(err)}`)
+        steps.push({
+          paso: '5. guarda: escribir en un PUBLICADO se bloquea sin tocar Woo',
+          ok: !r5.ok && /bloqueado/.test(r5.error ?? '') && stillWoo === pv.regular_price,
+          detalle: { sku: pv.sku, respuesta: r5.error, woo_sigue_en: stillWoo },
+        })
+      }
     }
   }
   catch (err) {
