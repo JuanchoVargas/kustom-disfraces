@@ -10,11 +10,13 @@
 const MP_PAYMENT_META = '_mp_payment_id'
 
 interface WooOrderMeta { key: string, value: unknown }
+interface WooOrderLine { id?: number, name?: string, product_id?: number, variation_id?: number, sku?: string }
 interface WooOrder {
   id: number
   status: string
   total: string
   meta_data?: WooOrderMeta[]
+  line_items?: WooOrderLine[]
 }
 
 export interface OrderItemInput {
@@ -91,10 +93,11 @@ export const sanitizeWooOrderError = (err: unknown): string =>
   String((err as Error)?.message ?? err).replace(/(consumer_key|consumer_secret)=[^&"'\s]+/g, '$1=***')
 
 /**
- * Busca una orden ya creada para este pago (idempotencia). Escanea las órdenes
- * recientes por la meta `_mp_payment_id`. Nota: no es un lock atómico — dos
- * webhooks casi simultáneos podrían colarse; en la práctica MP los espacia y el
- * segundo encuentra la orden del primero. Un lock real necesitaría BD.
+ * Busca una orden ya creada para este pago. Escanea las órdenes recientes por la
+ * meta `_mp_payment_id`. NO es un candado (dos webhooks simultáneos consultan antes
+ * de que ninguno cree: así nacieron #770 y #771): el candado es la tabla `pagos_mp`
+ * (pagosMp.ts). Esto queda como SEGUNDA barrera, para las órdenes anteriores a la
+ * tabla y para una fila que no se alcanzó a marcar `creada`.
  */
 export async function findWooOrderByPaymentId(paymentId: string): Promise<WooOrder | null> {
   const orders = await wooOrdersFetch<WooOrder[]>('/orders', {
@@ -108,9 +111,14 @@ export async function findWooOrderByPaymentId(paymentId: string): Promise<WooOrd
 /**
  * Crea la orden en Woo: estado processing (pagado), pagador y referencia de MP.
  *
- * ENLACE DE LÍNEAS. Cada línea lleva `product_id` y `variation_id` explícitos,
- * resueltos desde el SKU del producto + la talla. Es lo que hace que **Woo
- * descuente el stock de la variación correcta**: `set_paid:true` dispara
+ * ENLACE DE LÍNEAS. Cada línea resuelta lleva SOLO `variation_id` (resuelto desde
+ * el SKU del producto + la talla). Ni `sku` ni `product_id`: el controlador de Woo
+ * (`WC_REST_Orders_V2_Controller::get_product_id`) mira PRIMERO el `sku`, y con el
+ * SKU del padre enlazaba el producto variable e ignoraba el `variation_id` que
+ * venía al lado (todas las órdenes web quedaban con variation_id 0). Sin `sku`,
+ * `variation_id` manda y Woo deduce el padre solo. El SKU se conserva en el
+ * `meta_data` de la línea. Es lo que hace que **Woo descuente el stock de la
+ * variación correcta**: `set_paid:true` dispara
  * `payment_complete()` → `wc_maybe_reduce_stock_levels`, que sin `variation_id`
  * tomaba el padre (que no gestiona stock) y no bajaba nada. Nuestro código NO toca
  * stock en ningún punto: descuenta Woo, que además es idempotente
@@ -118,25 +126,30 @@ export async function findWooOrderByPaymentId(paymentId: string): Promise<WooOrd
  *
  * SI NO SE PUEDE RESOLVER: la orden **se crea igual**. Mercado Pago ya cobró y
  * jamás se bloquea una orden pagada por una búsqueda de inventario. La línea va
- * sin ids (como antes del cambio, o sea: nadie descuenta y se ajusta a mano), la
+ * con su `sku` y sin ids (nadie descuenta y se ajusta a mano), la
  * orden queda marcada con `_kustom_ajuste_manual`, una nota visible en wp-admin y
  * el detalle en `lineasSinEnlazar` para que el llamador dispare la alerta.
+ *
+ * VERIFICACIÓN POSTERIOR: si una línea que SÍ se resolvió vuelve de Woo con otro
+ * `variation_id` (0 incluido), se devuelve en `lineasVariacionPerdida` para que el
+ * llamador marque la orden y avise a ventas. Este fallo no vuelve a ser silencioso.
  *
  * El `name` de la línea se deja EXACTAMENTE igual que antes ("Nombre (Talla 4)"),
  * por si algo aguas abajo —rótulos, exportaciones— lo estuviera leyendo.
  */
-export async function createWooOrder(input: CreateOrderInput): Promise<WooOrder & { lineasSinEnlazar: LineaSinEnlazar[] }> {
+export async function createWooOrder(input: CreateOrderInput): Promise<WooOrder & { lineasSinEnlazar: LineaSinEnlazar[], lineasVariacionPerdida: LineaSinEnlazar[] }> {
   const sinEnlazar: LineaSinEnlazar[] = []
+  /** variation_id esperado por posición de línea (null = línea que no se resolvió). */
+  const esperado: (number | null)[] = input.items.map(() => null)
   const lineItems = input.items.length
-    ? await Promise.all(input.items.map(async (it) => {
+    ? await Promise.all(input.items.map(async (it, idx) => {
         const total = String(Math.round(it.unitPrice * it.quantity))
         const base = {
           name: it.title,
           quantity: it.quantity,
           subtotal: total,
           total,
-          ...(it.sku ? { sku: it.sku } : {}),
-          // SKU también en meta: queda registrado aunque Woo no lo enlace en la creación.
+          // El SKU queda SIEMPRE registrado en el meta de la línea.
           ...(it.sku ? { meta_data: [{ key: 'sku', value: it.sku }] } : {}),
         }
         // Resolver NUNCA puede tumbar la creación de la orden.
@@ -150,9 +163,12 @@ export async function createWooOrder(input: CreateOrderInput): Promise<WooOrder 
         if (!r.ok) {
           sinEnlazar.push({ sku: it.sku, title: it.title, talla: it.talla, motivo: r.motivo ?? 'no se pudo resolver' })
           console.error(`[woo-orders] ⚠️ línea SIN enlazar (se crea igual, ajuste manual): "${it.title}" sku=${it.sku} talla=${it.talla ?? '—'} — ${r.motivo}`)
-          return base
+          // Sin variación solo queda el SKU del padre para que Woo enlace al menos el producto.
+          return { ...base, ...(it.sku ? { sku: it.sku } : {}) }
         }
-        return { ...base, product_id: r.product_id, variation_id: r.variation_id }
+        // SOLO variation_id (ver comentario de la función): con `sku` Woo lo ignoraría.
+        esperado[idx] = Number(r.variation_id)
+        return { ...base, variation_id: r.variation_id }
       }))
     // Respaldo: sin ítems detallados, una sola línea con el total pagado.
     : [{ name: 'Pedido Kustom (Mercado Pago)', quantity: 1, subtotal: String(Math.round(input.amount)), total: String(Math.round(input.amount)) }]
@@ -241,5 +257,27 @@ export async function createWooOrder(input: CreateOrderInput): Promise<WooOrder 
   }
 
   const orden = await wooOrdersFetch<WooOrder>('/orders', { method: 'POST', body })
-  return { ...orden, lineasSinEnlazar: sinEnlazar }
+
+  // Woo devuelve las líneas en el orden en que se enviaron.
+  const perdidas: LineaSinEnlazar[] = []
+  esperado.forEach((variationId, idx) => {
+    if (variationId == null) return
+    const devuelto = Number(orden.line_items?.[idx]?.variation_id ?? 0)
+    if (devuelto === variationId) return
+    const it = input.items[idx]!
+    perdidas.push({ sku: it.sku, title: it.title, talla: it.talla, motivo: `se envió variation_id ${variationId} y Woo guardó ${devuelto}; Woo NO descontó el stock de esa talla` })
+    console.error(`[woo-orders] ⚠️ Woo #${orden.id}: línea "${it.title}" sku=${it.sku} talla=${it.talla ?? '—'} enviada con variation_id ${variationId} y guardada con ${devuelto}`)
+  })
+  return { ...orden, lineasSinEnlazar: sinEnlazar, lineasVariacionPerdida: perdidas }
+}
+
+/**
+ * Marca como AJUSTE MANUAL una orden YA creada (motivos detectados después de
+ * crearla): meta `_kustom_ajuste_manual` para poder filtrarla y una nota privada
+ * visible en wp-admin para quien despacha.
+ */
+export async function marcarAjusteManualWoo(orderId: number, motivos: string[]): Promise<void> {
+  const detalle = motivos.join(' | ')
+  await wooOrdersFetch(`/orders/${orderId}`, { method: 'PUT', body: { meta_data: [{ key: '_kustom_ajuste_manual', value: detalle }] } })
+  await wooOrdersFetch(`/orders/${orderId}/notes`, { method: 'POST', body: { note: `⚠️ AJUSTE MANUAL DE INVENTARIO: ${detalle}`, customer_note: false } })
 }
