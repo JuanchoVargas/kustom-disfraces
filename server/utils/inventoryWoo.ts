@@ -162,6 +162,23 @@ async function writeThrough(product: InvProduct, updated: InvVariation[]): Promi
   return next
 }
 
+/**
+ * Varias operaciones sobre la MISMA variación (p. ej. precio + stock de una sobreescritura)
+ * viajan como UNA sola actualización con los cuerpos fusionados. Enviadas por separado,
+ * Woo las aplicaba bien pero la respuesta de la primera se tomaba para las dos: el
+ * snapshot quedaba sin el segundo cambio y el registro repetía el primero y perdía el otro.
+ * Conserva el orden de llegada y el `before` de la primera.
+ */
+export function fusionarPorVariacion<T extends { id: number, body: Record<string, unknown> }>(updates: T[]): T[] {
+  const porId = new Map<number, T>()
+  for (const u of updates) {
+    const prev = porId.get(u.id)
+    if (prev) prev.body = { ...prev.body, ...u.body }
+    else porId.set(u.id, { ...u, body: { ...u.body } })
+  }
+  return [...porId.values()]
+}
+
 /** Una escritura ya resuelta a cuerpo de Woo. `cuerpo` valida y puede lanzar InvValidationError. */
 interface EscrituraWoo { sku: string, ids?: InvOpIds, cuerpo: () => Record<string, unknown> }
 
@@ -190,6 +207,7 @@ async function escribirLoteWoo(escrituras: EscrituraWoo[], ctx: WriteContext): P
     }
   }
   for (const g of groups.values()) {
+    g.updates = fusionarPorVariacion(g.updates)
     for (let i = 0; i < g.updates.length; i += WOO_BATCH) {
       const slice = g.updates.slice(i, i + WOO_BATCH)
       try {

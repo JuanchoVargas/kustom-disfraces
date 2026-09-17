@@ -68,5 +68,23 @@ const ramaSinBloqueo = paso5.slice(iSinBloqueo, iElse)
 ok(/ok: false/.test(ramaSinBloqueo) && !/store\./.test(ramaSinBloqueo) && /sin tocar/.test(ramaSinBloqueo), '6. si la guarda NO bloquea: falla y no llama al adaptador (precios sin tocar)')
 ok(/!permitidos\.includes\(p\.sku\.toLowerCase\(\)\)/.test(paso5), '6. el publicado de la prueba nunca es uno de la lista de permitidos')
 
+
+// ───────── varias operaciones sobre la misma variación → una sola actualización ─────────
+{
+  const antes = { regular_price: '', manage_stock: false }
+  const entrada = [
+    { id: 191, sku: '001001001-T2', before: antes, body: { regular_price: '159000', sale_price: '' } },
+    { id: 190, sku: '001001001-T0', before: antes, body: { manage_stock: true, stock_quantity: 5 } },
+    { id: 191, sku: '001001001-T2', before: antes, body: { manage_stock: true, stock_quantity: 5 } },
+  ]
+  const copia = JSON.stringify(entrada)
+  const f = G.fusionarPorVariacion(entrada)
+  ok(f.length === 2 && f[0].id === 191 && f[1].id === 190, '7. precio + stock de la MISMA variación → una sola actualización (orden de llegada conservado)', f.map(u => u.id).join(','))
+  ok(JSON.stringify(f[0].body) === JSON.stringify({ regular_price: '159000', sale_price: '', manage_stock: true, stock_quantity: 5 }), '7. el cuerpo fusionado lleva los cuatro campos y nada más', JSON.stringify(f[0].body))
+  ok(JSON.stringify(entrada) === copia, '7. no modifica las operaciones de entrada')
+  const woo = readFileSync(new URL('../server/utils/inventoryWoo.ts', import.meta.url), 'utf8').replace(/\r\n/g, '\n')
+  ok(woo.indexOf('g.updates = fusionarPorVariacion(g.updates)') > 0 && woo.indexOf('g.updates = fusionarPorVariacion(g.updates)') < woo.indexOf('variations/batch`'), '7. el lote fusiona ANTES de llamar a Woo')
+}
+
 console.log(fails ? `\n❌ ${fails} fallo(s)` : '\n✅ todo correcto')
 process.exitCode = fails ? 1 : 0
