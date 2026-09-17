@@ -162,6 +162,87 @@ async function writeThrough(product: InvProduct, updated: InvVariation[]): Promi
   return next
 }
 
+/** Una escritura ya resuelta a cuerpo de Woo. `cuerpo` valida y puede lanzar InvValidationError. */
+interface EscrituraWoo { sku: string, ids?: InvOpIds, cuerpo: () => Record<string, unknown> }
+
+/**
+ * NÚCLEO DE LA ESCRITURA POR LOTES (lo comparten bulkUpdate y restaurarStockWoo): se
+ * valida cada escritura, se resuelve su variación, pasa la GUARDA, se agrupa por
+ * producto padre y se envía POST /products/<padre>/variations/batch en trozos de 100.
+ * Un fallo de validación o de resolución NO frena el resto: se reporta por SKU.
+ */
+async function escribirLoteWoo(escrituras: EscrituraWoo[], ctx: WriteContext): Promise<InvOpResult[]> {
+  const results = new Map<string, InvOpResult>()
+  const groups = new Map<number, { product: InvProduct, updates: { id: number, before: InvVariation, sku: string, body: Record<string, unknown> }[] }>()
+  for (const e of escrituras) {
+    try {
+      const body = e.cuerpo()
+      const r = await resolve(e.sku, e.ids)
+      if (!r) { results.set(e.sku, { sku: e.sku, ok: false, error: e.ids?.variation_id ? `la variación ${e.ids.variation_id} ya no existe en el catálogo (vuelve a calcular la vista previa)` : 'SKU de variación inexistente en Woo' }); continue }
+      const blocked = guardDraft(r.product)
+      if (blocked) { results.set(e.sku, { sku: e.sku, ok: false, error: blocked }); continue }
+      let g = groups.get(r.product.id)
+      if (!g) { g = { product: r.product, updates: [] }; groups.set(r.product.id, g) }
+      g.updates.push({ id: r.variation.id, before: r.variation, sku: e.sku, body })
+    }
+    catch (err) {
+      results.set(e.sku, { sku: e.sku, ok: false, error: err instanceof InvValidationError ? err.message : String((err as Error)?.message ?? err) })
+    }
+  }
+  for (const g of groups.values()) {
+    for (let i = 0; i < g.updates.length; i += WOO_BATCH) {
+      const slice = g.updates.slice(i, i + WOO_BATCH)
+      try {
+        const res = await wooWrite<{ update?: (WooVariationRaw & { error?: { message?: string } })[] }>(
+          `/products/${g.product.id}/variations/batch`,
+          { method: 'POST', body: { update: slice.map(u => ({ id: u.id, ...u.body })) } },
+        )
+        const updated: InvVariation[] = []
+        for (const u of slice) {
+          const raw = res.update?.find(x => x.id === u.id)
+          if (!raw || raw.error) { results.set(u.sku, { sku: u.sku, ok: false, error: `Woo: ${raw?.error?.message ?? 'sin respuesta para la variación'}` }); continue }
+          const after = fromRaw(raw, u.sku)
+          after.stock_status = stockStatusFor(after)
+          updated.push(after)
+          await logChanges('woo', u.sku, pick(u.before), pick(after), ctx)
+          results.set(u.sku, { sku: u.sku, ok: true, before: pick(u.before), after: pick(after) })
+        }
+        if (updated.length) g.product = await writeThrough(g.product, updated)
+      }
+      catch (err) {
+        const msg = `Woo: ${sanitizeWooError(err)}`
+        for (const u of slice) results.set(u.sku, { sku: u.sku, ok: false, error: msg })
+      }
+    }
+  }
+  return escrituras.map(e => results.get(e.sku) ?? { sku: e.sku, ok: false, error: 'sin resultado' })
+}
+
+/** Estado de stock de una variación tal como quedó en un respaldo (scripts/respaldo-woo.mjs). */
+export interface StockRespaldado { sku: string, manage_stock: boolean, stock_quantity: number | null, stock_status: 'instock' | 'outofstock' | 'onbackorder' }
+
+/**
+ * RESTAURAR STOCK desde un respaldo: deja `manage_stock`, `stock_quantity` y
+ * `stock_status` como estaban. SOLO esos tres campos (nunca precio, imagen ni estado),
+ * por el mismo lote y con la MISMA guarda que cualquier otra escritura. Escribe en Woo
+ * sea cual sea el adaptador activo: es la marcha atrás de "aplicar overrides a Woo".
+ * `stock_status` va explícito porque al quitar la gestión Woo conserva el último
+ * estado: una talla que llegó a 0 seguiría "agotada" para siempre.
+ */
+export async function restaurarStockWoo(items: StockRespaldado[], ctx: WriteContext): Promise<InvOpResult[]> {
+  return await escribirLoteWoo(items.map(it => ({
+    sku: it.sku,
+    cuerpo: () => {
+      if (!['instock', 'outofstock', 'onbackorder'].includes(it.stock_status)) throw new InvValidationError(`stock_status inválido "${it.stock_status}"`)
+      if (typeof it.manage_stock !== 'boolean') throw new InvValidationError('manage_stock debe ser true o false')
+      // Sin gestión, Woo descarta la cantidad: no se envía.
+      return it.manage_stock
+        ? { manage_stock: true, stock_quantity: normalizeStock(it.stock_quantity), stock_status: it.stock_status }
+        : { manage_stock: false, stock_status: it.stock_status }
+    },
+  })), ctx)
+}
+
 export function createWooStore(): InventoryStore {
   async function single(op: InvOperation, ctx: WriteContext): Promise<InvOpResult> {
     try {
@@ -215,50 +296,7 @@ export function createWooStore(): InventoryStore {
      * validación o de resolución NO frena el resto: se reporta por SKU.
      */
     async bulkUpdate(operations, ctx) {
-      const results = new Map<string, InvOpResult>()
-      const groups = new Map<number, { product: InvProduct, updates: { id: number, before: InvVariation, sku: string, body: Record<string, unknown> }[] }>()
-      for (const op of operations) {
-        try {
-          const body = bodyFor(op)
-          const r = await resolve(op.sku, op)
-          if (!r) { results.set(op.sku, { sku: op.sku, ok: false, error: op.variation_id ? `la variación ${op.variation_id} ya no existe en el catálogo (vuelve a calcular la vista previa)` : 'SKU de variación inexistente en Woo' }); continue }
-          const blocked = guardDraft(r.product)
-          if (blocked) { results.set(op.sku, { sku: op.sku, ok: false, error: blocked }); continue }
-          let g = groups.get(r.product.id)
-          if (!g) { g = { product: r.product, updates: [] }; groups.set(r.product.id, g) }
-          g.updates.push({ id: r.variation.id, before: r.variation, sku: op.sku, body })
-        }
-        catch (err) {
-          results.set(op.sku, { sku: op.sku, ok: false, error: err instanceof InvValidationError ? err.message : String((err as Error)?.message ?? err) })
-        }
-      }
-      for (const g of groups.values()) {
-        for (let i = 0; i < g.updates.length; i += WOO_BATCH) {
-          const slice = g.updates.slice(i, i + WOO_BATCH)
-          try {
-            const res = await wooWrite<{ update?: (WooVariationRaw & { error?: { message?: string } })[] }>(
-              `/products/${g.product.id}/variations/batch`,
-              { method: 'POST', body: { update: slice.map(u => ({ id: u.id, ...u.body })) } },
-            )
-            const updated: InvVariation[] = []
-            for (const u of slice) {
-              const raw = res.update?.find(x => x.id === u.id)
-              if (!raw || raw.error) { results.set(u.sku, { sku: u.sku, ok: false, error: `Woo: ${raw?.error?.message ?? 'sin respuesta para la variación'}` }); continue }
-              const after = fromRaw(raw, u.sku)
-              after.stock_status = stockStatusFor(after)
-              updated.push(after)
-              await logChanges('woo', u.sku, pick(u.before), pick(after), ctx)
-              results.set(u.sku, { sku: u.sku, ok: true, before: pick(u.before), after: pick(after) })
-            }
-            if (updated.length) g.product = await writeThrough(g.product, updated)
-          }
-          catch (err) {
-            const msg = `Woo: ${sanitizeWooError(err)}`
-            for (const u of slice) results.set(u.sku, { sku: u.sku, ok: false, error: msg })
-          }
-        }
-      }
-      return operations.map(op => results.get(op.sku) ?? { sku: op.sku, ok: false, error: 'sin resultado' })
+      return await escribirLoteWoo(operations.map(op => ({ sku: op.sku, ids: op, cuerpo: () => bodyFor(op) })), ctx)
     },
 
     async ping() {

@@ -889,6 +889,22 @@ llamar a Woo. `node scripts/test-guarda-woo.mjs` cubre los tres casos:
 | `true` | `001006004-P` (códigos de PRODUCTO, por comas) | borradores + esos códigos y nada más (piloto) |
 | `false` | (no se usa) | todo |
 
+**Respaldo y marcha atrás del stock de Woo.** Antes de aplicar inventario a Woo:
+
+```bash
+node scripts/respaldo-inventario.mjs   # Neon: inventory_overrides + inventory_changes (.sql y .xlsx)
+node scripts/respaldo-woo.mjs          # Woo: todos los productos y variaciones → backups/woo-productos-variaciones-<fecha>.json
+node scripts/restaurar-woo.mjs [respaldo.json] [--sku 001006004-P]                 # EN SECO: qué cambiaría
+node scripts/restaurar-woo.mjs [respaldo.json] https://www.disfraceskustom.com --aplicar
+```
+
+`restaurar-woo` compara el respaldo con lo que Woo tiene hoy (llave de **solo lectura**) y
+restaura **solo** `manage_stock`, `stock_quantity` y `stock_status` (nunca precio, imagen ni
+estado). La llave de escritura no existe en local: con `--aplicar` escribe el **servidor**
+(`POST /api/inventario/restaurar-woo`), por el mismo lote y la misma guarda que cualquier
+otra escritura, sea cual sea `NUXT_INVENTORY_BACKEND`, y al final relee Woo para confirmar.
+`backups/` está ignorado por git. `node scripts/test-restaurar-woo.mjs` lo cubre.
+
 Un producto con estructura rota en Woo (`PRODUCTOS_BLOQUEADOS`) no se escribe en ningún
 caso. El botón **Probar escritura en Woo** solo escribe en un borrador (sube $1 y
 revierte); sobre un publicado primero consulta la guarda y, si no bloquea, se detiene
