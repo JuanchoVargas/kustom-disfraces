@@ -1,4 +1,4 @@
-import { getStockState } from './stockState'
+import { getPublicStockState } from './stockState'
 
 /**
  * Stock para el BOT (búsqueda y menús son SÍNCRONOS): los webhooks llaman
@@ -12,7 +12,7 @@ let tallasAgotadas = new Map<string, string[]>()
 
 export async function refreshBotStock(): Promise<void> {
   try {
-    const st = await getStockState()
+    const st = await getPublicStockState() // sin base mientras el stock real no se aplique al sitio
     agotados = st.enabled ? st.agotados : new Set()
     tallasAgotadas = st.enabled ? st.tallasAgotadas : new Map()
   }

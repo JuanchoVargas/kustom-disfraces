@@ -51,6 +51,9 @@ en `docs/`; este archivo es el resumen de reglas que no se negocian. Fuente:
   primero por `verificarFirmaMeta()` (`server/utils/metaFirma.ts`), que verifica el
   HMAC del cuerpo CRUDO; el handler parsea el JSON desde esos mismos bytes. Nunca
   usar `readBody` antes de verificar. `node scripts/test-firma-meta.mjs` lo cubre.
+- **Rutas públicas sin base**: home, PLP, PDP y el 404 de un escáner no deben leer
+  Neon. El estado de stock público sale de `getPublicStockState()` (sin base mientras
+  el stock real no se aplique al sitio); `getStockState()` es solo del panel.
 - Claves de Woo, Mercado Pago, Meta y SMTP **nunca al cliente**: viven en
   `runtimeConfig` server-only. Los precios se recalculan siempre en el servidor.
 - **Logs sin datos personales**: ningún `console.*` imprime teléfono completo, nombre,

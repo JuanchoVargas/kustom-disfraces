@@ -267,11 +267,56 @@ export async function getStockState(force = false): Promise<StockState> {
 
 export function invalidateStockState(): void {
   cache = null
+  cachePublico = null
+}
+
+/**
+ * ESTADO DE STOCK PÚBLICO — lo que usan el sitio (/api/stock), el bot y el checkout.
+ *
+ * Con el stock real SIN aplicar al sitio (NUXT_INVENTORY_PUBLIC_STOCK en auto con
+ * adaptador mock, o en off), lo único que puede agotar algo es NUXT_SKUS_AGOTADOS, y
+ * para validarlo basta catalogo.json: **no se toca la base**. Antes, cada visita a una
+ * instancia fría (home, PDP, el 404 de un escáner) leía el snapshot y los overrides
+ * completos (~800 kB de Neon) solo para calcular datos que usa el PANEL
+ * (agotadosSinForzar, contadores). Eso sigue en getStockState(), que ahora solo llaman
+ * el panel y las alertas.
+ *
+ * Con el stock real aplicado al sitio (adaptador woo, o 'on') sí hace falta el
+ * inventario: se delega en getStockState().
+ */
+let cachePublico: { at: number, state: StockState } | null = null
+
+/**
+ * catalogo.json con la forma mínima que necesita computeStockState: cada referencia
+ * con sus tallas como variaciones SIN gestión de stock. Autocontenido a propósito: no
+ * importa el snapshot ni la base (este es el camino de las páginas públicas).
+ */
+function catalogoComoInventario(): InvProduct[] {
+  return (catalogoData as ProductoCatalogo[]).map(l => ({
+    sku: l.codigo,
+    name: l.nombre,
+    status: l.disponibleWeb ? 'publish' : 'draft',
+    variations: (l.tallas ?? []).map(t => ({
+      sku: variationSku(l.codigo, t),
+      manage_stock: false,
+      stock_quantity: null,
+      stock_status: 'instock',
+      attributes: [{ name: 'Talla', option: String(t) }],
+    })),
+  }) as unknown as InvProduct)
+}
+
+export async function getPublicStockState(): Promise<StockState> {
+  if (publicStockEnabled()) return await getStockState()
+  if (cachePublico && Date.now() - cachePublico.at < TTL_MS) return cachePublico.state
+  const state = computeStockState(catalogoComoInventario(), false, getInventoryStore().backend)
+  cachePublico = { at: Date.now(), state }
+  return state
 }
 
 /** Versión pública (sin cantidades): lo que consume el sitio. */
 export async function publicStockPayload(): Promise<{ enabled: boolean, agotados: string[], tallas: Record<string, string[]>, updated_at: string }> {
-  const st = await getStockState()
+  const st = await getPublicStockState()
   if (!st.enabled) return { enabled: false, agotados: [], tallas: {}, updated_at: st.updated_at }
   return { enabled: true, agotados: [...st.agotados], tallas: Object.fromEntries(st.tallasAgotadas), updated_at: st.updated_at }
 }
@@ -283,7 +328,7 @@ export interface StockProblem { sku: string, size: string, pedido: number, dispo
  * Devuelve los que no alcanzan. Sin talla o talla sin gestionar → pasa.
  */
 export async function checkStockFor(items: { sku: string, size?: string | number | null, quantity: number }[]): Promise<StockProblem[]> {
-  const st = await getStockState()
+  const st = await getPublicStockState()
   if (!st.enabled) return []
   const problems: StockProblem[] = []
   // Varias líneas del carrito con la misma talla suman.
