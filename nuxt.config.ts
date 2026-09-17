@@ -173,7 +173,8 @@ export default defineNuxtConfig({
     // se puede escribir con ONLY_DRAFTS=true (piloto). Separados por coma. Vacío = ninguno.
     inventoryWooAllow: process.env.NUXT_INVENTORY_WOO_ALLOW || '', // -> NUXT_INVENTORY_WOO_ALLOW (ej: 001006004-P)
     // ¿El stock del adaptador se aplica al SITIO, al BOT y al CHECKOUT? (lógica de
-    // agotado: talla en 0 no seleccionable, producto en 0 fuera del catálogo).
+    // agotado: talla en 0 no seleccionable; producto con todo en 0 visible con cinta
+    // AGOTADO y sin poder comprarse. Nunca desaparece del catálogo).
     //   auto (default) = solo cuando el adaptador es woo (el mock es simulación).
     //   on  = también con mock (para probar en local / preview).   off = nunca.
     inventoryPublicStock: process.env.NUXT_INVENTORY_PUBLIC_STOCK || 'auto', // -> NUXT_INVENTORY_PUBLIC_STOCK (auto | on | off)

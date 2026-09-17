@@ -44,7 +44,7 @@ interface StockAgotado { enabled: boolean, agotados: string[], tallas: Record<st
  * nunca podía verse); talla agotada → soldOutSizes (la PDP la muestra
  * deshabilitada). Sin stock aplicable, no cambia nada.
  */
-function applyStock(products: Product[], stock: StockAgotado | null): Product[] {
+export function applyStock(products: Product[], stock: StockAgotado | null): Product[] {
   if (!stock?.enabled) return products
   const agotados = new Set(stock.agotados)
   return products.map((p) => {

@@ -7,8 +7,9 @@ export interface StockAgotado {
 /**
  * LÓGICA DE AGOTADO (módulo de inventario). Durante el SSR trae de /api/stock
  * qué productos y tallas están agotados y lo hidrata en useState('stock-agotado');
- * useProducts lo aplica: producto agotado → fuera del catálogo; talla agotada →
- * soldOutSizes (no seleccionable en la PDP). Si el endpoint falla o el stock no
+ * useProducts lo aplica: producto agotado → SIGUE en el catálogo con la cinta AGOTADO,
+ * todas las tallas bloqueadas y al final de los listados (nunca desaparece); talla
+ * agotada → soldOutSizes (no seleccionable en la PDP). Si el endpoint falla o el stock no
  * aplica (enabled:false), el sitio vende como siempre.
  */
 export default defineNuxtPlugin(async () => {

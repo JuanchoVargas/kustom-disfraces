@@ -103,6 +103,6 @@ en `docs/`; este archivo es el resumen de reglas que no se negocian. Fuente:
 - No hay test runner ni `npm test`; son scripts en `scripts/`. Locales sin red ni
   BD (siempre ejecutables): `test-textos-bot`, `test-agotados-override`,
   `test-autor-panel`, `test-escritura-segura`, `test-sincronizacion`,
-  `test-log-seguro`, `test-guarda-woo`, `test-restaurar-woo`. Los que escriben exigen `npm run dev:test`; `test-pagos-mp` escribe
+  `test-log-seguro`, `test-guarda-woo`, `test-restaurar-woo`, `test-agotado-stock-real`. Los que escriben exigen `npm run dev:test`; `test-pagos-mp` escribe
   directo en la rama de pruebas (candado `pagos_mp`) y no necesita el servidor.
 - `npm run build` es la validación real antes de un push (es lo que corre Vercel).
